@@ -1382,9 +1382,13 @@ async function executeImportAssertion(
     walked: enumeration.files.map((file) => file.relativePath),
     targets: existingTargets,
     unresolved: unresolved.length,
+    unread: analysable.length > 0 ? unread.length : 0,
     missing,
   };
 
+  // A cycle rule claims nothing of a file outside its graph: Go, Rust and C#
+  // have no cycle between files to find (ADR-0011), so what it did not place
+  // is said and fails nothing, strict or not.
   if (cycles) return finishCycles(assertion, options, said, warnings, startedAt, read);
   if (assertion.layers) {
     return finishLayers(assertion, assertion.layers, options, said, warnings, startedAt, read);
@@ -1420,7 +1424,7 @@ async function executeImportAssertion(
   const actual = matches.length - excluded;
 
   const strictFailure =
-    read.missing !== null || (options.strictTargets && unresolved.length > 0);
+    read.missing !== null || (options.strictTargets && (unresolved.length > 0 || read.unread > 0));
   const ok = satisfies(actual, assertion.bounds) && !strictFailure && !staleFailure;
 
   return {
@@ -1433,7 +1437,7 @@ async function executeImportAssertion(
         excluded,
         stale: staleFailure ? stale : [],
         gaps: 0,
-      }) + strictSuffix(options, unresolved.length),
+      }) + strictSuffix(options, unresolved.length, read.unread),
     baselinedMatches: excluded,
     staleBaseline: stale,
     fileMatches: [...fileCounts].map(([file, count]) => ({ file, count })),
@@ -1452,6 +1456,13 @@ interface ImportRead {
   targets: string[];
   /** References the tokenizer could not resolve statically. */
   unresolved: number;
+  /**
+   * Files in scope that may hold an import no reader here reads, beside files
+   * that were read. Where none was read the rule failed as verifying nothing,
+   * or was allowed to be empty, which `allow-empty` says of exactly that, so
+   * the count is 0 there.
+   */
+  unread: number;
   /** Why a missing target fails the assertion, or null when it does not. */
   missing: string | null;
 }
@@ -1461,11 +1472,20 @@ type ImportBase = Omit<
   "ok" | "actual" | "message" | "matches" | "durationMs"
 >;
 
-/** What `--strict` adds to a message when references went unresolved. */
-function strictSuffix(options: { strictTargets: boolean }, unresolved: number): string {
-  return options.strictTargets && unresolved > 0
-    ? `; ${unresolved} reference${unresolved === 1 ? "" : "s"} could not be resolved`
-    : "";
+/**
+ * What `--strict` adds to a message when references went unresolved, or files
+ * in scope went unread: each is something the rule could not verify, which is
+ * what `--strict` fails (ADR-0005), and an unread file is mended by leaving it
+ * out of the scope.
+ */
+function strictSuffix(options: { strictTargets: boolean }, unresolved: number, unread = 0): string {
+  if (!options.strictTargets) return "";
+  const resolved = unresolved > 0 ? `; ${unresolved} reference${unresolved === 1 ? "" : "s"} could not be resolved` : "";
+  const read =
+    unread > 0
+      ? `; ${unread} file${unread === 1 ? " is" : "s are"} in a language whose imports spec-guard cannot read: leave ${unread === 1 ? "it" : "them"} out with exclude`
+      : "";
+  return resolved + read;
 }
 
 /**
@@ -1606,7 +1626,7 @@ function finishLayers(
     report.ambiguous.length === 0 &&
     !blindFailure &&
     !uncrossedFailure &&
-    !(options.strictTargets && read.unresolved > 0);
+    !(options.strictTargets && (read.unresolved > 0 || read.unread > 0));
 
   const message =
     read.missing ??
@@ -1626,7 +1646,7 @@ function finishLayers(
                 actual,
                 { excluded, stale: staleFailure ? stale : [], gaps: 0 },
                 VIOLATING_FILES,
-              ) + strictSuffix(options, read.unresolved));
+              ) + strictSuffix(options, read.unresolved, read.unread));
 
   return {
     ...base,

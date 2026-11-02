@@ -459,6 +459,94 @@ describe('@assert-import-absence', () => {
   });
 });
 
+describe('what --strict does with a file an import rule could not read', () => {
+  const spec = (rule: string): Record<string, string> => ({
+    'docs/adr.md': `${rule}\n`,
+    'src/a.ts': 'export const a = 1;\n',
+    'src/page.razor': '@using Shop.Db\n',
+  });
+
+  it('fails an import rule, says why, and passes it without --strict', async () => {
+    const root = await repo(spec('<!-- @assert-import-absence target="src" module="src/db" -->'));
+
+    const strict = await runSpecGuard({ patterns: ['docs/adr.md'], root, engine: 'javascript', strictTargets: true });
+    const lenient = await runSpecGuard({ patterns: ['docs/adr.md'], root, engine: 'javascript' });
+
+    expect(strict.ok).toBe(false);
+    expect(strict.results[0]?.message).toBe(
+      'expected no matches, found 0; 1 file is in a language whose imports spec-guard cannot read: leave it out with exclude',
+    );
+    expect(lenient.ok).toBe(true);
+    expect(lenient.results[0]?.warnings).toEqual(['analysed 1 of 2 files; 1 is in a language whose imports spec-guard cannot read (.razor)']);
+  });
+
+  it('counts each file, and says both where references went unresolved too', async () => {
+    const root = await repo({
+      ...spec('<!-- @assert-import-count target="src" module="src/db" max="5" -->'),
+      'src/styles.css': '@import "x.css";\n',
+      'src/loader.ts': 'const mod = await import(name);\n',
+    });
+
+    const report = await runSpecGuard({ patterns: ['docs/adr.md'], root, engine: 'javascript', strictTargets: true });
+
+    expect(report.ok).toBe(false);
+    expect(report.results[0]?.message).toMatch(
+      /; 1 reference could not be resolved; 2 files are in a language whose imports spec-guard cannot read: leave them out with exclude$/,
+    );
+  });
+
+  it('passes once the scope leaves it out, and fails nothing for a file that can hold no import', async () => {
+    const root = await repo({
+      ...spec('<!-- @assert-import-absence target="src" module="src/db" exclude="*.razor" -->'),
+      'src/m.json': '{}\n',
+    });
+    const data = await repo({
+      'docs/adr.md': '<!-- @assert-import-absence target="src" module="src/db" -->\n',
+      'src/a.ts': 'export const a = 1;\n',
+      'src/m.json': '{}\n',
+      'src/logo.png': `PNG${String.fromCharCode(0)}`,
+    });
+
+    expect((await runSpecGuard({ patterns: ['docs/adr.md'], root, engine: 'javascript', strictTargets: true })).ok).toBe(true);
+    expect((await runSpecGuard({ patterns: ['docs/adr.md'], root: data, engine: 'javascript', strictTargets: true })).ok).toBe(true);
+  });
+
+  it('fails a layer rule the same way', async () => {
+    const root = await repo({
+      'docs/adr.md': '<!-- @assert-layers target="src" order="src/db, src/ui" -->\n',
+      'src/ui/a.ts': "import { b } from '../db/b.js';\nexport const a = b;\n",
+      'src/db/b.ts': 'export const b = 1;\n',
+      'src/ui/page.razor': '@using Shop.Db\n',
+    });
+
+    const strict = await runSpecGuard({ patterns: ['docs/adr.md'], root, engine: 'javascript', strictTargets: true });
+
+    expect(strict.ok).toBe(false);
+    expect(strict.results[0]?.message).toContain('; 1 file is in a language whose imports spec-guard cannot read: leave it out with exclude');
+    expect((await runSpecGuard({ patterns: ['docs/adr.md'], root, engine: 'javascript' })).ok).toBe(true);
+  });
+
+  it('fails no cycle rule for a file outside its graph, which it claims nothing of', async () => {
+    const root = await repo({ ...spec('<!-- @assert-import-cycle target="src" -->'), 'src/s.py': 'import os\n' });
+
+    const report = await runSpecGuard({ patterns: ['docs/adr.md'], root, engine: 'javascript', strictTargets: true });
+
+    expect(report.ok).toBe(true);
+    expect(report.results[0]?.warnings).toEqual(['placed 1 of 3 files in the import graph; 2 are not JavaScript or TypeScript']);
+  });
+
+  it('fails no rule allowed to be empty where it read nothing', async () => {
+    const root = await repo({
+      'docs/adr.md': '<!-- @assert-import-absence target="config" module="src/db" allow-empty="true" -->\n',
+      'config/settings.yaml': 'a: 1\n',
+    });
+
+    const report = await runSpecGuard({ patterns: ['docs/adr.md'], root, engine: 'javascript', strictTargets: true });
+
+    expect(report.ok).toBe(true);
+  });
+});
+
 describe('@assert-import-count', () => {
   async function counted(spec: string): Promise<string> {
     return repo({

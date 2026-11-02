@@ -286,6 +286,31 @@ So neither count holds such a file, and no warning names it:
   name dependencies. They are what a `<ProjectReference>` is to a C# rule, a
   reference that is no import in any file, and a text rule holds them.
 
+*Amended again 2026-11-02.* **`--strict` fails a file in scope whose imports
+spec-guard cannot read.** This ADR has `--strict` promote the warnings above to
+failures, "anything spec-guard could not fully verify is a failure", and the
+README says the same, but the code failed only a reference it could not
+resolve: under `--strict` a rule over a Razor page that holds
+`@using Shop.Db` passed, exit 0, saying only that it had read 1 of 2 files
+(measured on 0.30.0). That is the false green `--strict` is for. Now:
+
+- **An import or layer rule fails** where a file in its scope may hold an
+  import no reader here reads, beside files that were read, and says how many
+  and how to mend it: leave them out with `exclude`, the one scope attribute
+  these rules take.
+- **A cycle rule fails nothing for a file outside its graph.** It claims
+  nothing of one: Go, Rust and C# have no cycle between files to find
+  ([ADR-0011](0011-layers-and-cycles.md)), and what it did not place it says,
+  as before.
+- **A rule that read nothing** fails as verifying nothing, or passes where
+  `allow-empty` says that is expected, as before: `--strict` adds nothing to
+  either.
+- It comes after the amendment above, so a file that can hold no import, a
+  JSON file or an image, fails nothing.
+
+An exit code that can change for a tree that passed is a minor release
+(spec-core's ADR-0009).
+
 ### How specifiers are matched
 
 Relative specifiers are resolved by **path arithmetic only** - no filesystem

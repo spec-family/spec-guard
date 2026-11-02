@@ -12,6 +12,20 @@ is deprecated before it goes, is spec-core's
 
 ## Unreleased
 
+### Changed
+
+- **`--strict` fails an import or layer rule whose scope holds a file in a
+  language whose imports spec-guard cannot read.** The README and ADR-0005
+  said `--strict` fails what spec-guard could not fully verify, and a rule
+  over a Razor page holding `@using Shop.Db` passed under it, with a
+  warning. It now fails, saying how many files and to leave them out with
+  `exclude`; a cycle rule still only says what it did not place
+  ([ADR-0005](https://github.com/spec-family/spec-guard/blob/main/docs/adr/0005-import-assertions.md),
+  amended 2026-11-02). Upgrading: a run with `--strict` or `"strict": true`
+  whose import or layer rules cover such files, YAML, Markdown, CSS, Razor
+  and the like, fails until each rule leaves them out, as with
+  `exclude="*.css *.md"`; the warning names their kinds.
+
 ### Fixed
 
 - **A file that can hold no import is no longer counted as one spec-guard
