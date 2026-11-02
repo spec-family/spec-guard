@@ -1555,6 +1555,17 @@ ran high where they were least measured: `runner.ts` and `text.ts` took 7m35s
 against 15.2 minutes, and `cli.ts` alone 8m18s against 15.1, so the next
 split starts from this run's logs rather than 398fe94's.
 
+### 0.31.0: what an import rule could not read, and no survivor more
+
+CI's full sweep of 93662af (run 41435347363) came out at **99.28% over
+14,641 mutants with 105 survivors and 1 without coverage**, 236 of them
+detected by timeout and none an error; the shards took from 8m36s to
+23m05s. Against main's sweep of 0.30.0's release commit d4c9e23 (run
+40869083357, the same figures as the section below) the release adds 61
+mutants, the files that can hold no import and what `--strict` fails of
+the ones that can (ADR-0005, amended 2026-11-02), and every one of them is
+killed: the survivors are the same, mutant for mutant, and none is gone.
+
 ### 0.30.0: the same survivors, under a new name
 
 CI's full sweep of d2987e2 (run 40317465661) came out at **99.27% over

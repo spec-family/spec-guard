@@ -10,7 +10,11 @@ what to do when upgrading; the family's policy, including how a flag or field
 is deprecated before it goes, is spec-core's
 [ADR-0009](https://github.com/spec-family/spec-core/blob/main/docs/adr/0009-versions-before-1-0.md).
 
-## Unreleased
+## 0.31.0
+
+An import rule no longer counts a file that can hold no import as one it
+could not read, and `--strict` fails an import or layer rule over a file it
+could not read, as the README and ADR-0005 said it did.
 
 ### Changed
 
