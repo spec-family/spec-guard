@@ -856,31 +856,32 @@ describe('files in a language whose imports cannot be read', () => {
     const root = await repo({
       'src/a.ts': "import './b.js';\n",
       'src/b.ts': 'export const b = 1;\n',
-      'src/notes.txt': 'not code\n',
+      'src/notes.yaml': 'not: code\n',
       'docs/a.md': '<!-- @assert-import-absence target="src" module="nothing/**" -->\n',
     });
 
     expect((await run(root)).results[0]?.warnings).toContain(
-      'analysed 2 of 3 files; 1 is in a language whose imports spec-guard cannot read (.txt)',
+      'analysed 2 of 3 files; 1 is in a language whose imports spec-guard cannot read (.yaml)',
     );
   });
 
   it('pluralises two', async () => {
     const root = await repo({
       'src/a.ts': "import './b.js';\n",
-      'src/notes.txt': 'not code\n',
-      'src/more.txt': 'also not code\n',
+      'src/notes.yaml': 'not: code\n',
+      'src/more.yaml': 'also: not code\n',
       'docs/a.md': '<!-- @assert-import-absence target="src" module="nothing/**" -->\n',
     });
 
     expect((await run(root)).results[0]?.warnings).toContain(
-      'analysed 1 of 3 files; 2 are in a language whose imports spec-guard cannot read (.txt)',
+      'analysed 1 of 3 files; 2 are in a language whose imports spec-guard cannot read (.yaml)',
     );
   });
 
   it('names each kind it could not read once, in order, and a file with no extension by its name', async () => {
     // A Razor page holds `@using` lines no import rule reads, and in a .NET
     // project it sits among project files and settings: a count alone hides it.
+    // The settings are JSON, which holds no import, and are in no count.
     const root = await repo({
       'src/Web/Program.cs': 'using Shop.Application;\n',
       'src/Web/Web.csproj': '<Project />\n',
@@ -892,7 +893,7 @@ describe('files in a language whose imports cannot be read', () => {
     });
 
     expect((await run(root)).results[0]?.warnings).toContain(
-      'analysed 1 of 6 files; 5 are in a language whose imports spec-guard cannot read (.csproj, .json, .razor, Dockerfile)',
+      'analysed 1 of 5 files; 4 are in a language whose imports spec-guard cannot read (.csproj, .razor, Dockerfile)',
     );
   });
 });

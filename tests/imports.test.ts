@@ -12,6 +12,7 @@ import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { analyzeSource, createImportIndex, resolveSpecifier, tokenize } from '../src/imports.js';
+import { nodeIo } from '../src/io.js';
 import { runSpecGuard } from '../src/runner.js';
 import { makeTempRepo, removeTempRepo } from './helpers.js';
 
@@ -275,6 +276,28 @@ describe('the import index', () => {
     expect(result.references).toEqual([]);
     expect(result.notes[0]?.kind).toBe('unreadable');
   });
+
+  it('does not take a file it cannot read for one that holds no import', async () => {
+    const index = createImportIndex();
+
+    expect(await index.holdsNoImport(path.join('does', 'not', 'exist.razor'), 'does/not/exist.razor')).toBe(false);
+  });
+
+  it('reads a file once to tell whether it is binary, whichever rules ask', async () => {
+    const root = await repo({ 'src/logo.png': `PNG${String.fromCharCode(0)}` });
+    const absolute = path.join(root, 'src/logo.png');
+    const reads: string[] = [];
+    const index = createImportIndex({ ...nodeIo, readFile: (file) => (reads.push(file), nodeIo.readFile(file)) });
+
+    expect(await Promise.all([index.holdsNoImport(absolute, 'src/logo.png'), index.holdsNoImport(absolute, 'src/logo.png')])).toEqual([true, true]);
+    expect(reads).toEqual([absolute]);
+  });
+
+  it('reads no bytes of a file its extension answers for', async () => {
+    const index = createImportIndex({ ...nodeIo, readFile: () => Promise.reject(new Error('read')) });
+
+    expect(await index.holdsNoImport(path.join('src', 'm.JSON'), 'src/m.JSON')).toBe(true);
+  });
 });
 
 describe('@assert-import-absence', () => {
@@ -367,16 +390,72 @@ describe('@assert-import-absence', () => {
       'docs/adr.md': '<!-- @assert-import-absence target="src" module="src/db" -->\n',
       'src/a.ts': 'export const a = 1;\n',
       'src/script.py': 'import os\n',
-      'src/notes.txt': 'text\n',
+      'src/page.razor': '@using Shop.Db\n',
     });
 
     const report = await runSpecGuard({ patterns: ['docs/adr.md'], root, engine: 'javascript' });
 
-    // The Python file is analysed now; the plain text file is what remains,
-    // and it is still counted rather than quietly dropped.
+    // The Python file is analysed now; the Razor page is what remains, and it
+    // is still counted rather than quietly dropped.
     expect(report.results[0]?.warnings.join('\n')).toContain(
-      'analysed 2 of 3 files; 1 is in a language whose imports spec-guard cannot read (.txt)',
+      'analysed 2 of 3 files; 1 is in a language whose imports spec-guard cannot read (.razor)',
     );
+  });
+
+  it.each(['m.json', 'm.jsonc', 'm.json5', 'm.jsonl', 'm.ndjson', 't.csv', 't.tsv', 'n.txt', 'i.svg', 'M.JSON'])('says nothing of %s, which can hold no import', async (name) => {
+    const root = await repo({
+      'docs/adr.md': '<!-- @assert-import-absence target="src" module="src/db" -->\n',
+      'src/a.ts': 'export const a = 1;\n',
+      [`src/${name}`]: '{}\n',
+    });
+
+    const report = await runSpecGuard({ patterns: ['docs/adr.md'], root, engine: 'javascript' });
+
+    expect(report.results[0]?.warnings).toEqual([]);
+  });
+
+  it('says nothing of a binary file, whatever its name', async () => {
+    const root = await repo({
+      'docs/adr.md': '<!-- @assert-import-absence target="src" module="src/db" -->\n',
+      'src/a.ts': 'export const a = 1;\n',
+      'src/logo.png': `PNG${String.fromCharCode(0)}`,
+      'src/font': `wOF2${String.fromCharCode(0)}`,
+    });
+
+    const report = await runSpecGuard({ patterns: ['docs/adr.md'], root, engine: 'javascript' });
+
+    expect(report.results[0]?.warnings).toEqual([]);
+  });
+
+  it('leaves what can hold no import out of the count of what it could not read', async () => {
+    const root = await repo({
+      'docs/adr.md': '<!-- @assert-import-absence target="src" module="src/db" -->\n',
+      'src/a.ts': 'export const a = 1;\n',
+      'src/m.json': '{}\n',
+      'src/page.razor': '@using Shop.Db\n',
+      'src/styles.yaml': 'a: 1\n',
+    });
+
+    const report = await runSpecGuard({ patterns: ['docs/adr.md'], root, engine: 'javascript' });
+
+    expect(report.results[0]?.warnings).toEqual(['analysed 1 of 3 files; 2 are in a language whose imports spec-guard cannot read (.razor, .yaml)']);
+  });
+
+  it('counts a cycle rule the same way, and still names a language it does not place', async () => {
+    const quiet = await repo({
+      'docs/adr.md': '<!-- @assert-import-cycle target="src" -->\n',
+      'src/a.ts': 'export const a = 1;\n',
+      'src/m.json': '{}\n',
+    });
+    const mixed = await repo({
+      'docs/adr.md': '<!-- @assert-import-cycle target="src" -->\n',
+      'src/a.ts': 'export const a = 1;\n',
+      'src/m.json': '{}\n',
+      'src/s.py': 'import os\n',
+    });
+
+    expect((await runSpecGuard({ patterns: ['docs/adr.md'], root: quiet, engine: 'javascript' })).results[0]?.warnings).toEqual([]);
+    expect((await runSpecGuard({ patterns: ['docs/adr.md'], root: mixed, engine: 'javascript' })).results[0]?.warnings).toEqual(['placed 1 of 2 files in the import graph; 1 is not JavaScript or TypeScript']);
   });
 });
 

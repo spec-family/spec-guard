@@ -21,6 +21,7 @@ import {
   ANY_FILE_PROBE,
   ROOT_TARGETS,
   type CachedEngine,
+  type Enumeration,
   type Engine,
   type EnginePreference,
   type SearchRequest,
@@ -1335,20 +1336,23 @@ async function executeImportAssertion(
     };
   }
 
-  const skipped = enumeration.files.length - analysable.length;
-  if (skipped > 0) {
+  // A file that can hold no import is neither read nor left unread, so it is
+  // in no count here: a directory of translations beside the code says nothing
+  // about the code (ADR-0005). One by one, as the analysis below reads them.
+  const inAnalysis = new Set(analysable);
+  const unread: Enumeration["files"] = [];
+  for (const file of enumeration.files) {
+    if (!inAnalysis.has(file) && !(await options.imports.holdsNoImport(file.absolutePath, file.relativePath))) unread.push(file);
+  }
+  if (unread.length > 0) {
     // Which kinds, because "2 files" in a .NET project is a project file and a
     // Razor page, and only one of them can hold an `@using` nothing here reads.
-    const inAnalysis = new Set(analysable);
-    const kinds = new Set(
-      enumeration.files.flatMap((file) =>
-        inAnalysis.has(file) ? [] : [path.posix.extname(file.relativePath) || path.posix.basename(file.relativePath)],
-      ),
-    );
+    const kinds = new Set(unread.map((file) => path.posix.extname(file.relativePath) || path.posix.basename(file.relativePath)));
+    const inScope = analysable.length + unread.length;
     warnings.push(
       cycles
-        ? `placed ${analysable.length} of ${enumeration.files.length} files in the import graph; ${skipped} ${skipped === 1 ? "is" : "are"} not JavaScript or TypeScript`
-        : `analysed ${analysable.length} of ${enumeration.files.length} files; ${skipped} ${skipped === 1 ? "is" : "are"} in a language whose imports spec-guard cannot read (${[...kinds].sort().join(", ")})`,
+        ? `placed ${analysable.length} of ${inScope} files in the import graph; ${unread.length} ${unread.length === 1 ? "is" : "are"} not JavaScript or TypeScript`
+        : `analysed ${analysable.length} of ${inScope} files; ${unread.length} ${unread.length === 1 ? "is" : "are"} in a language whose imports spec-guard cannot read (${[...kinds].sort().join(", ")})`,
     );
   }
 

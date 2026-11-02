@@ -10,6 +10,20 @@ what to do when upgrading; the family's policy, including how a flag or field
 is deprecated before it goes, is spec-core's
 [ADR-0009](https://github.com/spec-family/spec-core/blob/main/docs/adr/0009-versions-before-1-0.md).
 
+## Unreleased
+
+### Fixed
+
+- **A file that can hold no import is no longer counted as one spec-guard
+  could not read.** An import rule over a tree with `zh-TW.json` in it said
+  `analysed 16 of 17 files; 1 is in a language whose imports spec-guard
+  cannot read (.json)`, and a cycle rule the same in its own words, of a file
+  no reader could find an import in. JSON in its five spellings, `.csv`,
+  `.tsv`, `.txt`, `.svg` and anything binary are now in neither count, so an
+  `exclude="*.json"` that was there for this can go. A directory of nothing
+  else still fails as verifying nothing
+  ([ADR-0005](https://github.com/spec-family/spec-guard/blob/main/docs/adr/0005-import-assertions.md)).
+
 ## 0.30.0
 
 The first release as `@spec-family/spec-guard`, from
