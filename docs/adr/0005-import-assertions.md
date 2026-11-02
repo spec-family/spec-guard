@@ -261,6 +261,56 @@ reports how many files were analysed out of how many were in scope - so a rule
 pointed at a Python tree says "analysed 0 of 240 files" rather than "0 imports,
 passed".
 
+*Amended 2026-11-02.* **A file that can hold no import is not skipped.** A rule
+over `src` in a project with its translations in `src/messages/zh-TW.json` read
+"analysed 16 of 17 files; 1 is in a language whose imports spec-guard cannot
+read (.json)", and each rule over that tree said it again. Measured on 0.30.0,
+one rule over one tree of each kind: `.css`, `.gif`, `.html`, `.md`, `.png`,
+`.svg`, `.vue`, `.woff2`, `.yaml` and a file named `LICENSE` were all counted
+so. A skip is what a reader would have seen and spec-guard did not
+([ADR-0007](0007-search-scope.md)), and no reader finds an import in a font.
+So neither count holds such a file, and no warning names it:
+
+- **By its extension, text that names no module in any dialect**: JSON in its
+  five spellings, `.csv`, `.tsv`, `.txt` and `.svg`, read without its bytes.
+  YAML, XML, Markdown and CSS stay reported: `!include`, XInclude, an MDX
+  import and `@import` are forms that take in another file.
+- **By its bytes, whatever is binary**: a NUL anywhere, which is what binary
+  means to both engines, so no list of image and font extensions has to keep
+  up. Those bytes are read once a run, through the one door every read goes
+  through, and a file that cannot be read stays reported: it is not known to
+  hold none.
+- **A directory of nothing else still fails**, as a directory of YAML does: a
+  dependency claim about it is a claim about nothing, and the message says so.
+- **What goes unsaid.** `package.json`, `tsconfig.json` and an import map do
+  name dependencies. They are what a `<ProjectReference>` is to a C# rule, a
+  reference that is no import in any file, and a text rule holds them.
+
+*Amended again 2026-11-02.* **`--strict` fails a file in scope whose imports
+spec-guard cannot read.** This ADR has `--strict` promote the warnings above to
+failures, "anything spec-guard could not fully verify is a failure", and the
+README says the same, but the code failed only a reference it could not
+resolve: under `--strict` a rule over a Razor page that holds
+`@using Shop.Db` passed, exit 0, saying only that it had read 1 of 2 files
+(measured on 0.30.0). That is the false green `--strict` is for. Now:
+
+- **An import or layer rule fails** where a file in its scope may hold an
+  import no reader here reads, beside files that were read, and says how many
+  and how to mend it: leave them out with `exclude`, the one scope attribute
+  these rules take.
+- **A cycle rule fails nothing for a file outside its graph.** It claims
+  nothing of one: Go, Rust and C# have no cycle between files to find
+  ([ADR-0011](0011-layers-and-cycles.md)), and what it did not place it says,
+  as before.
+- **A rule that read nothing** fails as verifying nothing, or passes where
+  `allow-empty` says that is expected, as before: `--strict` adds nothing to
+  either.
+- It comes after the amendment above, so a file that can hold no import, a
+  JSON file or an image, fails nothing.
+
+An exit code that can change for a tree that passed is a minor release
+(spec-core's ADR-0009).
+
 ### How specifiers are matched
 
 Relative specifiers are resolved by **path arithmetic only** - no filesystem

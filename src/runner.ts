@@ -21,6 +21,7 @@ import {
   ANY_FILE_PROBE,
   ROOT_TARGETS,
   type CachedEngine,
+  type Enumeration,
   type Engine,
   type EnginePreference,
   type SearchRequest,
@@ -1335,20 +1336,23 @@ async function executeImportAssertion(
     };
   }
 
-  const skipped = enumeration.files.length - analysable.length;
-  if (skipped > 0) {
+  // A file that can hold no import is neither read nor left unread, so it is
+  // in no count here: a directory of translations beside the code says nothing
+  // about the code (ADR-0005). One by one, as the analysis below reads them.
+  const inAnalysis = new Set(analysable);
+  const unread: Enumeration["files"] = [];
+  for (const file of enumeration.files) {
+    if (!inAnalysis.has(file) && !(await options.imports.holdsNoImport(file.absolutePath, file.relativePath))) unread.push(file);
+  }
+  if (unread.length > 0) {
     // Which kinds, because "2 files" in a .NET project is a project file and a
     // Razor page, and only one of them can hold an `@using` nothing here reads.
-    const inAnalysis = new Set(analysable);
-    const kinds = new Set(
-      enumeration.files.flatMap((file) =>
-        inAnalysis.has(file) ? [] : [path.posix.extname(file.relativePath) || path.posix.basename(file.relativePath)],
-      ),
-    );
+    const kinds = new Set(unread.map((file) => path.posix.extname(file.relativePath) || path.posix.basename(file.relativePath)));
+    const inScope = analysable.length + unread.length;
     warnings.push(
       cycles
-        ? `placed ${analysable.length} of ${enumeration.files.length} files in the import graph; ${skipped} ${skipped === 1 ? "is" : "are"} not JavaScript or TypeScript`
-        : `analysed ${analysable.length} of ${enumeration.files.length} files; ${skipped} ${skipped === 1 ? "is" : "are"} in a language whose imports spec-guard cannot read (${[...kinds].sort().join(", ")})`,
+        ? `placed ${analysable.length} of ${inScope} files in the import graph; ${unread.length} ${unread.length === 1 ? "is" : "are"} not JavaScript or TypeScript`
+        : `analysed ${analysable.length} of ${inScope} files; ${unread.length} ${unread.length === 1 ? "is" : "are"} in a language whose imports spec-guard cannot read (${[...kinds].sort().join(", ")})`,
     );
   }
 
@@ -1378,9 +1382,13 @@ async function executeImportAssertion(
     walked: enumeration.files.map((file) => file.relativePath),
     targets: existingTargets,
     unresolved: unresolved.length,
+    unread: analysable.length > 0 ? unread.length : 0,
     missing,
   };
 
+  // A cycle rule claims nothing of a file outside its graph: Go, Rust and C#
+  // have no cycle between files to find (ADR-0011), so what it did not place
+  // is said and fails nothing, strict or not.
   if (cycles) return finishCycles(assertion, options, said, warnings, startedAt, read);
   if (assertion.layers) {
     return finishLayers(assertion, assertion.layers, options, said, warnings, startedAt, read);
@@ -1416,7 +1424,7 @@ async function executeImportAssertion(
   const actual = matches.length - excluded;
 
   const strictFailure =
-    read.missing !== null || (options.strictTargets && unresolved.length > 0);
+    read.missing !== null || (options.strictTargets && (unresolved.length > 0 || read.unread > 0));
   const ok = satisfies(actual, assertion.bounds) && !strictFailure && !staleFailure;
 
   return {
@@ -1429,7 +1437,7 @@ async function executeImportAssertion(
         excluded,
         stale: staleFailure ? stale : [],
         gaps: 0,
-      }) + strictSuffix(options, unresolved.length),
+      }) + strictSuffix(options, unresolved.length, read.unread),
     baselinedMatches: excluded,
     staleBaseline: stale,
     fileMatches: [...fileCounts].map(([file, count]) => ({ file, count })),
@@ -1448,6 +1456,13 @@ interface ImportRead {
   targets: string[];
   /** References the tokenizer could not resolve statically. */
   unresolved: number;
+  /**
+   * Files in scope that may hold an import no reader here reads, beside files
+   * that were read. Where none was read the rule failed as verifying nothing,
+   * or was allowed to be empty, which `allow-empty` says of exactly that, so
+   * the count is 0 there.
+   */
+  unread: number;
   /** Why a missing target fails the assertion, or null when it does not. */
   missing: string | null;
 }
@@ -1457,11 +1472,20 @@ type ImportBase = Omit<
   "ok" | "actual" | "message" | "matches" | "durationMs"
 >;
 
-/** What `--strict` adds to a message when references went unresolved. */
-function strictSuffix(options: { strictTargets: boolean }, unresolved: number): string {
-  return options.strictTargets && unresolved > 0
-    ? `; ${unresolved} reference${unresolved === 1 ? "" : "s"} could not be resolved`
-    : "";
+/**
+ * What `--strict` adds to a message when references went unresolved, or files
+ * in scope went unread: each is something the rule could not verify, which is
+ * what `--strict` fails (ADR-0005), and an unread file is mended by leaving it
+ * out of the scope.
+ */
+function strictSuffix(options: { strictTargets: boolean }, unresolved: number, unread = 0): string {
+  if (!options.strictTargets) return "";
+  const resolved = unresolved > 0 ? `; ${unresolved} reference${unresolved === 1 ? "" : "s"} could not be resolved` : "";
+  const read =
+    unread > 0
+      ? `; ${unread} file${unread === 1 ? " is" : "s are"} in a language whose imports spec-guard cannot read: leave ${unread === 1 ? "it" : "them"} out with exclude`
+      : "";
+  return resolved + read;
 }
 
 /**
@@ -1602,7 +1626,7 @@ function finishLayers(
     report.ambiguous.length === 0 &&
     !blindFailure &&
     !uncrossedFailure &&
-    !(options.strictTargets && read.unresolved > 0);
+    !(options.strictTargets && (read.unresolved > 0 || read.unread > 0));
 
   const message =
     read.missing ??
@@ -1622,7 +1646,7 @@ function finishLayers(
                 actual,
                 { excluded, stale: staleFailure ? stale : [], gaps: 0 },
                 VIOLATING_FILES,
-              ) + strictSuffix(options, read.unresolved));
+              ) + strictSuffix(options, read.unresolved, read.unread));
 
   return {
     ...base,

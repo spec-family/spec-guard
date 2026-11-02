@@ -126,6 +126,20 @@ describe('an import assertion whose scope holds nothing it can read', () => {
     );
   });
 
+  it('fails on a directory of files that can hold no import, which a rule over it verifies nothing of', async () => {
+    const root = await repo({
+      'docs/a.md': '<!-- @assert-import-absence target="config" module="src/db" -->\n',
+      'config/settings.json': '{}\n',
+    });
+
+    const report = await run(root, ['docs/a.md']);
+
+    expect(report.ok).toBe(false);
+    expect(report.results[0]?.message).toContain(
+      'none of the 1 files here are in a language whose imports spec-guard can read',
+    );
+  });
+
   it('fails when the target is empty of files entirely', async () => {
     const root = await repo({
       'docs/a.md': '<!-- @assert-import-absence target="svc" module="app/db/**" exclude="svc/**" -->\n',

@@ -301,7 +301,16 @@ stops it being mistaken for a complete answer.
   counted and reported**, so a rule pointed at the wrong tree says "analysed 2
   of 3 files; 1 is in a language whose imports spec-guard cannot read (.razor)"
   rather than quietly passing - and if *none* of them can be read, the
-  assertion fails rather than passing on an empty analysis.
+  assertion fails rather than passing on an empty analysis. Under
+  `--strict` such a file fails an import or layer rule, as a reference it
+  could not resolve does: leave it out with `exclude`. A cycle rule claims
+  nothing of a file outside its graph, and says it without failing.
+- **A file that can hold no import is in neither count**: JSON in any of its
+  spellings (`.json`, `.jsonc`, `.json5`, `.jsonl`, `.ndjson`), `.csv`, `.tsv`,
+  `.txt`, `.svg`, and anything binary, a NUL in its bytes, as an image or a
+  font has. YAML, XML, Markdown and CSS are reported, since each has a form
+  that takes in another file. A dependency a `package.json` names is a text
+  rule's, as a `<ProjectReference>` is.
 
 [ADR-0005](https://github.com/spec-family/spec-guard/blob/main/docs/adr/0005-import-assertions.md) has the measurements and the
 reasoning behind each boundary.

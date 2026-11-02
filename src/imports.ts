@@ -31,6 +31,7 @@ import { toPosix } from './glob.js';
 import { nodeIo, type Io } from './io.js';
 import { NO_MEMO, type Memo } from './memo.js';
 import { analyzePolyglot, enclosingModules, languageFor, normalizeModule, POLYGLOT_EXTENSIONS } from './polyglot.js';
+import { isBinary } from './scope.js';
 
 /** Extensions the JavaScript tokenizer below reads. */
 export const JS_EXTENSIONS: ReadonlySet<string> = new Set([
@@ -52,6 +53,16 @@ export const JS_EXTENSIONS: ReadonlySet<string> = new Set([
  * we could read imports the database".
  */
 export const ANALYSABLE_EXTENSIONS: ReadonlySet<string> = new Set([...JS_EXTENSIONS, ...POLYGLOT_EXTENSIONS.keys()]);
+
+/**
+ * Text that names no module in any dialect of it: JSON and the tables and
+ * plain text beside it, and an SVG, which is an image. A file like this is not
+ * one spec-guard failed to read, since no reader of its imports could find any,
+ * so it is no skip to report. YAML, XML, Markdown and CSS are not here: each
+ * has a form that takes in another file, `!include`, XInclude, an MDX import
+ * and `@import`, and a rule over one has not seen those.
+ */
+const DATA_EXTENSIONS: ReadonlySet<string> = new Set(['.json', '.jsonc', '.json5', '.jsonl', '.ndjson', '.csv', '.tsv', '.txt', '.svg']);
 
 export type ReferenceKind = 'import' | 'export' | 'require' | 'dynamic-import' | 'use' | 'using';
 
@@ -569,6 +580,13 @@ export function moduleNames(specifier: string, importingFile: string, namespace?
 
 export interface ImportIndex {
   analyze(absolutePath: string, relativePath: string): Promise<FileImports>;
+  /**
+   * Whether a file cannot hold an import at all: data by its extension, or
+   * binary by its bytes, which is what binary means to both engines
+   * (ADR-0007), so an image or a font needs no list. A file that cannot be
+   * read is not known to hold none, so it answers false.
+   */
+  holdsNoImport(absolutePath: string, relativePath: string): Promise<boolean>;
   /** Files analysed so far, for reporting. */
   readonly size: number;
 }
@@ -585,10 +603,22 @@ export interface ImportIndex {
  */
 export function createImportIndex(io: Io = nodeIo, memo: Memo = NO_MEMO): ImportIndex {
   const cache = new Map<string, Promise<FileImports>>();
+  const empty = new Map<string, Promise<boolean>>();
 
   return {
     get size(): number {
       return cache.size;
+    },
+    holdsNoImport(absolutePath: string, relativePath: string): Promise<boolean> {
+      if (DATA_EXTENSIONS.has(path.posix.extname(relativePath).toLowerCase())) return Promise.resolve(true);
+      // Several rules walk one tree, and the assets in it are the largest
+      // files they meet.
+      let pending = empty.get(absolutePath);
+      if (!pending) {
+        pending = io.readFile(absolutePath).then(isBinary, () => false);
+        empty.set(absolutePath, pending);
+      }
+      return pending;
     },
     analyze(absolutePath: string, relativePath: string): Promise<FileImports> {
       let pending = cache.get(absolutePath);
