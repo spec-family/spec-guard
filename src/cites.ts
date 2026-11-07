@@ -18,7 +18,7 @@
 
 import path from 'node:path';
 
-import { commentTable, lexRanges, syntaxFor, type CommentTable } from './comments.js';
+import { commentTable, lexRanges, shebangSyntax, syntaxFor, type CommentSyntax, type CommentTable } from './comments.js';
 import { comparePaths, MAX_CONCURRENT_READS, withinSizeLimit } from './engine.js';
 import { createExcludeMatcher, createPathMatcher, globBase, isGlob, pathPatternError, toPosix, walkPaths } from './glob.js';
 import { nodeIo, type Io } from './io.js';
@@ -546,7 +546,9 @@ export async function findCitations(options: CitesOptions): Promise<CitesReport>
   const templates = families.map(({ template }) => template);
   const scope = createScope(defaultSkips);
   const unclassified = new Map<string, number>();
-  const candidates: Array<{ file: string; absolute: string }> = [];
+  // `sniff`: a file with no extension the path says nothing of, read for its
+  // `#!` line before it is counted as one whose comments cannot be told.
+  const candidates: Array<{ file: string; absolute: string; sniff: boolean }> = [];
   const starts = options.paths?.map((entry) => (entry === '.' ? '' : entry)) ?? [''];
   const seen = new Set<string>();
   const workTrees: string[] = [];
@@ -576,14 +578,17 @@ export async function findCitations(options: CitesOptions): Promise<CitesReport>
         const extension = path.posix.extname(relativePath).toLowerCase();
         if (MARKDOWN.has(extension) || specFiles.has(absolutePath) || cited.has(relativePath) || excluded(relativePath)) continue;
         const syntax = syntaxFor(relativePath, comments);
+        if (syntax === null && extension === '') {
+          candidates.push({ file: relativePath, absolute: absolutePath, sniff: true });
+          continue;
+        }
         if (syntax === null) {
-          const name = extension === '' ? '(none)' : extension;
-          unclassified.set(name, (unclassified.get(name) ?? 0) + 1);
+          unclassified.set(extension, (unclassified.get(extension) ?? 0) + 1);
           continue;
         }
         // A format known to have no comments has no citations to read.
         if (syntax.line.length === 0 && syntax.block.length === 0) continue;
-        candidates.push({ file: relativePath, absolute: absolutePath });
+        candidates.push({ file: relativePath, absolute: absolutePath, sniff: false });
       }
     }
   }
@@ -596,7 +601,18 @@ export async function findCitations(options: CitesOptions): Promise<CitesReport>
   let citations = 0;
   let others = 0;
 
-  const scan = (file: string, bytes: Buffer | Error): void => {
+  const scan = (file: string, bytes: Buffer | Error, sniff: boolean): void => {
+    // A file with no extension is read for a `#!` line and for nothing else:
+    // one that has none, or cannot be read as text, is counted as one whose
+    // comments cannot be told, as it was before it was read, and is no gap.
+    let syntax: CommentSyntax | null = sniff ? null : syntaxFor(file, comments);
+    if (sniff) {
+      syntax = bytes instanceof Error || !withinSizeLimit(bytes.length) || isBinary(bytes) ? null : shebangSyntax(bytes.toString('utf8'));
+      if (syntax === null) {
+        unclassified.set('(none)', (unclassified.get('(none)') ?? 0) + 1);
+        return;
+      }
+    }
     if (bytes instanceof Error) {
       gaps.push({ file, reason: 'unreadable', detail: `could not be read: ${bytes.message}` });
       return;
@@ -611,7 +627,7 @@ export async function findCitations(options: CitesOptions): Promise<CitesReport>
     }
     read += 1;
     const text = bytes.toString('utf8');
-    const lexed = lexRanges(text, syntaxFor(file, comments) as NonNullable<ReturnType<typeof syntaxFor>>);
+    const lexed = lexRanges(text, syntax!);
     if (lexed.unterminated) {
       gaps.push({ file, reason: 'lost-scan', detail: 'a string or comment was never closed, so what follows it may be misread' });
     }
@@ -637,7 +653,7 @@ export async function findCitations(options: CitesOptions): Promise<CitesReport>
   for (const pending = [...candidates]; pending.length > 0; ) {
     const batch = pending.splice(0, MAX_CONCURRENT_READS);
     const sources = await readAll(io, batch.map(({ absolute }) => absolute));
-    batch.forEach(({ file }, index) => scan(file, sources[index] as Buffer | Error));
+    batch.forEach(({ file, sniff }, index) => scan(file, sources[index] as Buffer | Error, sniff));
   }
 
   const ghosts = findings.filter((finding) => finding.rule === 'ghost-citation').length;

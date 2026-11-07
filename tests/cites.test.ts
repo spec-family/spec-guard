@@ -722,7 +722,7 @@ describe('a scan', () => {
         'node_modules/pkg/index.js': '// ADR-0099\n',
         'data.json': '{ "a": "ADR-0099" }',
         'logo.png': 'ADR-0099',
-        Makefile: '# ADR-0099',
+        NOTICE: '# ADR-0099',
         'src/a.ts': '// ADR-0001\n',
       },
       {
@@ -744,6 +744,21 @@ describe('a scan', () => {
     // node_modules is read when the default skips are off.
     const everything = await cites({ 'node_modules/pkg/index.js': '// ADR-0099\n' }, { defaultSkips: false });
     expect(found(everything)).toEqual(['node_modules/pkg/index.js:1:4 ghost-citation ADR-0099']);
+  });
+
+  it('reads a file with no extension by its name or its #! line, and counts the rest unclassified, as gaps never', async () => {
+    const report = await cites({
+      Makefile: 'all: ; # ADR-0098\n',
+      'bin/deploy': '#!/usr/bin/env bash\n# ADR-0097\n',
+      NOTICE: 'ADR-0096\n',
+      'bin/tool': Buffer.from([0x7f, 0x45, 0x4c, 0x46, 0x00, 0x41]),
+      'bin/empty': '',
+      'src/a.ts': '// ADR-0001\n',
+    });
+    expect(found(report)).toEqual(['Makefile:1:10 ghost-citation ADR-0098', 'bin/deploy:2:3 ghost-citation ADR-0097']);
+    expect(report.unclassified).toEqual([{ extension: '(none)', files: 3 }]);
+    expect(report.gaps).toEqual([]);
+    expect(report.summary).toMatchObject({ files: 3, unclassified: 3 });
   });
 
   it("reads the comments of a file the project names a syntax for, and refuses a table that cannot be read", async () => {

@@ -12,6 +12,19 @@ is deprecated before it goes, is spec-core's
 
 ## Unreleased
 
+### Changed
+
+- **The built-in table knows 34 more extensions and 11 file names, and a
+  script by its `#!` line.** Groovy, Gradle, Protocol Buffers, Solidity,
+  shaders, CUDA, JSON5, GraphQL, CMake, Bazel, Perl modules, Ruby's build
+  files, Makefiles, Dockerfiles and more XML are read by the profile their
+  comments are written in; a file with no extension is read by the program
+  its `#!` line runs. Verilog, VHDL, Elixir, Julia, Nix, CSS, fish and
+  `.properties` are left out, since a profile would read their code as a
+  comment. Upgrading: a match in a comment of such a file no longer counts,
+  as in any file the table knows, so a rule with a `min` that a comment
+  there satisfied now fails; `comments="include"` counts it again.
+
 ### Added
 
 - **`comments` in the configuration names a file's comment syntax.** A file

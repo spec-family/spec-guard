@@ -113,7 +113,7 @@ describe('which language an extension is', () => {
     // Unclassified, not "no comments": guessing either way is how a match in a
     // language nobody taught it gets silently reclassified.
     expect(syntaxFor('a.wat')).toBeNull();
-    expect(syntaxFor('Makefile')).toBeNull();
+    expect(syntaxFor('NOTICE')).toBeNull();
   });
 });
 
