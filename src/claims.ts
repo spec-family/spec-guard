@@ -18,6 +18,7 @@ import path from 'node:path';
 
 import { nodeIo, readText, type Io } from './io.js';
 import { proveSpecGuard } from './prove.js';
+import { elapsed } from './runner.js';
 import { readSpecs, specPath } from './specs.js';
 import type { ConfigUse, Directive, ProveResult } from './types.js';
 import { claimsIn, type ListItem, type MarkdownScan } from './parser.js';
@@ -130,44 +131,47 @@ export interface ClaimsOptions {
   readonly exclude?: readonly string[];
   readonly defaultSkips?: boolean;
   readonly comments?: Readonly<Record<string, string>>;
-  readonly allowMissingTargets?: boolean;
-  readonly allowEmptyScope?: boolean;
   readonly io?: Io;
 }
 
 /** A configuration no answer can be trusted under: the report is not written, and the command exits 2. */
 export class ClaimsError extends Error {}
 
-/** The items nested under `item`, which hold their own words. */
-function nestedUnder(items: readonly ListItem[], item: ListItem): ListItem[] {
-  return items.filter((other) => other.start > item.start && other.end <= item.end);
-}
-
-/** The item's own text, less what is nested under it, read from the structure mask. */
+/**
+ * The item's own text, less the items nested under it, read from the
+ * structure mask. Its children, one level down and inside it, lie apart and in
+ * order, and each holds what is nested deeper. An item opens at its line's
+ * content and ends before a terminator, where no other opens: `<` for the
+ * first `<=` below and `>` for the `>=` answer alike, as does text begun with
+ * anything, since a criterion is looked for in it and none is written so.
+ */
 function ownText(scan: MarkdownScan, item: ListItem): string {
   let text = '';
   let at = item.textStart;
-  for (const nested of nestedUnder(scan.listItems, item)) {
-    if (nested.start < at) continue;
-    text += scan.masks.structure.slice(at, nested.start);
-    at = nested.end;
+  for (const child of scan.listItems) {
+    if (child.depth !== item.depth + 1 || child.start <= item.start || child.start >= item.end) continue;
+    text += scan.masks.structure.slice(at, child.start);
+    at = child.end;
   }
   return text + scan.masks.structure.slice(at, item.end);
 }
 
-/** Whether a directive's symbol names a test and its bounds need one to be there. */
+/**
+ * Whether a directive counts a test: a symbol that starts as a test's name, and
+ * a `min` or `expected` of at least 1. Only a count of a symbol takes both, so
+ * no kind is asked.
+ */
 function namesTest(directive: Directive, prefixes: readonly string[]): boolean {
-  if (directive.kind !== 'assert-count') return false;
-  const symbol = directive.attributes['symbol'] ?? '';
+  const symbol = directive.attributes['symbol'];
   const least = Math.max(Number(directive.attributes['min'] ?? 0), Number(directive.attributes['expected'] ?? 0));
-  return least >= 1 && prefixes.some((prefix) => symbol.startsWith(prefix));
+  return symbol !== undefined && least >= 1 && prefixes.some((prefix) => symbol.startsWith(prefix));
 }
 
-/** What the report says of a directive that names a test and is no evidence, by what `prove` found of it. */
-function whyNot(proof: ProveResult | undefined): string {
+/** What the report says of a directive that counts a test and is no evidence, by what `prove` found of it. */
+export function whyNot(proof: ProveResult | undefined): string {
   if (proof === undefined) return 'its document is not in force, so the rule is not run';
   if (proof.outcome === 'survived') return 'prove made a change that should fail it and it still passed';
-  return `prove could not show it failing: ${proof.unprovable ?? 'no violation could be made'}`;
+  return `prove could not show it failing: ${proof.unprovable!}`;
 }
 
 /**
@@ -181,9 +185,9 @@ export async function findClaimsReport(options: ClaimsOptions): Promise<ClaimsRe
   const root = path.resolve(options.root);
   const { config } = options;
   const vocabulary = Object.keys(config.labels);
-  const prefixes = config.testPrefixes ?? [];
+  const where = (location: { readonly relativeFile: string; readonly line: number; readonly column: number }): string =>
+    `${location.relativeFile}:${location.line}:${location.column}`;
   const set = await readSpecs(config.files, root, io);
-  const unmatched = set.unmatched ?? [];
   if (set.files.length === 0) {
     throw new ClaimsError(`"claims.files" matched no file (${config.files.join(', ')}), so no claim can be read`);
   }
@@ -194,14 +198,13 @@ export async function findClaimsReport(options: ClaimsOptions): Promise<ClaimsRe
   for (const document of set.documents) {
     const source = await readText(io, document.file);
     const { claims, scan } = claimsIn(source, vocabulary);
-    // The innermost claim around a directive is the one it is written under.
+    // The innermost claim around a directive is the one it is written under,
+    // and the last of those around it to open. A directive opens at its `<!--`,
+    // never at an item's first or last offset, so `<` for the `<=` and `<=`
+    // for the `<` answer alike, and so does a column two off.
     const owner = (directive: Directive): number => {
       const offset = scan.index.lineStart(directive.location.line) + directive.location.column - 1;
-      let found = -1;
-      claims.forEach((claim, index) => {
-        if (claim.item.start <= offset && offset < claim.item.end && (found === -1 || claim.item.start > claims[found]!.item.start)) found = index;
-      });
-      return found;
+      return claims.findLastIndex((claim) => claim.item.start <= offset && offset < claim.item.end);
     };
     const under = claims.map((): Directive[] => []);
     for (const directive of document.directives) {
@@ -221,32 +224,25 @@ export async function findClaimsReport(options: ClaimsOptions): Promise<ClaimsRe
         });
       }
       const rule = config.labels[claim.label]!;
-      pending.push({ entry, candidates: under[index]!.filter((directive) => namesTest(directive, prefixes)), rule, text: ownText(scan, claim.item), column });
+      // A label that asks for a test has its prefixes: the configuration is refused without them.
+      const candidates = rule.evidence === 'test' ? under[index]!.filter((directive) => namesTest(directive, config.testPrefixes!)) : [];
+      pending.push({ entry, candidates, rule, text: ownText(scan, claim.item), column });
     });
   }
 
-  // Proved once for every document, and only where some claim needs it.
-  const asked = pending.some((claim) => claim.rule.evidence === 'test' && claim.candidates.length > 0);
-  const proofs = new Map<string, ProveResult>();
-  if (asked) {
-    const proved = await proveSpecGuard({
-      patterns: config.files,
-      root,
-      io,
-      ...(options.exclude === undefined ? {} : { exclude: options.exclude }),
-      ...(options.defaultSkips === undefined ? {} : { defaultSkips: options.defaultSkips }),
-      ...(options.comments === undefined ? {} : { comments: options.comments }),
-      ...(options.allowMissingTargets === undefined ? {} : { allowMissingTargets: options.allowMissingTargets }),
-      ...(options.allowEmptyScope === undefined ? {} : { allowEmptyScope: options.allowEmptyScope }),
-    });
-    for (const proof of proved.results) proofs.set(`${proof.location.relativeFile}:${proof.location.line}:${proof.location.column}`, proof);
-  }
+  // Proved once for every document, the first time a claim has a directive to
+  // prove: a proof is a run per rule, and a check with none runs none.
+  let proved: Promise<Map<string, ProveResult>> | undefined;
+  const proofs = (): Promise<Map<string, ProveResult>> =>
+    (proved ??= proveSpecGuard({ patterns: config.files, root, io, exclude: options.exclude, defaultSkips: options.defaultSkips, comments: options.comments }).then(
+      (report) => new Map(report.results.map((proof) => [where(proof.location), proof])),
+    ));
 
   const claims: ClaimEntry[] = [];
   for (const { entry, candidates, rule, text, column } of pending) {
-    const proofOf = (directive: Directive): ProveResult | undefined =>
-      proofs.get(`${directive.location.relativeFile}:${directive.location.line}:${directive.location.column}`);
-    const evidence = rule.evidence === 'test' ? candidates.filter((directive) => proofOf(directive)?.outcome === 'killed') : [];
+    const found = candidates.length === 0 ? new Map<string, ProveResult>() : await proofs();
+    const proofOf = (directive: Directive): ProveResult | undefined => found.get(where(directive.location));
+    const evidence = candidates.filter((directive) => proofOf(directive)?.outcome === 'killed');
     claims.push({ ...entry, evidence: evidence.map((directive) => `${directive.location.relativeFile}:${directive.location.line}`) });
     if (rule.evidence === 'test' && evidence.length === 0) {
       const first = candidates[0];
@@ -256,7 +252,7 @@ export async function findClaimsReport(options: ClaimsOptions): Promise<ClaimsRe
         column,
         message:
           first === undefined
-            ? `\`${entry.label}\` needs a test, and no directive under the claim names one (${prefixes.join(', ')})`
+            ? `\`${entry.label}\` needs a test, and no directive under the claim names one (${config.testPrefixes!.join(', ')})`
             : `\`${entry.label}\` needs a test, and the directive naming one at line ${first.location.line} is no evidence: ${whyNot(proofOf(first))}`,
         hint: 'write a directive under the claim that counts the test, as <!-- @assert-count target="..." symbol="fn test_..." min="1" -->, or lower the label',
       });
@@ -282,7 +278,7 @@ export async function findClaimsReport(options: ClaimsOptions): Promise<ClaimsRe
     claims,
     findings,
     files: set.files.map((file) => specPath(root, file)),
-    unmatched,
-    durationMs: Math.round(performance.now() - started),
+    unmatched: set.unmatched!,
+    durationMs: elapsed(started),
   };
 }

@@ -6,7 +6,8 @@
 
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { claimsConfigError, ClaimsError, findClaimsReport, type ClaimsConfig } from '../src/claims.js';
+import { claimsConfigError, ClaimsError, findClaimsReport, whyNot, type ClaimsConfig } from '../src/claims.js';
+import type { ProveResult } from '../src/types.js';
 import { makeTempRepo, removeTempRepo } from './helpers.js';
 
 const temporary: string[] = [];
@@ -72,13 +73,64 @@ describe('a claim whose label asks for a test', () => {
     });
     const report = await findClaimsReport({ root, config: CONFIG });
     expect(report.findings.map((f) => f.line)).toEqual([1, 3]);
+    for (const finding of report.findings) expect(finding.message).toBe('`Implemented` needs a test, and no directive under the claim names one (fn test_)');
     expect(report.claims[2]?.evidence).toEqual(['spec/a.md:6']);
+  });
+
+  it('counts no directive without a symbol, and reads a test by any of its prefixes', async () => {
+    const root = await repo({
+      ...CODE,
+      'spec/a.md': [
+        '- `Implemented`: a present file is no test.',
+        '  <!-- @assert-present file="compiler/lib.rs" -->',
+        '- `Implemented`: named by the second prefix.',
+        count('#[test] fn'),
+        '',
+      ].join('\n'),
+      'compiler/lib.rs': '#[test] fn spec_hash() {}\n',
+    });
+    const report = await findClaimsReport({ root, config: { ...CONFIG, testPrefixes: ['fn test_', '#[test]'] } });
+    expect(report.findings.map((f) => [f.line, f.message])).toEqual([[1, '`Implemented` needs a test, and no directive under the claim names one (fn test_, #[test])']]);
+    expect(report.claims[1]?.evidence).toEqual(['spec/a.md:4']);
+  });
+
+  it('gives each claim its own evidence, the first and the second alike', async () => {
+    const root = await repo({ ...CODE, 'spec/a.md': ['- `Implemented`: one.', count('fn test_spec_hash'), '- `Implemented`: two.', count('fn test_spec_hash'), ''].join('\n') });
+    const report = await findClaimsReport({ root, config: CONFIG });
+    expect(report.claims.map((c) => c.evidence)).toEqual([['spec/a.md:2'], ['spec/a.md:4']]);
+  });
+
+  it('counts no directive written below a claim, past a blank line, outside it', async () => {
+    const root = await repo({ ...CODE, 'spec/a.md': ['- `Implemented`: nothing under it.', '', '<!-- @assert-count target="compiler" symbol="fn test_spec_hash" min="1" -->', ''].join('\n') });
+    const report = await findClaimsReport({ root, config: CONFIG });
+    expect(report.claims).toEqual([{ file: 'spec/a.md', line: 1, label: 'Implemented', evidence: [] }]);
+    expect(report.findings[0]?.hint).toBe('write a directive under the claim that counts the test, as <!-- @assert-count target="..." symbol="fn test_..." min="1" -->, or lower the label');
+  });
+
+  it('reads the test where the configuration says how files comment, and what it leaves out, as a run reads it', async () => {
+    const commented = { 'spec/a.md': ['- `Implemented`: in a comment only.', count('fn test_spec_hash'), ''].join('\n'), 'compiler/lib.mn': '// fn test_spec_hash\n' };
+    expect((await findClaimsReport({ root: await repo(commented), config: CONFIG })).ok).toBe(true);
+    expect((await findClaimsReport({ root: await repo(commented), config: CONFIG, comments: { '.mn': 'c-like' } })).ok).toBe(false);
+    expect((await findClaimsReport({ root: await repo({ ...CODE, 'spec/a.md': commented['spec/a.md'] }), config: CONFIG, exclude: ['*.rs'] })).ok).toBe(false);
+    const skipped = { 'spec/a.md': ['- `Implemented`: under node_modules.', '  <!-- @assert-count target="node_modules" symbol="fn test_spec_hash" min="1" -->', ''].join('\n'), 'node_modules/x/lib.rs': 'fn test_spec_hash() {}\n' };
+    expect((await findClaimsReport({ root: await repo(skipped), config: CONFIG, defaultSkips: false })).ok).toBe(true);
+  });
+});
+
+describe('why a directive that counts a test is no evidence', () => {
+  const proof = (outcome: ProveResult['outcome'], unprovable?: string): ProveResult =>
+    ({ kind: 'assert-count', location: { file: 'a', relativeFile: 'a', line: 1, column: 1 }, description: '', outcome, unprovable, probes: [], durationMs: 0 }) satisfies ProveResult;
+
+  it('says what prove found of it, or that its document is not in force', () => {
+    expect(whyNot(undefined)).toBe('its document is not in force, so the rule is not run');
+    expect(whyNot(proof('survived'))).toBe('prove made a change that should fail it and it still passed');
+    expect(whyNot(proof('unprovable', 'it fails on the tree as it stands'))).toBe('prove could not show it failing: it fails on the tree as it stands');
   });
 
   it('fails where the test is not there yet, which prove cannot show failing, and says so', async () => {
     const root = await repo({ ...CODE, 'spec/a.md': ['- `Implemented`: a test not written.', count('fn test_not_written'), ''].join('\n') });
     const [finding] = (await findClaimsReport({ root, config: CONFIG })).findings;
-    expect(finding?.message).toMatch(/^`Implemented` needs a test, and the directive naming one at line 2 is no evidence: prove could not show it failing: /);
+    expect(finding?.message).toMatch(/^`Implemented` needs a test, and the directive naming one at line 2 is no evidence: prove could not show it failing: it fails on the tree as it stands /);
   });
 
   it('fails where the document holding the directive is not in force', async () => {
@@ -119,6 +171,34 @@ describe('what else a label asks', () => {
       [2, 'missing-criterion', '`Hypothesis` says how it will be judged, and the claim holds no "Criterion:"'],
     ]);
     expect(report.totals).toEqual({ Implemented: 0, Specified: 2, Target: 0, Hypothesis: 2 });
+    expect(report.findings[1]?.hint).toBe('say what would settle it, after "Criterion:"');
+  });
+
+  it('reads a criterion in the claim\'s own words wherever they are, and in no other item', async () => {
+    const findings = async (lines: string[]): Promise<number[]> =>
+      (await findClaimsReport({ root: await repo({ 'spec/a.md': [...lines, ''].join('\n') }), config: CONFIG })).findings.map((f) => f.line);
+    // Before an item nested under it, and after one.
+    expect(await findings(['- `Hypothesis`: Criterion: before.', '  - a nested item'])).toEqual([]);
+    expect(await findings(['- `Hypothesis`: after.', '  - a nested item', '', '  Criterion: in its own words still.'])).toEqual([]);
+    // In a child's words after its own child, in a sibling's child before it, and in one after it.
+    expect(await findings(['- `Hypothesis`: none.', '  - a child', '    - a grandchild', '', '    Criterion: the child\'s.'])).toEqual([1]);
+    expect(await findings(['- before', '  - Criterion: a sibling\'s child.', '- `Hypothesis`: none.'])).toEqual([3]);
+    expect(await findings(['- `Hypothesis`: none.', '- after', '  - Criterion: a sibling\'s child.'])).toEqual([1]);
+  });
+
+  it('orders the findings by document and by line, whichever rule found them first', async () => {
+    const root = await repo({
+      'spec/a.md': '- `Implemented`: no test.\n- `Specified`; and `Target`.\n',
+      'spec/b.md': '- `Specified`; and `Target`.\n- `Implemented`: no test.\n',
+    });
+    const report = await findClaimsReport({ root, config: CONFIG });
+    expect(report.findings.map((f) => [f.file, f.line, f.rule])).toEqual([
+      ['spec/a.md', 1, 'unevidenced-claim'],
+      ['spec/a.md', 2, 'mixed-labels'],
+      ['spec/b.md', 1, 'mixed-labels'],
+      ['spec/b.md', 2, 'unevidenced-claim'],
+    ]);
+    expect(report.findings.find((f) => f.rule === 'mixed-labels')?.hint).toBe('split it into one item per label, each with what shows it holds');
   });
 
   it('runs no proof where no claim needs one, and reads every document the files name', async () => {
@@ -130,7 +210,9 @@ describe('what else a label asks', () => {
 
   it('refuses documents that match no file, since no claim can be read', async () => {
     const root = await repo({ 'docs/a.md': '- `Specified`: one.\n' });
-    await expect(findClaimsReport({ root, config: CONFIG })).rejects.toThrow(new ClaimsError('"claims.files" matched no file (spec/*.md), so no claim can be read'));
+    await expect(findClaimsReport({ root, config: { ...CONFIG, files: ['spec/*.md', 'specs/*.md'] } })).rejects.toThrow(
+      new ClaimsError('"claims.files" matched no file (spec/*.md, specs/*.md), so no claim can be read'),
+    );
   });
 });
 
@@ -144,7 +226,11 @@ describe('a claims entry in the configuration', () => {
     const cases: Array<[unknown, string]> = [
       [[], 'must be an object such as { "files": ["spec/*.md"], "labels": { "Implemented": { "evidence": "test" } }, "testPrefixes": ["fn test_"] }'],
       [{ ...CONFIG, file: ['x'] }, 'has an unknown key "file"; it takes files, labels, testPrefixes'],
+      [null, 'must be an object such as { "files": ["spec/*.md"], "labels": { "Implemented": { "evidence": "test" } }, "testPrefixes": ["fn test_"] }'],
       [{ ...CONFIG, files: [] }, 'needs "files" as a non-empty list of spec globs'],
+      [{ ...CONFIG, files: [3] }, 'needs "files" as a non-empty list of spec globs'],
+      [{ ...CONFIG, files: ['spec/*.md', ' '] }, 'needs "files" as a non-empty list of spec globs'],
+      [{ ...CONFIG, testPrefixes: ['fn test_', ''] }, 'needs "testPrefixes" as a non-empty list of what a test\'s name starts with'],
       [{ ...CONFIG, files: ['spec/**.md'] }, expect.stringMatching(/^has an .* in "files"$/) as unknown as string],
       [{ ...CONFIG, labels: {} }, 'needs "labels" as an object of at least one label'],
       [{ ...CONFIG, labels: { ' Implemented': {} } }, 'has a label " Implemented" that no code span holds as written'],

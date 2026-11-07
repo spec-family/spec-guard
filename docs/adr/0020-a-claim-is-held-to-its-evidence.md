@@ -64,6 +64,10 @@ claim to what its label asks, and fails, exit 1, where one does not.**
   it is evidence for, survives the items being reordered, and renders as
   nothing on GitHub. A claim that other documents cite is named the way
   spec-graph names an item, `<!-- @spec-item id="float-square-ensures" -->`.
+  What is under an item is what spec-core's list reading gives it: a
+  directive on the line right after the item's text, with no blank line
+  between, is read as the item's continuation at any indent, and one past a
+  blank line at the item's own indent or less is not.
 - **`evidence: "test"`** asks for at least one such directive that counts a
   test: an `@assert-count` whose `symbol` starts with one of `testPrefixes`
   and whose `min` or `expected` is at least 1, in a document in force, which
@@ -83,8 +87,9 @@ claim to what its label asks, and fails, exit 1, where one does not.**
   written into a document.
 - **A command of its own**, as `cites` is, with JSON (`formatVersion` 1),
   SARIF, and GitHub and GitLab annotations. It reads `exclude`,
-  `allowMissingTargets`, `allowEmptyScope`, `defaultSkips` and `comments`,
-  which decide whether a rule under a claim passes and can fail. No `claims`
+  `defaultSkips` and `comments`, which decide whether a count under a claim
+  finds its test; a missing target or an empty scope fails a count of at
+  least one either way, so neither is read. No `claims`
   in the configuration, or `files` that match no file, is exit 2; a pattern
   among them that matched nothing is named.
 - **A proof only where it is asked for**: `prove` runs, once for every

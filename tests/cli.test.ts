@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { EXIT_ERROR, EXIT_FAILED, EXIT_OK, HELP, main, parseArgs, UsageError, type CliIO } from '../src/cli.js';
+import { EXIT_ERROR, EXIT_FAILED, EXIT_OK, HELP, main, parseArgs, UsageError, version, type CliIO } from '../src/cli.js';
 import { DEMO_REPO, makeTempRepo, PROJECT_ROOT, removeTempRepo } from './helpers.js';
 
 const temporary: string[] = [];
@@ -535,6 +535,38 @@ describe('spec-guard claims', () => {
     const gitlab = createIO();
     await main(['claims', '--root', root, '--format', 'gitlab'], gitlab.io);
     expect(JSON.parse(gitlab.out.join(''))[0]).toMatchObject({ check_name: 'unevidenced-claim', severity: 'critical' });
+  });
+
+  it('refuses each option about running rules it does not take, by name', async () => {
+    const root = await project(HELD);
+    const refused = [
+      '--allow-missing-targets', '--no-allow-missing-targets', '--allow-empty-scope', '--no-allow-empty-scope', '--verbose', '--watch', '--fail-fast',
+      '--engine=js', '--print-baseline', '--ignore-status', '--no-ignore-status', '--include-specs', '--no-include-specs', '--max-snippets=1', '--concurrency=1', '--allow-empty',
+    ];
+    for (const option of refused) {
+      const { io, err } = createIO();
+      expect(await main(['claims', option, '--root', root], io), option).toBe(EXIT_ERROR);
+      expect(err.join('\n'), option).toContain(`Option ${option.split('=')[0]} does not apply to spec-guard claims.`);
+    }
+  });
+
+  it('writes for a person by default and with --format human, in colour and in either glyphs where asked, and SARIF with its version', async () => {
+    const root = await project(UNHELD);
+    const human = createIO();
+    expect(await main(['claims', '--root', root, '--format', 'human', '--no-ascii'], human.io)).toBe(EXIT_FAILED);
+    expect(human.out.join('\n')).toContain('✖ spec/a.md:1  ');
+    const ascii = createIO();
+    await main(['claims', '--root', root, '--ascii'], ascii.io);
+    expect(ascii.out.join('\n')).toContain('x spec/a.md:1  ');
+    const painted = createIO();
+    await main(['claims', '--root', root, '--color'], painted.io);
+    expect(painted.out.join('\n')).toContain('\u001b[31m');
+    const sarif = createIO();
+    await main(['claims', '--root', root, '--format', 'sarif'], sarif.io);
+    expect(JSON.parse(sarif.out.join('')).runs[0].tool.driver.version).toBe(version());
+    const quiet = createIO();
+    expect(await main(['claims', '--root', await project(HELD), '--format', 'github'], quiet.io)).toBe(EXIT_OK);
+    expect(quiet.out).toEqual([]);
   });
 
   it('exits 2 with nothing configured, for an argument, and for a spec named on the line', async () => {

@@ -426,6 +426,10 @@ const NOT_FOR: Record<Exclude<Command, 'check'>, ReadonlySet<string>> = {
   // whether its rule is evidence, so it is not ignored, and no spec is named.
   claims: new Set([
     '--spec',
+    '--allow-missing-targets',
+    '--no-allow-missing-targets',
+    '--allow-empty-scope',
+    '--no-allow-empty-scope',
     '--verbose',
     '--watch',
     '--fail-fast',
@@ -797,8 +801,12 @@ const QUERY_KEYS: ReadonlySet<ConfigKey> = new Set<ConfigKey>(['specs', 'exclude
 /** The configurable options a citation check reads: which specs, what to leave out, and how strictly. */
 const CITES_KEYS: ReadonlySet<ConfigKey> = new Set<ConfigKey>(['specs', 'exclude', 'strict', 'defaultSkips', 'comments', 'cites']);
 
-/** The configurable options a claims check reads: its own entry, and what decides whether a rule under a claim passes and can fail. */
-const CLAIMS_KEYS: ReadonlySet<ConfigKey> = new Set<ConfigKey>(['exclude', 'allowMissingTargets', 'allowEmptyScope', 'defaultSkips', 'comments', 'claims']);
+/**
+ * The configurable options a claims check reads: its own entry, and what
+ * decides whether a count under a claim finds its test. A missing target or an
+ * empty scope fails a count of at least one either way, so neither is read.
+ */
+const CLAIMS_KEYS: ReadonlySet<ConfigKey> = new Set<ConfigKey>(['exclude', 'defaultSkips', 'comments', 'claims']);
 
 /** The configurable options a proof reads: what decides whether a rule passes, and not how a run is scheduled. */
 const PROVE_KEYS: ReadonlySet<ConfigKey> = new Set<ConfigKey>([
@@ -1307,8 +1315,6 @@ async function runClaims(options: CliOptions, io: CliIO, use: ConfigUse | undefi
         exclude: options.exclude,
         defaultSkips: options.defaultSkips,
         comments: options.comments,
-        allowMissingTargets: options.allowMissingTargets,
-        allowEmptyScope: options.allowEmptyScope,
       })),
       config: use,
     };

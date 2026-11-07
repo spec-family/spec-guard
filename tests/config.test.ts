@@ -585,7 +585,7 @@ describe('applyConfig', () => {
 
   it('applies claims to spec-guard claims alone, with what decides whether a rule under a claim passes and can fail', () => {
     const options = parseArgs(['claims'], cwd);
-    expect(applyConfig(options, everything)).toEqual({ file: 'package.json', applied: ['exclude', 'allowMissingTargets', 'allowEmptyScope', 'defaultSkips', 'comments', 'claims'], overridden: [] });
+    expect(applyConfig(options, everything)).toEqual({ file: 'package.json', applied: ['exclude', 'defaultSkips', 'comments', 'claims'], overridden: [] });
     expect(options.claims).toEqual(everything.claims);
     for (const argv of [[], ['query', 'src'], ['prove'], ['cites'], ['mcp'], ['--watch']]) {
       expect(applyConfig(parseArgs(argv, cwd), { claims: everything.claims }), argv.join(' ')).toBeUndefined();
