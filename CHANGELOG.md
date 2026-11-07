@@ -37,7 +37,7 @@ is deprecated before it goes, is spec-core's
   a finding too. The totals of each label are in the report and in JSON,
   with SARIF and GitHub and GitLab annotations as `cites` has; no `claims`
   is exit 2 and changes nothing else. Which item is a claim is spec-core's
-  reading, at 90a7ba8
+  reading, at b76ba0b
   ([ADR-0020](https://github.com/spec-family/spec-guard/blob/main/docs/adr/0020-a-claim-is-held-to-its-evidence.md)).
 
 - **`comments` in the configuration names a file's comment syntax.** A file

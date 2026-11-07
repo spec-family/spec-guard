@@ -1,6 +1,6 @@
 {
   "source": "https://github.com/spec-family/spec-core",
-  "commit": "90a7ba8f7a3f77773701d66cf8285bc5f43bdff4",
+  "commit": "b76ba0b7d2c135e4a5ee2c9c1fe0f7e202ffec85",
   "modules": {
     "jsonrpc": {
       "files": {
@@ -10,7 +10,7 @@
     },
     "markdown": {
       "files": {
-        "claims.ts": "sha256-031018a73b26df4a927b0b38a99b1213b442e39c909f6c099dff5c96065a3207",
+        "claims.ts": "sha256-a9fc433be4f14cdc4228c39b2b4fd5ac7b6cec96bc3b964028cc298af1181ba0",
         "frontmatter.ts": "sha256-e4cdf9b5ef5886b6b4b439790c4fbc4fbbd0f2dd90ee1971ab794bbdebd5af8d",
         "headings.ts": "sha256-70c68c677556f44354204b9c00fd5a465d9051f348b41ed70c0187456bab0eb1",
         "index.ts": "sha256-f16438c6b60f6f0bc44b464bb27a49e25b228d660134264f26b641b4024f5af6",
