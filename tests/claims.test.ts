@@ -8,6 +8,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { claimsConfigError, ClaimsError, findClaimsReport, whyNot, type ClaimsConfig } from '../src/claims.js';
 import type { ProveResult } from '../src/types.js';
+import { nodeIo } from '../src/io.js';
 import { makeTempRepo, removeTempRepo } from './helpers.js';
 
 const temporary: string[] = [];
@@ -92,6 +93,43 @@ describe('a claim whose label asks for a test', () => {
     const report = await findClaimsReport({ root, config: { ...CONFIG, testPrefixes: ['fn test_', '#[test]'] } });
     expect(report.findings.map((f) => [f.line, f.message])).toEqual([[1, '`Implemented` needs a test, and no directive under the claim names one (fn test_, #[test])']]);
     expect(report.claims[1]?.evidence).toEqual(['spec/a.md:4']);
+  });
+
+  it('counts no count without a symbol, such as an import count', async () => {
+    const root = await repo({ ...CODE, 'spec/a.md': ['- `Implemented`: an import count names no test.', '  <!-- @assert-import-count target="compiler" module="x" min="1" -->', ''].join('\n') });
+    const [finding] = (await findClaimsReport({ root, config: CONFIG })).findings;
+    expect(finding?.message).toBe('`Implemented` needs a test, and no directive under the claim names one (fn test_)');
+  });
+
+  it('holds each directive to its own proof, one that cannot be shown failing beside one that can', async () => {
+    const root = await repo({ ...CODE, 'spec/a.md': ['- `Implemented`: not written.', count('fn test_not_written'), '- `Implemented`: written.', count('fn test_spec_hash'), ''].join('\n') });
+    const report = await findClaimsReport({ root, config: CONFIG });
+    expect(report.findings.map((f) => f.line)).toEqual([1]);
+    expect(report.claims.map((c) => c.evidence)).toEqual([[], ['spec/a.md:4']]);
+  });
+
+  it('gives a parent the directive written under it after an item nested under it', async () => {
+    const root = await repo({
+      ...CODE,
+      'spec/a.md': ['- `Implemented`: the parent.', '  - `Specified`: a child.', '', '  <!-- @assert-count target="compiler" symbol="fn test_spec_hash" min="1" -->', ''].join('\n'),
+    });
+    const report = await findClaimsReport({ root, config: CONFIG });
+    expect(report.findings).toEqual([]);
+    expect(report.claims.map((c) => [c.line, c.evidence])).toEqual([
+      [1, ['spec/a.md:4']],
+      [2, []],
+    ]);
+  });
+
+  it('reads no code where no claim has a directive to prove', async () => {
+    const root = await repo({
+      ...CODE,
+      'spec/a.md': ['- `Implemented`: nothing under it.', '- `Specified`: a count under a claim that asks for none.', count('verify'), ''].join('\n'),
+    });
+    const read: string[] = [];
+    const io = { ...nodeIo, readFile: (file: string) => (read.push(file), nodeIo.readFile(file)) };
+    await findClaimsReport({ root, config: CONFIG, io });
+    expect(read.filter((file) => file.endsWith('lib.rs'))).toEqual([]);
   });
 
   it('gives each claim its own evidence, the first and the second alike', async () => {
@@ -184,6 +222,9 @@ describe('what else a label asks', () => {
     expect(await findings(['- `Hypothesis`: none.', '  - a child', '    - a grandchild', '', '    Criterion: the child\'s.'])).toEqual([1]);
     expect(await findings(['- before', '  - Criterion: a sibling\'s child.', '- `Hypothesis`: none.'])).toEqual([3]);
     expect(await findings(['- `Hypothesis`: none.', '- after', '  - Criterion: a sibling\'s child.'])).toEqual([1]);
+    // A sibling's own words, after its child, and before one.
+    expect(await findings(['- before', '  - a child', '', '  Criterion: the sibling\'s own.', '- `Hypothesis`: none.'])).toEqual([5]);
+    expect(await findings(['- `Hypothesis`: none.', '- Criterion: the next sibling\'s own.', '  - its child'])).toEqual([1]);
   });
 
   it('orders the findings by document and by line, whichever rule found them first', async () => {

@@ -564,6 +564,9 @@ describe('spec-guard claims', () => {
     const sarif = createIO();
     await main(['claims', '--root', root, '--format', 'sarif'], sarif.io);
     expect(JSON.parse(sarif.out.join('')).runs[0].tool.driver.version).toBe(version());
+    const terminal = createIO({ isTTY: true });
+    await main(['claims', '--root', root], terminal.io);
+    expect(terminal.out.join('\n')).toContain('\u001b[31m');
     const quiet = createIO();
     expect(await main(['claims', '--root', await project(HELD), '--format', 'github'], quiet.io)).toBe(EXIT_OK);
     expect(quiet.out).toEqual([]);

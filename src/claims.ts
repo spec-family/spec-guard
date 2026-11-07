@@ -240,6 +240,7 @@ export async function findClaimsReport(options: ClaimsOptions): Promise<ClaimsRe
 
   const claims: ClaimEntry[] = [];
   for (const { entry, candidates, rule, text, column } of pending) {
+    // A claim with nothing to prove runs no proof: tests hold that the code is not read then.
     const found = candidates.length === 0 ? new Map<string, ProveResult>() : await proofs();
     const proofOf = (directive: Directive): ProveResult | undefined => found.get(where(directive.location));
     const evidence = candidates.filter((directive) => proofOf(directive)?.outcome === 'killed');
@@ -270,6 +271,7 @@ export async function findClaimsReport(options: ClaimsOptions): Promise<ClaimsRe
 
   const totals: Record<string, number> = {};
   for (const label of vocabulary) totals[label] = claims.filter((claim) => claim.label === label).length;
+  // Two files told apart by `<` are told apart by `<=`: the same file is the first answer.
   findings.sort((a, b) => (a.file === b.file ? a.line - b.line : a.file < b.file ? -1 : 1));
   return {
     ok: findings.length === 0,

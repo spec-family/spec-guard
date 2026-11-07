@@ -1333,6 +1333,8 @@ async function runClaims(options: CliOptions, io: CliIO, use: ConfigUse | undefi
             ? formatGithub(claimsAnnotations(report))
             : formatClaims(report, {
                 color: shouldUseColor({ isTTY: io.isTTY }, options.color, io.env),
+                // A claims report shows no passing rule, so it reads no verbose,
+                // and the mutant that sets it is equivalent.
                 verbose: false,
                 ascii: options.ascii ?? shouldUseAscii(io.env),
               });
