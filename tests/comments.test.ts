@@ -11,7 +11,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { BUILT_IN_ONLY, COMMENT_PROFILES, commentEntryError, commentRanges, commentTable, createCommentMask, syntaxFor } from '../src/comments.js';
+import { BUILT_IN_ONLY, COMMENT_PROFILES, commentEntryError, commentRanges, commentTable, createCommentMask, shebangSyntax, syntaxFor, syntaxOf } from '../src/comments.js';
 
 /** Whether each NEEDLE in the source was classified as comment text. */
 function classify(source: string, file: string): boolean[] {
@@ -457,12 +457,82 @@ describe('syntaxFor', () => {
 
   it('returns null for an unknown extension', () => {
     expect(syntaxFor('a.unknownext')).toBeNull();
-    expect(syntaxFor('Makefile')).toBeNull();
+    expect(syntaxFor('NOTICE')).toBeNull();
   });
 
   it('resolves the extension, not a dot anywhere in the path', () => {
     expect(syntaxFor('src/a.ts.snapshot')).toBeNull();
     expect(syntaxFor('my.dir/a.ts')?.name).toBe('javascript');
+  });
+});
+
+describe('the languages added on 2026-11-07', () => {
+  it('reads each by the profile its comments and strings are written in', () => {
+    const expected: Record<string, string> = {
+      'a.groovy': 'c-like', 'build.gradle': 'c-like', 'a.proto': 'c-like', 'a.sol': 'c-like', 'a.glsl': 'c-like', 'a.vert': 'c-like',
+      'a.frag': 'c-like', 'a.hlsl': 'c-like', 'a.wgsl': 'c-like', 'a.cu': 'c-like', 'a.cuh': 'c-like', 'a.ino': 'c-like', 'a.json5': 'c-like',
+      'a.graphql': 'hash', 'a.gql': 'hash', 'a.cmake': 'hash', 'a.bzl': 'hash', 'BUILD.bazel': 'hash', 'a.star': 'hash', 'a.pm': 'hash',
+      'a.rake': 'hash', 'a.gemspec': 'hash', 'a.ksh': 'shell', 'rules.mk': 'shell', 'app.dockerfile': 'shell',
+      'a.xhtml': 'markup', 'a.xsd': 'markup', 'a.xsl': 'markup', 'a.xslt': 'markup', 'Info.plist': 'markup', 'a.wsdl': 'markup',
+      'a.jsonl': 'none', 'a.ndjson': 'none', 'a.geojson': 'none',
+      Gemfile: 'hash', Rakefile: 'hash', Podfile: 'hash', Vagrantfile: 'hash', Brewfile: 'hash', 'cpp/CMakeLists.txt': 'hash',
+      Dockerfile: 'shell', Containerfile: 'shell', Makefile: 'shell', makefile: 'shell', GNUmakefile: 'shell',
+    };
+    expect(Object.fromEntries(Object.keys(expected).map((file) => [file, syntaxFor(file)?.name ?? null]))).toEqual(expected);
+  });
+
+  it('leaves out each language a profile would read code of as a comment', () => {
+    for (const file of ['a.v', 'a.sv', 'a.vhd', 'a.ex', 'a.exs', 'a.jl', 'a.nix', 'a.css', 'a.scss', 'a.fish', 'a.properties', 'Dockerfile.dev', 'BUILD']) {
+      expect(syntaxFor(file), file).toBeNull();
+    }
+  });
+
+  it("reads a whole file name before any extension, and the project's names before the table's", () => {
+    expect(syntaxFor('CMakeLists.txt', commentTable({ '.txt': 'c-like' }))?.name).toBe('hash');
+    expect(syntaxFor('CMakeLists.txt', commentTable({ 'CMakeLists.txt': 'none' }))?.name).toBe('none');
+    expect(syntaxFor('notes.txt', commentTable({ '.txt': 'hash' }))?.name).toBe('hash');
+  });
+});
+
+describe("a script's #! line", () => {
+  it('names the program, read after env, past its options and the variables it sets, without a directory or a version', () => {
+    const cases: Record<string, string | null> = {
+      '#!/bin/sh\n': 'shell',
+      '#!/bin/bash\r\necho\r\n': 'shell',
+      '#! /usr/bin/env zsh': 'shell',
+      '#!/usr/bin/env -S node --no-warnings\n': 'javascript',
+      '#!/usr/bin/env NODE_ENV=test deno run\n': 'javascript',
+      '#!/usr/bin/env bun\n': 'javascript',
+      '#!/usr/bin/python3.12 -u\n': 'hash',
+      '#!/usr/bin/env pypy3\n': 'hash',
+      '#!/usr/bin/ruby\n': 'hash',
+      '#!/usr/bin/env Rscript\n': 'hash',
+      '#!/usr/bin/env php\n': 'c-like',
+      '#!/usr/bin/lua5.4\n': 'sql-like',
+      '#!/usr/bin/env awk -f\n': null,
+      '#!/usr/bin/env\n': null,
+      '#!/usr/bin/env\nnode\n': null,
+      '#!/usr/bin/env  node\n': 'javascript',
+      '#!/usr/bin/pyth3on\n': null,
+      '#!\n': null,
+      '# not a #! line\n': null,
+      '﻿#!/bin/sh\n': null,
+      '': null,
+    };
+    expect(Object.fromEntries(Object.keys(cases).map((source) => [source, shebangSyntax(source)?.name ?? null]))).toEqual(cases);
+  });
+
+  it('decides a file with no extension the table does not know, and no other', () => {
+    expect(syntaxOf('bin/deploy', '#!/bin/sh\n# LegacyThing\n')?.name).toBe('shell');
+    expect(syntaxOf('bin/deploy', 'echo\n')).toBeNull();
+    // An extension says what it says, even one nobody knows.
+    expect(syntaxOf('tools/run.mn', '#!/bin/sh\n')).toBeNull();
+    expect(syntaxOf('a.py', '#!/usr/bin/env node\n')?.name).toBe('hash');
+    // A name the table or the project knows comes first.
+    expect(syntaxOf('Makefile', '#!/usr/bin/env node\n')?.name).toBe('shell');
+    expect(syntaxOf('bin/deploy', '#!/bin/sh\n', commentTable({ deploy: 'none' }))?.name).toBe('none');
+    expect(createCommentMask('#!/bin/sh\n# LegacyThing\necho LegacyThing\n', 'bin/deploy')).toMatchObject({ classified: true, syntax: 'shell' });
+    expect(createCommentMask('#!/bin/sh\n# LegacyThing\n', 'bin/deploy').isComment(14)).toBe(true);
   });
 });
 

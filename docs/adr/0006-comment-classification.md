@@ -360,6 +360,40 @@ over that file passes, and says the file could not be classified.
   of what a watch session's memo keys a scan by, and of what tells two requests
   apart that may share a pass (ADR-0014).
 
+*Amended again 2026-11-07.* **The table knows more of what is common, and a
+script by its `#!` line.** The configuration is for what spec-guard will never
+know, a project's own language; what a common repository holds should need
+none of it.
+
+- **Thirty-four extensions and eleven file names more**, each a language whose
+  comments and strings an existing profile reads as it is written: Groovy and
+  Gradle, Protocol Buffers, Solidity, GLSL, HLSL, WGSL, CUDA, Arduino and JSON5
+  as `c-like`; GraphQL, CMake, Starlark and Bazel, Perl modules and Ruby's
+  build files as `hash`; `.ksh`, `.mk` and `.dockerfile` as `shell`; more XML
+  as `markup`; JSON Lines and GeoJSON as `none`. By name: `Gemfile`,
+  `Rakefile`, `Podfile`, `Vagrantfile`, `Brewfile` and `CMakeLists.txt` as
+  `hash`, `Dockerfile`, `Containerfile` and the Makefiles as `shell`. A
+  Makefile comments with `#` anywhere, a shell only where a word starts, so
+  the shell's rule reads `a#b` and `\#` as code, the direction that fails
+  loudly.
+- **Left out on purpose**, since a profile would read code of theirs as a
+  comment: Verilog and VHDL, whose quote is also an operator; Elixir and
+  Julia, whose `?#` and adjoint `'` open nothing; Nix, whose `''` strings hold
+  shell `#` lines; CSS and SCSS, whose `url(//cdn)` is unquoted; fish, whose
+  single quotes escape; `.properties`, where a `#` after a value is part of
+  it. Each takes a profile of its own, or a project's word for it.
+- **A script with no extension is read by its `#!` line**: the program it
+  runs, after `env` past its options and the variables it sets, without its
+  directory or a trailing version, names `shell`, `hash`, `javascript`,
+  `c-like` or `sql-like`. Only where the path says nothing: a file with an
+  extension, even one the table does not know, is the configuration's to
+  name. `cites`, which chooses its files before it reads them, reads such a
+  file for that line alone, and one with none, or that is not text, is counted
+  unclassified as before, never a gap.
+- **The order is the more specific first**: the project's file name, the
+  table's file name, the project's extension, the table's extension, and the
+  `#!` line.
+
 ## How ripgrep stays fast
 
 Classification needs the file's text. ripgrep's match stream does not carry it,

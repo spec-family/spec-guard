@@ -97,6 +97,24 @@ describe('the javascript engine', () => {
   });
 });
 
+describe('a script with no extension', () => {
+  it('is read by its #! line, and a file with neither is counted as code, and said', async () => {
+    const root = await repo({
+      'docs/spec.md': '<!-- @assert-absence target="bin" symbol="LegacyThing" -->\n',
+      'bin/deploy': '#!/usr/bin/env bash\n# LegacyThing was removed\necho done\n',
+      'bin/Makefile': 'all: ; @true # LegacyThing\n',
+    });
+    const read = await runSpecGuard({ patterns: ['docs/spec.md'], root, engine: 'javascript' });
+    expect(read.ok).toBe(true);
+    expect(read.results[0]).toMatchObject({ actual: 0, commentMatches: 2, unclassifiedFiles: 0 });
+
+    const unknown = await repo({ 'docs/spec.md': '<!-- @assert-absence target="bin" symbol="LegacyThing" -->\n', 'bin/notes': '# LegacyThing was removed\n' });
+    const counted = await runSpecGuard({ patterns: ['docs/spec.md'], root: unknown, engine: 'javascript' });
+    expect(counted.ok).toBe(false);
+    expect(counted.results[0]).toMatchObject({ actual: 1, unclassifiedFiles: 1 });
+  });
+});
+
 describe("a file whose comment syntax the project names", () => {
   // Mente's compiler: `.mn` files comment with `//` and `///`.
   const MN = {
