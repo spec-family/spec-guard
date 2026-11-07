@@ -1,6 +1,8 @@
 export { linesOf, scanMarkdown } from './scan.js';
 export { findClaims } from './claims.js';
 export type { Claim } from './claims.js';
+export { findCommitReferences } from './commits.js';
+export type { CommitReference } from './commits.js';
 export { sectionsOf, slugify, titleOf } from './headings.js';
 export {
   findEntry,
