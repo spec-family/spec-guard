@@ -1555,6 +1555,45 @@ ran high where they were least measured: `runner.ts` and `text.ts` took 7m35s
 against 15.2 minutes, and `cli.ts` alone 8m18s against 15.1, so the next
 split starts from this run's logs rather than 398fe94's.
 
+### 0.32.0: claims and a wider table, and nine survivors more, each equivalent
+
+CI's full sweep of f7325e0 (run 42375576626) came out at **99.25% over
+15,398 mutants with 114 survivors and 1 without coverage**, 235 of them
+detected by timeout and one an error; the shards took from 6m26s to
+19m47s. Against 0.31.0's sweep of 93662af (run 41435347363), 105
+survivors and 1 without coverage over 14,641:
+
+- the release has 757 mutants more: 320 in `src/claims.ts`, new, which
+  holds a claim to its evidence (ADR-0020); 206 in `src/comments.ts`,
+  the configuration's `comments`, the wider table and the `#!` line
+  (ADR-0006, amended 2026-11-07); 92 in `src/reporter.ts` and 90 in
+  `src/cli.ts`, the command's reports and options; 19 in
+  `src/config.ts`; and 30 in `src/cites.ts`, `src/engine.ts`,
+  `src/parser.ts` and `src/runner.ts`, which read the table or pass it
+  on;
+- 9 survivors are new and none is gone. Eight are #87's, each said
+  equivalent beside its code: in `ownText`, the text begun with
+  anything, and `<=` and `>=` for `<` and `>` in telling a child
+  from its parent, since an item opens at its line's content and ends
+  before a terminator where no other opens; in a directive's owner, `<`
+  for `<=`, `<=` for `<`, and a column two off, since a directive
+  opens at its `<!--`, never at an item's first or last offset; `<=`
+  for `<` in the findings' order of files, where the same file is the
+  first answer; and the claims report's `verbose: false` made `true`,
+  since the report shows no passing rule. The ninth, `target === '.'`
+  made `true` in `src/impact.ts`, is the equivalent its comment names
+  (0.18.1), detected by timeout in 0.31.0's sweep and not in this one,
+  as 0.29.0 recorded the other way;
+- the error is `||` made `&&` in `src/structure.ts`'s walk, the
+  descent for ever the comment beside it names: 0.31.0's sweep killed it
+  with the walk of a root that is a linked worktree, and here its worker
+  ran out of memory first. It is detected either way, and the score
+  leaves it out.
+
+Each of the release's three pull requests was swept incrementally before
+it merged, and each ended with every undetected mutant of its own lines
+killed or said equivalent beside its code.
+
 ### 0.31.0: what an import rule could not read, and no survivor more
 
 CI's full sweep of 93662af (run 41435347363) came out at **99.28% over

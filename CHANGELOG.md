@@ -10,7 +10,12 @@ what to do when upgrading; the family's policy, including how a flag or field
 is deprecated before it goes, is spec-core's
 [ADR-0009](https://github.com/spec-family/spec-core/blob/main/docs/adr/0009-versions-before-1-0.md).
 
-## Unreleased
+## 0.32.0
+
+`spec-guard claims` holds each claim a specification labels, such as
+`Implemented`, to the evidence its label asks for. A project names the
+comment syntax of a file the built-in table does not know, and the table
+knows more common languages and reads a script by its `#!` line.
 
 ### Changed
 

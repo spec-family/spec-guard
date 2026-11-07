@@ -1,6 +1,6 @@
 {
   "name": "@spec-family/spec-guard",
-  "version": "0.31.0",
+  "version": "0.32.0",
   "description": "Executable architecture assertions for Markdown specs & ADRs.",
   "keywords": [
     "adr",
