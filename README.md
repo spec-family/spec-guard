@@ -760,10 +760,13 @@ touching code, a run that passed this way says so:
 ✔ every spec assertion holds
 ```
 
-Comment syntax is known for around 68 extensions across 11 families (JS/TS, C,
+Comment syntax is known for around 100 extensions across 11 families (JS/TS, C,
 C#, Rust, Go, Python-style `#`, shell `#`, YAML, SQL-style `--`, markup -
-MSBuild project files included - and formats with no comments at all). What
-would hide real code if misread is tracked too:
+MSBuild project files included - and formats with no comments at all), for
+files known by their whole names (`Dockerfile`, `Makefile`, `Gemfile`,
+`CMakeLists.txt` and the like), and for a script with no extension, by the
+program its `#!` line runs (`sh`, `bash`, `python`, `node`, `ruby` and the
+like). What would hide real code if misread is tracked too:
 - **Strings**, because `//` inside a URL is not a comment.
 - **JavaScript's regular expressions**, because the quote in `/["']/` is not a
   quote.
@@ -789,8 +792,10 @@ a match. So a project names what the table does not know, in its
   file name, which is how a file with no extension is named.
 - A value is one of the profiles: `javascript`, `c-like`, `c#`, `rust`, `go`,
   `hash`, `shell`, `yaml`, `sql-like`, `markup` or `none`.
-- The project's names come before the built-in table, so `".m": "hash"` reads
-  `.m` otherwise than as Objective-C.
+- A file name comes before an extension, and the project's before the
+  built-in table's, so `".m": "hash"` reads `.m` otherwise than as
+  Objective-C; a `#!` line is read last, and only for a file with no
+  extension.
 - A path, a pattern, an unknown profile, or an extension named twice in two
   cases is exit 2, naming the key.
 - A run, `prove`, `--watch`, the MCP server and `cites` read it; `query` and

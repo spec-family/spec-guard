@@ -420,6 +420,12 @@ const NO_COMMENTS: CommentSyntax = {
 /** Extension to comment syntax. Anything absent is left unclassified. */
 const BY_EXTENSION = new Map<string, CommentSyntax>();
 
+/** A whole file name to comment syntax: the files with no extension of their own, and one whose extension misleads. */
+const BY_FILE_NAME = new Map<string, CommentSyntax>();
+
+/** The program a script's `#!` line runs, to the syntax its scripts are written in. */
+const BY_INTERPRETER = new Map<string, CommentSyntax>();
+
 /**
  * The same profiles, addressed by name instead of by extension.
  *
@@ -469,6 +475,41 @@ register(MARKUP, ['.csproj', '.fsproj', '.vbproj', '.props', '.targets', '.slnx'
 // .jsonc is named for the comments it allows, so it gets the C-style reader.
 register(C_LIKE, ['.jsonc']);
 register(NO_COMMENTS, ['.json', '.txt', '.csv', '.tsv', '.lock', '.log']);
+
+// Added 2026-11-07, each a language whose comments and strings a profile above
+// reads as it is written (ADR-0006, amended again 2026-11-07). Left out on
+// purpose, because a profile here would read code as a comment: Verilog and
+// VHDL, where a quote is also an operator; Elixir and Julia, whose `?#` and
+// adjoint `'` open nothing; Nix, whose '' strings hold shell `#` lines; CSS
+// and SCSS, where `url(//cdn)` is unquoted; fish, whose single quotes escape;
+// and .properties, where a `#` after a value is part of it.
+register(C_LIKE, ['.groovy', '.gradle', '.proto', '.sol', '.glsl', '.vert', '.frag', '.hlsl', '.wgsl', '.cu', '.cuh', '.ino', '.json5']);
+register(HASH, ['.graphql', '.gql', '.cmake', '.bzl', '.bazel', '.star', '.pm', '.rake', '.gemspec']);
+// A Makefile's `#` comments anywhere and a shell's only where a word starts,
+// so the shell's rule reads `a#b` as code, the direction that fails loudly,
+// and `\#` as code, which it is.
+register(SHELL, ['.ksh', '.mk', '.dockerfile']);
+register(MARKUP, ['.xhtml', '.xsd', '.xsl', '.xslt', '.plist', '.wsdl']);
+register(NO_COMMENTS, ['.jsonl', '.ndjson', '.geojson']);
+
+/** Records the files one profile covers by their whole names, as `register` does by extension. */
+function registerNames(syntax: CommentSyntax, names: readonly string[]): void {
+  for (const name of names) BY_FILE_NAME.set(name, syntax);
+}
+
+registerNames(HASH, ['Gemfile', 'Rakefile', 'Podfile', 'Vagrantfile', 'Brewfile', 'CMakeLists.txt']);
+registerNames(SHELL, ['Dockerfile', 'Containerfile', 'Makefile', 'makefile', 'GNUmakefile']);
+
+/** Records the programs whose scripts one profile reads, as `register` does by extension. */
+function registerInterpreters(syntax: CommentSyntax, programs: readonly string[]): void {
+  for (const program of programs) BY_INTERPRETER.set(program, syntax);
+}
+
+registerInterpreters(SHELL, ['sh', 'bash', 'zsh', 'ksh', 'dash', 'ash']);
+registerInterpreters(HASH, ['python', 'pypy', 'ruby', 'perl', 'rscript']);
+registerInterpreters(JS_LIKE, ['node', 'nodejs', 'deno', 'bun', 'tsx', 'ts-node']);
+registerInterpreters(C_LIKE, ['php']);
+registerInterpreters(SQL_LIKE, ['lua']);
 
 /** The profiles a project may name, in the order they are documented. */
 export const COMMENT_PROFILES: readonly string[] = [...BY_NAME.keys()];
@@ -538,10 +579,47 @@ export function commentTable(entries: Readonly<Record<string, string>>): Comment
   return extensions.size + names.size === 0 ? BUILT_IN_ONLY : { extensions, names, key };
 }
 
-/** The comment syntax for a path, or null when the language is unknown. */
+/**
+ * The comment syntax for a path, or null when the language is unknown. The
+ * more specific answer first: a whole file name, the project's and then the
+ * table's, before an extension, the project's and then the table's.
+ */
 export function syntaxFor(filePath: string, table: CommentTable = BUILT_IN_ONLY): CommentSyntax | null {
+  const name = path.basename(filePath);
   const extension = path.extname(filePath).toLowerCase();
-  return table.names.get(path.basename(filePath)) ?? table.extensions.get(extension) ?? BY_EXTENSION.get(extension) ?? null;
+  return table.names.get(name) ?? BY_FILE_NAME.get(name) ?? table.extensions.get(extension) ?? BY_EXTENSION.get(extension) ?? null;
+}
+
+/**
+ * The syntax a script's `#!` line names, or null. The program is the line's
+ * first word, or, after `env`, the first word that is neither an option nor a
+ * variable it sets, with its directory and a trailing version left off:
+ * `#!/usr/bin/env -S python3.12 -u` runs `python`.
+ */
+export function shebangSyntax(source: string): CommentSyntax | null {
+  if (!source.startsWith('#!')) return null;
+  const end = source.indexOf('\n');
+  const words = source.slice(2, end === -1 ? source.length : end).trim().split(/\s+/);
+  const base = (word: string): string => word.slice(word.lastIndexOf('/') + 1);
+  let program = base(words[0]!);
+  if (program === 'env') {
+    const named = words.slice(1).find((word) => !word.startsWith('-') && !word.includes('='));
+    if (named === undefined) return null;
+    program = base(named);
+  }
+  return BY_INTERPRETER.get(program.toLowerCase().replace(/[\d.]+$/, '')) ?? null;
+}
+
+/**
+ * The comment syntax of a file whose text is in hand: as `syntaxFor` reads its
+ * path, and for a file with no extension the path says nothing of, as its
+ * `#!` line says, which is how a script in `bin/` names its language. A file
+ * with an extension is not read for one: `.mn` beginning `#!/bin/sh` is a
+ * question for the project's configuration, not for a guess.
+ */
+export function syntaxOf(filePath: string, source: string, table: CommentTable = BUILT_IN_ONLY): CommentSyntax | null {
+  const known = syntaxFor(filePath, table);
+  return known !== null || path.extname(filePath) !== '' ? known : shebangSyntax(source);
 }
 
 export function syntaxNamed(name: string): CommentSyntax | null {
@@ -928,7 +1006,7 @@ const UNCLASSIFIED: CommentMask = {
 };
 
 export function createCommentMask(source: string, filePath: string, table: CommentTable = BUILT_IN_ONLY): CommentMask {
-  const syntax = syntaxFor(filePath, table);
+  const syntax = syntaxOf(filePath, source, table);
   if (!syntax) return UNCLASSIFIED;
 
   const ranges = commentRanges(source, syntax);
