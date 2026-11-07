@@ -14,6 +14,7 @@ import { createRequire } from 'node:module';
 import path from 'node:path';
 import type { Readable } from 'node:stream';
 
+import { ClaimsError, findClaimsReport, type ClaimsConfig } from './claims.js';
 import { CitesError, findCitations } from './cites.js';
 import { CONFIG_KEYS, ConfigError, engineNamed, findConfig, type ConfigKey, type ProjectConfig } from './config.js';
 import { formatImpact, formatImpactJson, impactOf } from './impact.js';
@@ -25,10 +26,14 @@ import { formatQuery, formatQueryJson, queryRules, resolveQueryPath } from './qu
 import { proveSpecGuard } from './prove.js';
 import {
   citesAnnotations,
+  claimsAnnotations,
   formatBaselines,
   formatCites,
   formatCitesJson,
   formatCitesSarif,
+  formatClaims,
+  formatClaimsJson,
+  formatClaimsSarif,
   formatConfigUse,
   formatGithub,
   formatGitlab,
@@ -78,10 +83,10 @@ export interface CliIO {
  * rules can fail, the citations of specs in code comments, or who depends on a
  * path.
  */
-export type Command = 'check' | 'query' | 'mcp' | 'prove' | 'cites' | 'impact';
+export type Command = 'check' | 'query' | 'mcp' | 'prove' | 'cites' | 'claims' | 'impact';
 
 /** The words that name a command when they come first. */
-const COMMANDS: ReadonlySet<string> = new Set<Command>(['query', 'mcp', 'prove', 'cites', 'impact']);
+const COMMANDS: ReadonlySet<string> = new Set<Command>(['query', 'mcp', 'prove', 'cites', 'claims', 'impact']);
 
 /** How a finished run is written out. */
 export type OutputFormat = 'human' | 'json' | 'sarif' | 'github' | 'gitlab';
@@ -95,6 +100,7 @@ const FORMATS: Readonly<Record<Exclude<Command, 'mcp'>, readonly OutputFormat[]>
   check: ['human', 'json', 'sarif', 'github', 'gitlab'],
   prove: ['human', 'json', 'sarif', 'github', 'gitlab'],
   cites: ['human', 'json', 'sarif', 'github', 'gitlab'],
+  claims: ['human', 'json', 'sarif', 'github', 'gitlab'],
   query: ['human', 'json'],
   impact: ['human', 'json'],
 };
@@ -116,6 +122,8 @@ export interface CliOptions {
   depth?: number;
   /** The documents comments cite, from a configuration; derived from the specs when absent. */
   cites?: CiteFamily[];
+  /** The claims check's entry, from the configuration alone. */
+  claims?: ClaimsConfig;
   root: string;
   verbose: boolean;
   failFast: boolean;
@@ -186,6 +194,7 @@ Usage
   spec-guard prove [patterns...] [options]
                                          show each rule a violation of itself, in memory, and report any that pass
   spec-guard cites [paths...] [options]  check that each spec a code comment cites exists and is in force
+  spec-guard claims [options]            hold each claim a specification labels to the evidence its label asks for
   spec-guard impact <paths...> [options] the files that depend on each path, and the rules in play there
 
 Patterns
@@ -263,7 +272,9 @@ Configuration
   --default-skips, ...), and --exclude= with nothing clears exclude.
   "cites": [{ "id": "ADR-{n}", "files": "docs/adr/{n}-*.md" }] names the
   documents code comments cite; without it, cites reads them off the titles of
-  numbered specs. "comments": { ".mn": "c-like", "LICENSE-MIT": "none" } names
+  numbered specs. "claims": { "files": ["spec/*.md"], "labels": { "Implemented":
+  { "evidence": "test" } }, "testPrefixes": ["fn test_"] } names the claims spec-guard
+  claims holds to their evidence. "comments": { ".mn": "c-like", "LICENSE-MIT": "none" } names
   the comment syntax of a file the built-in table does not know, by extension or
   file name, as one of c-like, javascript, c#, rust, go, hash, shell, yaml,
   sql-like, markup or none.
@@ -410,6 +421,24 @@ const NOT_FOR: Record<Exclude<Command, 'check'>, ReadonlySet<string>> = {
     '--concurrency',
     '--allow-empty',
   ]),
+  // Claims are read from the documents the configuration names, and their
+  // evidence proved as `prove` proves a rule: a document's status decides
+  // whether its rule is evidence, so it is not ignored, and no spec is named.
+  claims: new Set([
+    '--spec',
+    '--verbose',
+    '--watch',
+    '--fail-fast',
+    '--engine',
+    '--print-baseline',
+    '--ignore-status',
+    '--no-ignore-status',
+    '--include-specs',
+    '--no-include-specs',
+    '--max-snippets',
+    '--concurrency',
+    '--allow-empty',
+  ]),
 };
 
 /**
@@ -497,6 +526,7 @@ export function parseArgs(argv: readonly string[], cwd: string): CliOptions {
 
     if (onlyPositional || !argument.startsWith('-') || argument === '-') {
       if (command === 'mcp') throw new UsageError(`spec-guard mcp takes no arguments, got "${argument}". Name specs with --spec.`);
+      if (command === 'claims') throw new UsageError(`spec-guard claims takes no arguments, got "${argument}". Name the documents in the configuration's "claims".`);
       (command === 'query' || command === 'cites' || command === 'impact' ? options.paths : options.patterns).push(argument);
       continue;
     }
@@ -767,6 +797,9 @@ const QUERY_KEYS: ReadonlySet<ConfigKey> = new Set<ConfigKey>(['specs', 'exclude
 /** The configurable options a citation check reads: which specs, what to leave out, and how strictly. */
 const CITES_KEYS: ReadonlySet<ConfigKey> = new Set<ConfigKey>(['specs', 'exclude', 'strict', 'defaultSkips', 'comments', 'cites']);
 
+/** The configurable options a claims check reads: its own entry, and what decides whether a rule under a claim passes and can fail. */
+const CLAIMS_KEYS: ReadonlySet<ConfigKey> = new Set<ConfigKey>(['exclude', 'allowMissingTargets', 'allowEmptyScope', 'defaultSkips', 'comments', 'claims']);
+
 /** The configurable options a proof reads: what decides whether a rule passes, and not how a run is scheduled. */
 const PROVE_KEYS: ReadonlySet<ConfigKey> = new Set<ConfigKey>([
   'specs',
@@ -821,6 +854,9 @@ const SETTERS: { [Key in ConfigKey]-?: (options: CliOptions, value: NonNullable<
   cites: (options, value) => {
     options.cites = value.map((family) => ({ ...family }));
   },
+  claims: (options, value) => {
+    options.claims = value;
+  },
 };
 
 /**
@@ -846,7 +882,9 @@ export function applyConfig(options: CliOptions, config: ProjectConfig, file = '
           ? PROVE_KEYS.has(key)
           : options.command === 'cites'
             ? CITES_KEYS.has(key)
-            : key !== 'cites' && !(options.watch && key === 'engine');
+            : options.command === 'claims'
+              ? CLAIMS_KEYS.has(key)
+              : key !== 'cites' && key !== 'claims' && !(options.watch && key === 'engine');
     if (!reads) continue;
     if (options.fromCommandLine.has(key)) {
       overridden.push(key);
@@ -1250,6 +1288,53 @@ async function runCites(options: CliOptions, io: CliIO, use: ConfigUse | undefin
 }
 
 /**
+ * `spec-guard claims`: each claim the configured documents label, held to the
+ * evidence its label asks for. ADR-0020.
+ *
+ * Exit 1 for a finding; 2 where nothing can be answered - no `claims` in the
+ * configuration, or documents it names that match no file.
+ */
+async function runClaims(options: CliOptions, io: CliIO, use: ConfigUse | undefined): Promise<number> {
+  let report;
+  try {
+    if (options.claims === undefined) {
+      throw new ClaimsError('no claims are configured: name the documents and the labels in "claims", in .spec-guard.json or "specGuard" in package.json');
+    }
+    report = {
+      ...(await findClaimsReport({
+        root: options.root,
+        config: options.claims,
+        exclude: options.exclude,
+        defaultSkips: options.defaultSkips,
+        comments: options.comments,
+        allowMissingTargets: options.allowMissingTargets,
+        allowEmptyScope: options.allowEmptyScope,
+      })),
+      config: use,
+    };
+  } catch (error) {
+    io.stderr(`spec-guard: ${error instanceof Error ? error.message : String(error)}`);
+    return EXIT_ERROR;
+  }
+  const written =
+    options.format === 'json'
+      ? formatClaimsJson(report)
+      : options.format === 'sarif'
+        ? formatClaimsSarif(report, { version: version() })
+        : options.format === 'gitlab'
+          ? formatGitlab(claimsAnnotations(report))
+          : options.format === 'github'
+            ? formatGithub(claimsAnnotations(report))
+            : formatClaims(report, {
+                color: shouldUseColor({ isTTY: io.isTTY }, options.color, io.env),
+                verbose: false,
+                ascii: options.ascii ?? shouldUseAscii(io.env),
+              });
+  if (written !== '') io.stdout(written);
+  return report.ok ? EXIT_OK : EXIT_FAILED;
+}
+
+/**
  * Runs the CLI and resolves to the process exit code, for an error nothing
  * below expected too.
  *
@@ -1324,6 +1409,7 @@ async function run(argv: readonly string[], io: CliIO): Promise<number> {
 
   if (options.command === 'query') return runQuery(options, io, use);
   if (options.command === 'cites') return runCites(options, io, use);
+  if (options.command === 'claims') return runClaims(options, io, use);
   if (options.command === 'impact') return runImpact(options, io, use);
   if (options.command === 'mcp') return runMcp(options, commandLine, io, use);
   if (options.command === 'prove') return runProve(options, io, use);

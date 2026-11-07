@@ -88,6 +88,7 @@ describe('parseConfig', () => {
       maxSnippets: 0,
       concurrency: 1,
       cites: [{ id: 'ADR-{n}', files: 'docs/adr/{n}-*.md' }],
+      claims: { files: ['spec/*.md'], labels: { Implemented: { evidence: 'test' }, Specified: {} }, testPrefixes: ['fn test_'] },
     };
     expect(parseConfig(manifest(everything))).toEqual({ ...everything, engine: 'javascript' });
     expect(Object.keys(everything)).toEqual(CONFIG_KEYS);
@@ -134,7 +135,7 @@ describe('parseConfig', () => {
 
   it('refuses an unknown key, and lists the keys there are', () => {
     expect(refusal(manifest({ stict: true }))).toBe(
-      'package.json: unknown option "stict" in "specGuard". Options are specs, exclude, engine, strict, allowMissingTargets, allowEmptyScope, ignoreStatus, includeSpecs, defaultSkips, comments, maxSnippets, concurrency, cites.',
+      'package.json: unknown option "stict" in "specGuard". Options are specs, exclude, engine, strict, allowMissingTargets, allowEmptyScope, ignoreStatus, includeSpecs, defaultSkips, comments, maxSnippets, concurrency, cites, claims.',
     );
     // Not a way to reach an object's prototype, either.
     expect(refusal('{"specGuard": {"__proto__": {"strict": true}}}')).toMatch(/^package\.json: unknown option "__proto__"/);
@@ -414,8 +415,8 @@ describe('flags that a configuration can set', () => {
           process.cwd(),
         ).fromCommandLine,
       ].sort(),
-      // Every key but cites and comments, which name documents and files and have no flag.
-    ).toEqual(CONFIG_KEYS.filter((key) => key !== 'cites' && key !== 'comments').sort());
+      // Every key but cites, claims and comments, which name documents and files and have no flag.
+    ).toEqual(CONFIG_KEYS.filter((key) => key !== 'cites' && key !== 'claims' && key !== 'comments').sort());
     expect([...parseArgs(['--spec', 'a.md'], process.cwd()).fromCommandLine]).toEqual(['specs']);
     expect([...parseArgs(['query', 'src', '--spec', 'a.md'], process.cwd()).fromCommandLine]).toEqual(['specs']);
   });
@@ -475,9 +476,10 @@ describe('applyConfig', () => {
     maxSnippets: 9,
     concurrency: 3,
     cites: [{ id: 'ADR-{n}', files: 'docs/adr/{n}-*.md' }],
+    claims: { files: ['spec/*.md'], labels: { Implemented: { evidence: 'test' }, Specified: {} }, testPrefixes: ['fn test_'] },
   };
-  /** What a run reads: everything but cites, which is spec-guard cites' own. */
-  const RUN_KEYS = CONFIG_KEYS.filter((key) => key !== 'cites');
+  /** What a run reads: everything but cites and claims, which are those commands' own. */
+  const RUN_KEYS = CONFIG_KEYS.filter((key) => key !== 'cites' && key !== 'claims');
 
   it('fills in every option the command line left alone, and says so in the order of the keys', () => {
     const options = parseArgs([], cwd);
@@ -579,6 +581,15 @@ describe('applyConfig', () => {
       expect(options.comments, argv.join(' ')).not.toBe(comments);
     }
     for (const argv of [['query', 'src'], ['impact', 'src']]) expect(applyConfig(parseArgs(argv, cwd), { comments }), argv.join(' ')).toBeUndefined();
+  });
+
+  it('applies claims to spec-guard claims alone, with what decides whether a rule under a claim passes and can fail', () => {
+    const options = parseArgs(['claims'], cwd);
+    expect(applyConfig(options, everything)).toEqual({ file: 'package.json', applied: ['exclude', 'allowMissingTargets', 'allowEmptyScope', 'defaultSkips', 'comments', 'claims'], overridden: [] });
+    expect(options.claims).toEqual(everything.claims);
+    for (const argv of [[], ['query', 'src'], ['prove'], ['cites'], ['mcp'], ['--watch']]) {
+      expect(applyConfig(parseArgs(argv, cwd), { claims: everything.claims }), argv.join(' ')).toBeUndefined();
+    }
   });
 
   it('says nothing when a configuration had nothing for this command', () => {

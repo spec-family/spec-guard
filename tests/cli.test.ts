@@ -486,3 +486,66 @@ describe('comments in the configuration', () => {
     expect(JSON.parse(unnamed.out.join('')).summary).toMatchObject({ ghosts: 0, unclassified: 2 });
   });
 });
+
+describe('spec-guard claims', () => {
+  const CLAIMS = { files: ['spec/*.md'], labels: { Implemented: { evidence: 'test' }, Specified: {} }, testPrefixes: ['fn test_'] };
+
+  async function project(spec: string, claims: unknown = CLAIMS): Promise<string> {
+    const root = await makeTempRepo({
+      'compiler/lib.rs': 'fn test_spec_hash() {}\n',
+      'spec/a.md': spec,
+      '.spec-guard.json': JSON.stringify(claims === null ? { specs: ['spec/*.md'] } : { claims }),
+    });
+    temporary.push(root);
+    return root;
+  }
+  const HELD = '- `Implemented`: a field changes the hash.\n  <!-- @assert-count target="compiler" symbol="fn test_spec_hash" min="1" -->\n- `Specified`: units.\n';
+  const UNHELD = '- `Implemented`: nothing under it.\n';
+
+  it('exits 0 where every claim holds, and 1 for a finding, with the totals of each label', async () => {
+    const held = createIO();
+    expect(await main(['claims', '--root', await project(HELD)], held.io)).toBe(EXIT_OK);
+    expect(held.out.join('\n')).toContain('2 claims: Implemented 1, Specified 1');
+    const unheld = createIO();
+    expect(await main(['claims', '--root', await project(UNHELD)], unheld.io)).toBe(EXIT_FAILED);
+    expect(unheld.out.join('\n')).toContain('spec/a.md:1  `Implemented` needs a test, and no directive under the claim names one (fn test_)  unevidenced-claim');
+  });
+
+  it('writes JSON, SARIF and annotations for GitHub and GitLab', async () => {
+    const root = await project(UNHELD);
+    const json = createIO();
+    await main(['claims', '--root', root, '--format', 'json'], json.io);
+    expect(JSON.parse(json.out.join(''))).toMatchObject({
+      formatVersion: 1,
+      ok: false,
+      totals: { Implemented: 1, Specified: 0 },
+      claims: [{ file: 'spec/a.md', line: 1, label: 'Implemented', evidence: [] }],
+      findings: [{ rule: 'unevidenced-claim', file: 'spec/a.md', line: 1, column: 3 }],
+      config: { file: '.spec-guard.json', applied: ['claims'] },
+    });
+    const sarif = createIO();
+    await main(['claims', '--root', root, '--format', 'sarif'], sarif.io);
+    const run = JSON.parse(sarif.out.join('')).runs[0];
+    expect(run.tool.driver.name).toBe('spec-guard claims');
+    expect(run.tool.driver.rules.map((rule: { id: string }) => rule.id)).toEqual(['unevidenced-claim', 'mixed-labels', 'missing-criterion']);
+    expect(run.results[0]).toMatchObject({ ruleId: 'unevidenced-claim', level: 'error' });
+    const github = createIO();
+    await main(['claims', '--root', root, '--format', 'github'], github.io);
+    expect(github.out.join('\n')).toMatch(/^::error file=spec\/a\.md,line=1,title=unevidenced-claim::/);
+    const gitlab = createIO();
+    await main(['claims', '--root', root, '--format', 'gitlab'], gitlab.io);
+    expect(JSON.parse(gitlab.out.join(''))[0]).toMatchObject({ check_name: 'unevidenced-claim', severity: 'critical' });
+  });
+
+  it('exits 2 with nothing configured, for an argument, and for a spec named on the line', async () => {
+    const none = createIO();
+    expect(await main(['claims', '--root', await project(HELD, null)], none.io)).toBe(EXIT_ERROR);
+    expect(none.err.join('\n')).toContain('no claims are configured: name the documents and the labels in "claims"');
+    const root = await project(HELD);
+    const argument = createIO();
+    expect(await main(['claims', 'spec/a.md', '--root', root], argument.io)).toBe(EXIT_ERROR);
+    expect(argument.err.join('\n')).toContain('spec-guard claims takes no arguments, got "spec/a.md"');
+    const spec = createIO();
+    expect(await main(['claims', '--spec', 'spec/a.md', '--root', root], spec.io)).toBe(EXIT_ERROR);
+  });
+});

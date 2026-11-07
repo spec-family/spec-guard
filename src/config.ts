@@ -9,6 +9,7 @@
  * ADR-0014.
  */
 
+import { claimsConfigError, type ClaimsConfig } from './claims.js';
 import { citeFilesError, citeIdError } from './cites.js';
 import { commentTable } from './comments.js';
 import type { EnginePreference } from './engine.js';
@@ -41,6 +42,8 @@ export interface ProjectConfig {
   concurrency?: number;
   /** The documents code comments cite, for `spec-guard cites`: an id template and the files it names. */
   cites?: CiteFamily[];
+  /** The documents whose list items are claims, the labels, and what each asks, for `spec-guard claims` (ADR-0020). */
+  claims?: ClaimsConfig;
 }
 
 export type ConfigKey = keyof ProjectConfig;
@@ -60,6 +63,7 @@ export const CONFIG_KEYS: readonly ConfigKey[] = [
   'maxSnippets',
   'concurrency',
   'cites',
+  'claims',
 ];
 
 /**
@@ -157,6 +161,8 @@ function checkValue(key: ConfigKey, value: unknown): string | null {
       return Number.isInteger(value) && (value as number) >= 1 ? null : `must be an integer, 1 or more, got ${describe(value)}`;
     case 'cites':
       return citesIssue(value);
+    case 'claims':
+      return claimsConfigError(value);
     case 'comments':
       return commentsIssue(value);
     default:

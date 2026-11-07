@@ -1316,6 +1316,64 @@ reads only those paths.
 [ADR-0017](https://github.com/spec-family/spec-guard/blob/main/docs/adr/0017-citations-in-comments.md) has the design, and what is
 out of scope: links to symbols, which need a parser the family does not ship.
 
+## Does each claim have its evidence? - `claims`
+
+A specification marks what it says with how far it holds, and nothing held the
+mark to anything:
+
+```md
+- `Implemented`: a private field's change changes the spec hash.
+  <!-- @assert-count target="compiler" symbol="fn test_private_field_change_changes_spec_hash" min="1" -->
+- `Implemented`, as a token check only: raises `E0501 [Totality Error]`.
+  <!-- @assert-count target="compiler" symbol="E0501 [Totality Error]" min="1" -->
+- `Hypothesis`: agents write fewer guards. Criterion: the repair count.
+```
+
+`spec-guard claims` holds each claim to what its label asks, from the
+configuration:
+
+```json
+{
+  "claims": {
+    "files": ["spec/*.md"],
+    "labels": {
+      "Implemented": { "evidence": "test" },
+      "Specified": {},
+      "Hypothesis": { "criterion": "Criterion:" }
+    },
+    "testPrefixes": ["fn test_"]
+  }
+}
+```
+
+```text
+x spec/holographic.md:3  `Implemented` needs a test, and no directive under the claim names one (fn test_)  unevidenced-claim
+    hint: write a directive under the claim that counts the test, as <!-- @assert-count target="..." symbol="fn test_..." min="1" -->, or lower the label
+
+3 claims: Implemented 2, Specified 0, Hypothesis 1 - 14ms
+x 1 claim finding
+```
+
+- **A claim** is a list item that opens with a label as a code span, after a
+  checkbox where there is one; a nested item is a claim of its own.
+- **Its evidence** is a directive written under it. `"evidence": "test"` asks
+  for an `@assert-count` whose `symbol` starts with one of `testPrefixes`,
+  with a `min` or `expected` of at least 1, in a document in force, that
+  [`prove`](#can-each-rule-fail---prove) shows can fail. A count of an error
+  string is no evidence of a test, and the finding says why a directive was
+  not evidence: none named a test, its document is not in force, or prove
+  could not show it failing.
+- **`"criterion"`** asks for that text in the claim's own words.
+- **One label per claim**: an item whose own words hold two is
+  `mixed-labels`.
+- **The totals** of each label are in the report and in JSON, never in a
+  document.
+- `--format json`, `sarif`, `github` and `gitlab`, as `cites`. No `claims`
+  in the configuration, or `files` that match nothing, is exit 2.
+
+Which item is a claim is spec-core's reading, which spec-graph reads too
+([ADR-0020](https://github.com/spec-family/spec-guard/blob/main/docs/adr/0020-a-claim-is-held-to-its-evidence.md)).
+
 ## Who depends on this? - `impact`
 
 Before changing a file, the question after "which rules govern it" is "what
@@ -1556,6 +1614,7 @@ same options, at the top level, in `.spec-guard.json`:
 | `comments` | none | an object from an extension (`".mn"`) or a file name (`"LICENSE-MIT"`) to a comment profile ([comments](#comments---the-note-about-a-deletion-is-not-the-deletion)) |
 | `maxSnippets` | `--max-snippets` | an integer, 0 or more |
 | `concurrency` | `--concurrency` | an integer, 1 or more |
+| `claims` | none; `spec-guard claims` reads it | `{ "files": [...], "labels": { "<label>": { "evidence"?: "test", "criterion"?: "<text>" } }, "testPrefixes"?: [...] }` ([claims](#does-each-claim-have-its-evidence---claims)) |
 | `cites` | none; `spec-guard cites` reads it | a non-empty array of `{ "id": "ADR-{n}", "files": "docs/adr/{n}-*.md" }`, and no other key |
 
 - **Only the root's files** are read: the `--root` directory, or the working

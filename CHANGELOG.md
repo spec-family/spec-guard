@@ -14,6 +14,19 @@ is deprecated before it goes, is spec-core's
 
 ### Added
 
+- **`spec-guard claims` holds each claim a specification labels to its
+  evidence.** A list item that opens with a label as a code span, such as
+  `` - `Implemented`: ``, is a claim, and the configuration's `"claims"` says
+  which documents hold claims and what each label asks: `"evidence":
+  "test"`, a directive written under the claim that counts a test, by
+  `testPrefixes`, in a document in force, which `prove` shows can fail; and
+  `"criterion"`, text the claim's own words hold. A claim with two labels is
+  a finding too. The totals of each label are in the report and in JSON,
+  with SARIF and GitHub and GitLab annotations as `cites` has; no `claims`
+  is exit 2 and changes nothing else. Which item is a claim is spec-core's
+  reading, at 90a7ba8
+  ([ADR-0020](https://github.com/spec-family/spec-guard/blob/main/docs/adr/0020-a-claim-is-held-to-its-evidence.md)).
+
 - **`comments` in the configuration names a file's comment syntax.** A file
   the built-in table does not know had its comments counted as code, so a
   rule with a `min` was satisfied by a comment that names the symbol, and the

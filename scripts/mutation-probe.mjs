@@ -544,6 +544,7 @@ async function main() {
 
   const DEMO = path.join(FROZEN, 'tests', 'fixtures', 'demo-repo');
   const CITES = path.join(FROZEN, 'tests', 'fixtures', 'cites-corpus');
+  const CLAIMS = path.join(FROZEN, 'tests', 'fixtures', 'claims-corpus');
   const stable = (report) => ({ ...report, durationMs: 0, results: report.results.map((result) => ({ ...result, durationMs: 0 })) });
   const demoRun = stable(await runner.runSpecGuard({ patterns: ['docs/**/*.md'], root: DEMO, engine: 'javascript' }));
 
@@ -669,7 +670,7 @@ async function main() {
   say('cli.exits', '-', `${cli.EXIT_OK}|${cli.EXIT_FAILED}|${cli.EXIT_ERROR}`);
   say('cli.help', '-', createHash('sha256').update(cli.HELP).digest('hex'));
 
-  const TREES = { demo: DEMO, cites: CITES, project: FROZEN };
+  const TREES = { demo: DEMO, cites: CITES, claims: CLAIMS, project: FROZEN };
   /** Command lines the parser reads, each in the tree it runs in, and the exit code where the fixture's name promises one. */
   const ARGVS = [
     ['demo', []], ['demo', ['--help']], ['demo', ['-h']], ['demo', ['--version']],
@@ -704,6 +705,8 @@ async function main() {
     ['cites', ['cites']], ['cites', ['cites', '--strict']], ['cites', ['cites', '--format', 'json']],
     ['cites', ['cites', '--format', 'sarif']], ['cites', ['cites', '--format', 'github']], ['cites', ['cites', '--format', 'gitlab']],
     ['cites', ['cites', 'crates']], ['cites', ['cites', '--exclude', 'crates']], ['cites', ['query', 'crates']], ['cites', ['prove']],
+    ['claims', ['claims']], ['claims', ['claims', '--format', 'json']], ['claims', ['claims', '--format', 'sarif']],
+    ['claims', ['claims', '--format', 'github']], ['claims', ['claims', '--format', 'gitlab']], ['claims', ['claims', '--strict']], ['demo', ['claims']],
     ['project', []], ['project', ['--format', 'gitlab']], ['project', ['--strict', '--verbose']],
     ['project', ['query', 'src/engine.ts', 'src/vendor/spec-core/text/index.ts']], ['project', ['query', 'src', '--format', 'json']],
     ['project', ['prove']], ['project', ['prove', '--format', 'json']],

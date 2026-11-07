@@ -1,6 +1,6 @@
 {
   "source": "https://github.com/spec-family/spec-core",
-  "commit": "1104df782e29fb8969d3d4717c4a507b8027495f",
+  "commit": "90a7ba8f7a3f77773701d66cf8285bc5f43bdff4",
   "modules": {
     "jsonrpc": {
       "files": {
@@ -10,9 +10,10 @@
     },
     "markdown": {
       "files": {
+        "claims.ts": "sha256-031018a73b26df4a927b0b38a99b1213b442e39c909f6c099dff5c96065a3207",
         "frontmatter.ts": "sha256-e4cdf9b5ef5886b6b4b439790c4fbc4fbbd0f2dd90ee1971ab794bbdebd5af8d",
         "headings.ts": "sha256-70c68c677556f44354204b9c00fd5a465d9051f348b41ed70c0187456bab0eb1",
-        "index.ts": "sha256-6b6bbd394d85c1830be81f08492cd96f9b9ad0a92df440267db7c4040fd1c37b",
+        "index.ts": "sha256-f16438c6b60f6f0bc44b464bb27a49e25b228d660134264f26b641b4024f5af6",
         "layout.ts": "sha256-11293f9961ce7fcc672743e72945dcaa0a1475a8adea166ea10fa9c542cd6f75",
         "links.ts": "sha256-d85b0cfedd2ab1f0db019681528f09faf8b1a57af4bda7faa0c04498aa8d3282",
         "lists.ts": "sha256-ac2fa8e5c35ca0b17b2727f4a3d9b52edb56ebb7392955d79aa029bc3ae11ea6",
