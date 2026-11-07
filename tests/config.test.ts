@@ -84,7 +84,7 @@ describe('parseConfig', () => {
       ignoreStatus: false,
       includeSpecs: true,
       defaultSkips: false,
-      comments: { '.mn': 'c-like', 'LICENSE-MIT': 'none' },
+      comments: { '.dsl': 'c-like', 'LICENSE-MIT': 'none' },
       maxSnippets: 0,
       concurrency: 1,
       cites: [{ id: 'ADR-{n}', files: 'docs/adr/{n}-*.md' }],
@@ -122,15 +122,15 @@ describe('parseConfig', () => {
   });
 
   it("reads a file's comment syntax by extension or file name, and refuses what names neither, or no profile", () => {
-    expect(parseConfig(manifest({ comments: { '.mn': 'c-like', '.MN2': 'rust', 'LICENSE-MIT': 'none' } }))).toEqual({ comments: { '.mn': 'c-like', '.MN2': 'rust', 'LICENSE-MIT': 'none' } });
+    expect(parseConfig(manifest({ comments: { '.dsl': 'c-like', '.DSL2': 'rust', 'LICENSE-MIT': 'none' } }))).toEqual({ comments: { '.dsl': 'c-like', '.DSL2': 'rust', 'LICENSE-MIT': 'none' } });
     const profiles = 'javascript, c-like, c#, rust, go, hash, shell, yaml, sql-like, markup, none';
-    expect(refusal(manifest({ comments: {} }))).toBe('package.json: "specGuard.comments" must be an object such as { ".mn": "c-like" }, got an object.');
-    expect(refusal(manifest({ comments: ['.mn'] }))).toBe('package.json: "specGuard.comments" must be an object such as { ".mn": "c-like" }, got an array.');
-    expect(refusal(manifest({ comments: '.mn' }))).toBe('package.json: "specGuard.comments" must be an object such as { ".mn": "c-like" }, got ".mn".');
-    expect(refusal(manifest({ comments: { 'src/*.mn': 'c-like' } }))).toBe('package.json: "specGuard.comments" has "src/*.mn", which is neither an extension, such as ".mn", nor a file name, such as "LICENSE-MIT".');
-    expect(refusal(manifest({ comments: { '.mn': 'cpp' } }))).toBe(`package.json: "specGuard.comments" has ".mn" for "cpp", which is no profile; a profile is one of ${profiles}.`);
-    expect(refusal(manifest({ comments: { '.mn': 'c-like', '.MN': 'c-like' } }))).toBe('package.json: "specGuard.comments" has ".MN", which names the extension .mn a second time.');
-    expect(() => parseStandaloneConfig('{"comments": {".mn": true}}')).toThrow(`.spec-guard.json: "comments" has ".mn" for no profile; a profile is one of ${profiles}.`);
+    expect(refusal(manifest({ comments: {} }))).toBe('package.json: "specGuard.comments" must be an object such as { ".dsl": "c-like" }, got an object.');
+    expect(refusal(manifest({ comments: ['.dsl'] }))).toBe('package.json: "specGuard.comments" must be an object such as { ".dsl": "c-like" }, got an array.');
+    expect(refusal(manifest({ comments: '.dsl' }))).toBe('package.json: "specGuard.comments" must be an object such as { ".dsl": "c-like" }, got ".dsl".');
+    expect(refusal(manifest({ comments: { 'src/*.dsl': 'c-like' } }))).toBe('package.json: "specGuard.comments" has "src/*.dsl", which is neither an extension, such as ".dsl", nor a file name, such as "LICENSE-MIT".');
+    expect(refusal(manifest({ comments: { '.dsl': 'cpp' } }))).toBe(`package.json: "specGuard.comments" has ".dsl" for "cpp", which is no profile; a profile is one of ${profiles}.`);
+    expect(refusal(manifest({ comments: { '.dsl': 'c-like', '.DSL': 'c-like' } }))).toBe('package.json: "specGuard.comments" has ".DSL", which names the extension .dsl a second time.');
+    expect(() => parseStandaloneConfig('{"comments": {".dsl": true}}')).toThrow(`.spec-guard.json: "comments" has ".dsl" for no profile; a profile is one of ${profiles}.`);
   });
 
   it('refuses an unknown key, and lists the keys there are', () => {
@@ -472,7 +472,7 @@ describe('applyConfig', () => {
     ignoreStatus: true,
     includeSpecs: true,
     defaultSkips: false,
-    comments: { '.mn': 'c-like' },
+    comments: { '.dsl': 'c-like' },
     maxSnippets: 9,
     concurrency: 3,
     cites: [{ id: 'ADR-{n}', files: 'docs/adr/{n}-*.md' }],
@@ -563,7 +563,7 @@ describe('applyConfig', () => {
   it('applies cites to spec-guard cites alone, with what else it reads, and a copy of each family', () => {
     const options = parseArgs(['cites'], cwd);
     expect(applyConfig(options, everything)).toEqual({ file: 'package.json', applied: ['specs', 'exclude', 'strict', 'defaultSkips', 'comments', 'cites'], overridden: [] });
-    expect(options.comments).toEqual({ '.mn': 'c-like' });
+    expect(options.comments).toEqual({ '.dsl': 'c-like' });
     expect(options.cites).toEqual([{ id: 'ADR-{n}', files: 'docs/adr/{n}-*.md' }]);
     (options.cites?.[0] as { id: string }).id = 'X-{n}';
     expect(everything.cites?.[0]?.id).toBe('ADR-{n}');
@@ -573,7 +573,7 @@ describe('applyConfig', () => {
   });
 
   it("applies comments to every command that reads a file's comments, and to no query", () => {
-    const comments = { '.mn': 'c-like' };
+    const comments = { '.dsl': 'c-like' };
     for (const argv of [[], ['prove'], ['cites'], ['mcp'], ['--watch']]) {
       const options = parseArgs(argv, cwd);
       expect(applyConfig(options, { comments }), argv.join(' ')).toEqual({ file: 'package.json', applied: ['comments'], overridden: [] });

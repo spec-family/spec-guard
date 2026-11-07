@@ -785,7 +785,7 @@ a match. So a project names what the table does not know, in its
 [configuration](#configuration):
 
 ```json
-{ "comments": { ".mn": "c-like", "LICENSE-MIT": "none" } }
+{ "comments": { ".dsl": "c-like", "LICENSE-MIT": "none" } }
 ```
 
 - A key is an extension, a dot and one segment read in any case, or a whole
@@ -1327,11 +1327,11 @@ A specification marks what it says with how far it holds, and nothing held the
 mark to anything:
 
 ```md
-- `Implemented`: a private field's change changes the spec hash.
-  <!-- @assert-count target="compiler" symbol="fn test_private_field_change_changes_spec_hash" min="1" -->
-- `Implemented`, as a token check only: raises `E0501 [Totality Error]`.
-  <!-- @assert-count target="compiler" symbol="E0501 [Totality Error]" min="1" -->
-- `Hypothesis`: agents write fewer guards. Criterion: the repair count.
+- `Implemented`: a refund over the captured amount is refused.
+  <!-- @assert-count target="payments" symbol="fn test_refund_over_capture_is_refused" min="1" -->
+- `Implemented`, as a token check only: raises `E0420 [Refund Error]`.
+  <!-- @assert-count target="payments" symbol="E0420 [Refund Error]" min="1" -->
+- `Hypothesis`: retries cut failed captures. Criterion: the failed-capture rate.
 ```
 
 `spec-guard claims` holds each claim to what its label asks, from the
@@ -1352,7 +1352,7 @@ configuration:
 ```
 
 ```text
-x spec/holographic.md:3  `Implemented` needs a test, and no directive under the claim names one (fn test_)  unevidenced-claim
+x spec/refunds.md:3  `Implemented` needs a test, and no directive under the claim names one (fn test_)  unevidenced-claim
     hint: write a directive under the claim that counts the test, as <!-- @assert-count target="..." symbol="fn test_..." min="1" -->, or lower the label
 
 3 claims: Implemented 2, Specified 0, Hypothesis 1 - 14ms
@@ -1616,7 +1616,7 @@ same options, at the top level, in `.spec-guard.json`:
 | `exclude` | `--exclude` | an array of paths, gitignore-style, left out of every assertion that takes `exclude`; no `!`, `..`, drive path or root |
 | `engine` | `--engine` | `"auto"`, `"rg"` or `"js"` |
 | `strict`, `allowMissingTargets`, `allowEmptyScope`, `ignoreStatus`, `includeSpecs`, `defaultSkips` | the flag of that name | `true` or `false` |
-| `comments` | none | an object from an extension (`".mn"`) or a file name (`"LICENSE-MIT"`) to a comment profile ([comments](#comments---the-note-about-a-deletion-is-not-the-deletion)) |
+| `comments` | none | an object from an extension (`".dsl"`) or a file name (`"LICENSE-MIT"`) to a comment profile ([comments](#comments---the-note-about-a-deletion-is-not-the-deletion)) |
 | `maxSnippets` | `--max-snippets` | an integer, 0 or more |
 | `concurrency` | `--concurrency` | an integer, 1 or more |
 | `claims` | none; `spec-guard claims` reads it | `{ "files": [...], "labels": { "<label>": { "evidence"?: "test", "criterion"?: "<text>" } }, "testPrefixes"?: [...] }` ([claims](#does-each-claim-have-its-evidence---claims)) |

@@ -48,7 +48,7 @@ knows more common languages and reads a script by its `#!` line.
 - **`comments` in the configuration names a file's comment syntax.** A file
   the built-in table does not know had its comments counted as code, so a
   rule with a `min` was satisfied by a comment that names the symbol, and the
-  only way to say otherwise was to patch `dist/comments.js`. `{ ".mn":
+  only way to say otherwise was to patch `dist/comments.js`. `{ ".dsl":
   "c-like", "LICENSE-MIT": "none" }` gives an extension or a whole file name
   one of the profiles there are, `javascript`, `c-like`, `c#`, `rust`, `go`,
   `hash`, `shell`, `yaml`, `sql-like`, `markup` or `none`, read before the

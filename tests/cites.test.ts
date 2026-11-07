@@ -770,17 +770,17 @@ describe('a scan', () => {
   });
 
   it("reads the comments of a file the project names a syntax for, and refuses a table that cannot be read", async () => {
-    const files = { 'compiler/sema.mn': '/// ADR-0099 says why\nfn f() {}\n', 'LICENSE-MIT': 'ADR-0099\n' };
+    const files = { 'payments/sema.dsl': '/// ADR-0099 says why\nfn f() {}\n', 'LICENSE-MIT': 'ADR-0099\n' };
     const unnamed = await cites(files);
     expect(found(unnamed)).toEqual([]);
     expect(unnamed.unclassified).toEqual([
       { extension: '(none)', files: 1 },
-      { extension: '.mn', files: 1 },
+      { extension: '.dsl', files: 1 },
     ]);
-    const named = await cites(files, { comments: { '.mn': 'c-like', 'LICENSE-MIT': 'none' } });
-    expect(found(named)).toEqual(['compiler/sema.mn:1:5 ghost-citation ADR-0099']);
+    const named = await cites(files, { comments: { '.dsl': 'c-like', 'LICENSE-MIT': 'none' } });
+    expect(found(named)).toEqual(['payments/sema.dsl:1:5 ghost-citation ADR-0099']);
     expect(named.unclassified).toEqual([]);
-    await expect(cites(files, { comments: { '.mn': 'cpp' } })).rejects.toThrow(new CitesError('comments: ".mn" for "cpp", which is no profile; a profile is one of javascript, c-like, c#, rust, go, hash, shell, yaml, sql-like, markup, none'));
+    await expect(cites(files, { comments: { '.dsl': 'cpp' } })).rejects.toThrow(new CitesError('comments: ".dsl" for "cpp", which is no profile; a profile is one of javascript, c-like, c#, rust, go, hash, shell, yaml, sql-like, markup, none'));
   });
 
   it('counts the unclassified extensions most common first, then by name', async () => {

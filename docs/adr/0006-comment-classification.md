@@ -325,9 +325,9 @@ otherwise look absurd.
 does not know.** The paragraph above holds for `@assert-absence` and a `max`,
 and not for a `min`: a comment counted as code is a match, so a rule that
 needs one is satisfied by a comment in a language the table does not know.
-*Claimed* by a consumer of the family, whose compiler is written in its own
-language, `.mn`, commented with `//` and `///`: a rule that a diagnostic is
-raised, `@assert-count symbol="E0501 [Totality Error]" min="1"`, passed on a
+*Claimed* by a consumer of the family, whose code is written in a language of
+its own, `.dsl`, commented with `//` and `///`: a rule that a diagnostic is
+raised, `@assert-count symbol="E0420 [Refund Error]" min="1"`, passed on a
 `///` line that names the diagnostic and raises nothing, and the only way to
 teach spec-guard otherwise was a `postinstall` script patching
 `dist/comments.js`, which every upgrade undoes. *Measured* on 0.31.0: that rule
@@ -336,7 +336,7 @@ over that file passes, and says the file could not be classified.
 - **`comments` in the configuration**, `.spec-guard.json` or `"specGuard"`
   in `package.json`, maps a key to one of the profiles above by its name:
   `javascript`, `c-like`, `c#`, `rust`, `go`, `hash`, `shell`, `yaml`,
-  `sql-like`, `markup` or `none`. `{ ".mn": "c-like", "LICENSE-MIT": "none" }`.
+  `sql-like`, `markup` or `none`. `{ ".dsl": "c-like", "LICENSE-MIT": "none" }`.
 - **A key is an extension or a file name.** An extension is a dot and one
   segment, read in any case as the table reads one; anything else is a whole
   file name, in its case, which is how a file with no extension, `LICENSE-MIT`

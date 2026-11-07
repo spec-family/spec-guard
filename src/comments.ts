@@ -519,7 +519,7 @@ const PROFILE_NAMES: ReadonlySet<unknown> = new Set<unknown>(COMMENT_PROFILES);
 
 /**
  * What a project's configuration says of the files the table above does not
- * know, or knows otherwise: an extension, `.mn`, or a whole file name,
+ * know, or knows otherwise: an extension, `.dsl`, or a whole file name,
  * `LICENSE-MIT`, each given one of the profiles above by its name. A file
  * name is read before an extension, and both before the built-in table, so a
  * project that writes `.m` for MATLAB rather than Objective-C can say so
@@ -546,7 +546,7 @@ export const BUILT_IN_ONLY: CommentTable = { extensions: new Map(), names: new M
  */
 export function commentEntryError(key: string, value: unknown): string | null {
   if (key.startsWith('.') ? !/^\.[^./\\*?[\s]+$/.test(key) : key === '' || /[/\\]/.test(key) || /[*?[]/.test(key)) {
-    return `"${key}", which is neither an extension, such as ".mn", nor a file name, such as "LICENSE-MIT"`;
+    return `"${key}", which is neither an extension, such as ".dsl", nor a file name, such as "LICENSE-MIT"`;
   }
   if (!PROFILE_NAMES.has(value)) {
     return `"${key}" for ${typeof value === 'string' ? `"${value}", which is no profile` : 'no profile'}; a profile is one of ${COMMENT_PROFILES.join(', ')}`;
@@ -614,7 +614,7 @@ export function shebangSyntax(source: string): CommentSyntax | null {
  * The comment syntax of a file whose text is in hand: as `syntaxFor` reads its
  * path, and for a file with no extension the path says nothing of, as its
  * `#!` line says, which is how a script in `bin/` names its language. A file
- * with an extension is not read for one: `.mn` beginning `#!/bin/sh` is a
+ * with an extension is not read for one: `.dsl` beginning `#!/bin/sh` is a
  * question for the project's configuration, not for a guess.
  */
 export function syntaxOf(filePath: string, source: string, table: CommentTable = BUILT_IN_ONLY): CommentSyntax | null {

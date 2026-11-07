@@ -10,9 +10,8 @@ A consumer of the family marks each item of its specifications with how far
 it holds:
 
 ```md
-- `Implemented`, as a token check only: `verify_function_contracts` raises
-  `E0501 [Totality Error]` when a `@total` function's body contains `while`
-  and no `decreases`.
+- `Implemented`, as a token check only: `refund` raises
+  `E0420 [Refund Error]` when the amount is over what was captured.
 ```
 
 Its rule is that `Implemented` needs a unit test that fails when the
@@ -81,7 +80,7 @@ claim to what its label asks, and fails, exit 1, where one does not.**
   would settle it. Directives under a claim whose label asks for no test are
   run as rules and are evidence of nothing.
 - **One label per claim.** An item whose own words hold two labels as code
-  spans, `` `Specified`; the conversion is `Implemented` ``, is a finding:
+  spans, `` `Specified`; the partial refund is `Implemented` ``, is a finding:
   the consumer writes that today, and moves to one item per label.
 - **The totals of each label** are in the report and in JSON, and never
   written into a document.
