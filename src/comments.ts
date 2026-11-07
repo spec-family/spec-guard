@@ -470,9 +470,78 @@ register(MARKUP, ['.csproj', '.fsproj', '.vbproj', '.props', '.targets', '.slnx'
 register(C_LIKE, ['.jsonc']);
 register(NO_COMMENTS, ['.json', '.txt', '.csv', '.tsv', '.lock', '.log']);
 
+/** The profiles a project may name, in the order they are documented. */
+export const COMMENT_PROFILES: readonly string[] = [...BY_NAME.keys()];
+
+/** The same names, asked of a value that may be no string at all. */
+const PROFILE_NAMES: ReadonlySet<unknown> = new Set<unknown>(COMMENT_PROFILES);
+
+/**
+ * What a project's configuration says of the files the table above does not
+ * know, or knows otherwise: an extension, `.mn`, or a whole file name,
+ * `LICENSE-MIT`, each given one of the profiles above by its name. A file
+ * name is read before an extension, and both before the built-in table, so a
+ * project that writes `.m` for MATLAB rather than Objective-C can say so
+ * (ADR-0006, amended 2026-11-07). The profiles are this module's: a new
+ * language's strings and escapes are a lexer, not a line of configuration.
+ */
+export interface CommentTable {
+  readonly extensions: ReadonlyMap<string, CommentSyntax>;
+  readonly names: ReadonlyMap<string, CommentSyntax>;
+  /**
+   * The same entries as one text, for what remembers a scan: a file read
+   * under another table is another answer (ADR-0014).
+   */
+  readonly key: string;
+}
+
+/** No entries: the built-in table alone. */
+export const BUILT_IN_ONLY: CommentTable = { extensions: new Map(), names: new Map(), key: '' };
+
+/**
+ * What is wrong with one entry of a project's `comments`, or null. A key is an
+ * extension, a dot and one segment, or a file name; a path or a pattern would
+ * read as a name no file has, and match nothing without a word.
+ */
+export function commentEntryError(key: string, value: unknown): string | null {
+  if (key.startsWith('.') ? !/^\.[^./\\*?[\s]+$/.test(key) : key === '' || /[/\\]/.test(key) || /[*?[]/.test(key)) {
+    return `"${key}", which is neither an extension, such as ".mn", nor a file name, such as "LICENSE-MIT"`;
+  }
+  if (!PROFILE_NAMES.has(value)) {
+    return `"${key}" for ${typeof value === 'string' ? `"${value}", which is no profile` : 'no profile'}; a profile is one of ${COMMENT_PROFILES.join(', ')}`;
+  }
+  return null;
+}
+
+/**
+ * The table of a project's `comments`, its entries checked by
+ * `commentEntryError` first. An extension is read in any case, as the built-in
+ * table reads it, so two keys that differ only in case are one key named
+ * twice, and refused.
+ */
+export function commentTable(entries: Readonly<Record<string, string>>): CommentTable {
+  const extensions = new Map<string, CommentSyntax>();
+  const names = new Map<string, CommentSyntax>();
+  for (const [key, value] of Object.entries(entries)) {
+    const error = commentEntryError(key, value);
+    if (error !== null) throw new Error(error);
+    const syntax = BY_NAME.get(value)!;
+    if (!key.startsWith('.')) {
+      names.set(key, syntax);
+      continue;
+    }
+    const extension = key.toLowerCase();
+    if (extensions.has(extension)) throw new Error(`"${key}", which names the extension ${extension} a second time`);
+    extensions.set(extension, syntax);
+  }
+  const key = JSON.stringify([[...extensions].map(([k, v]) => [k, v.name]).sort(), [...names].map(([k, v]) => [k, v.name]).sort()]);
+  return extensions.size + names.size === 0 ? BUILT_IN_ONLY : { extensions, names, key };
+}
+
 /** The comment syntax for a path, or null when the language is unknown. */
-export function syntaxFor(filePath: string): CommentSyntax | null {
-  return BY_EXTENSION.get(path.extname(filePath).toLowerCase()) ?? null;
+export function syntaxFor(filePath: string, table: CommentTable = BUILT_IN_ONLY): CommentSyntax | null {
+  const extension = path.extname(filePath).toLowerCase();
+  return table.names.get(path.basename(filePath)) ?? table.extensions.get(extension) ?? BY_EXTENSION.get(extension) ?? null;
 }
 
 export function syntaxNamed(name: string): CommentSyntax | null {
@@ -858,8 +927,8 @@ const UNCLASSIFIED: CommentMask = {
   isComment: () => false,
 };
 
-export function createCommentMask(source: string, filePath: string): CommentMask {
-  const syntax = syntaxFor(filePath);
+export function createCommentMask(source: string, filePath: string, table: CommentTable = BUILT_IN_ONLY): CommentMask {
+  const syntax = syntaxFor(filePath, table);
   if (!syntax) return UNCLASSIFIED;
 
   const ranges = commentRanges(source, syntax);

@@ -125,6 +125,8 @@ export interface CliOptions {
   engine: EnginePreference;
   allowMissingTargets: boolean;
   defaultSkips: boolean;
+  /** A file's comment syntax, by extension or file name; the configuration's alone, with no flag. */
+  comments?: Record<string, string>;
   /** Paths no assertion looks at, beside each directive's own exclude. */
   exclude: string[];
   ignoreStatus: boolean;
@@ -255,13 +257,16 @@ Options
 Configuration
   package.json in the root can hold specs, exclude, engine, strict,
   allowMissingTargets, allowEmptyScope, ignoreStatus, includeSpecs, defaultSkips,
-  maxSnippets and concurrency under "specGuard"; a root with no package.json can
+  comments, maxSnippets and concurrency under "specGuard"; a root with no package.json can
   keep them in .spec-guard.json instead, but not in both. A flag wins over the
   file, every on/off option there also takes its opposite (--no-strict,
   --default-skips, ...), and --exclude= with nothing clears exclude.
   "cites": [{ "id": "ADR-{n}", "files": "docs/adr/{n}-*.md" }] names the
   documents code comments cite; without it, cites reads them off the titles of
-  numbered specs.
+  numbered specs. "comments": { ".mn": "c-like", "LICENSE-MIT": "none" } names
+  the comment syntax of a file the built-in table does not know, by extension or
+  file name, as one of c-like, javascript, c#, rust, go, hash, shell, yaml,
+  sql-like, markup or none.
 
 Directives
   <!-- @assert-absence target="src/" symbol="LegacyGateway" exclude="src/legacy/**" -->
@@ -760,7 +765,7 @@ export function parseArgs(argv: readonly string[], cwd: string): CliOptions {
 const QUERY_KEYS: ReadonlySet<ConfigKey> = new Set<ConfigKey>(['specs', 'exclude', 'ignoreStatus', 'includeSpecs', 'defaultSkips']);
 
 /** The configurable options a citation check reads: which specs, what to leave out, and how strictly. */
-const CITES_KEYS: ReadonlySet<ConfigKey> = new Set<ConfigKey>(['specs', 'exclude', 'strict', 'defaultSkips', 'cites']);
+const CITES_KEYS: ReadonlySet<ConfigKey> = new Set<ConfigKey>(['specs', 'exclude', 'strict', 'defaultSkips', 'comments', 'cites']);
 
 /** The configurable options a proof reads: what decides whether a rule passes, and not how a run is scheduled. */
 const PROVE_KEYS: ReadonlySet<ConfigKey> = new Set<ConfigKey>([
@@ -772,6 +777,7 @@ const PROVE_KEYS: ReadonlySet<ConfigKey> = new Set<ConfigKey>([
   'ignoreStatus',
   'includeSpecs',
   'defaultSkips',
+  'comments',
 ]);
 
 /** Where each key of a configuration lands on the command line's options. */
@@ -802,6 +808,9 @@ const SETTERS: { [Key in ConfigKey]-?: (options: CliOptions, value: NonNullable<
   },
   defaultSkips: (options, value) => {
     options.defaultSkips = value;
+  },
+  comments: (options, value) => {
+    options.comments = { ...value };
   },
   maxSnippets: (options, value) => {
     options.maxSnippets = value;
@@ -871,6 +880,7 @@ function runOptionsOf(options: CliOptions): Omit<RunOptions, 'patterns' | 'root'
     allowMissingTargets: options.allowMissingTargets,
     allowEmptyScope: options.allowEmptyScope,
     defaultSkips: options.defaultSkips,
+    comments: options.comments,
     exclude: options.exclude,
     ignoreStatus: options.ignoreStatus,
     strictTargets: options.strictTargets,
@@ -1087,6 +1097,7 @@ async function runProve(options: CliOptions, io: CliIO, use: ConfigUse | undefin
         allowEmptyScope: options.allowEmptyScope,
         includeSpecs: options.includeSpecs,
         defaultSkips: options.defaultSkips,
+        comments: options.comments,
         exclude: options.exclude,
         ignoreStatus: options.ignoreStatus,
       })),
@@ -1199,6 +1210,7 @@ async function runCites(options: CliOptions, io: CliIO, use: ConfigUse | undefin
         ...(paths.length === 0 ? {} : { paths: paths.map((entry) => entry.path) }),
         exclude: options.exclude,
         defaultSkips: options.defaultSkips,
+        comments: options.comments,
         strict: options.strictTargets,
       })),
       config: use,

@@ -440,3 +440,49 @@ describe('--print-baseline', () => {
     expect(out.join('\n')).toContain('nothing to baseline');
   });
 });
+
+describe('comments in the configuration', () => {
+  // Mente's compiler: a diagnostic named in a /// line and raised nowhere.
+  const FILES = {
+    'docs/a.md': '# A\n\nStatus: Accepted\n\n<!-- @assert-count target="compiler" symbol="E0501" min="1" -->\n',
+    'compiler/sema.mn': '/// raises E0501 when a while has no decreases\nfn verify() {}\n',
+    'compiler/cite.mn': '// ADR-0099 says why\n',
+    // A family of numbered documents, which cites reads its ids off.
+    'docs/adr/0001-one.md': '# ADR-0001: One\n\nStatus: Accepted\n',
+  };
+
+  async function project(comments: boolean): Promise<string> {
+    const root = await makeTempRepo({
+      ...FILES,
+      '.spec-guard.json': JSON.stringify({ specs: ['docs/**/*.md'], ...(comments ? { comments: { '.mn': 'c-like' } } : {}) }),
+    });
+    temporary.push(root);
+    return root;
+  }
+
+  it('reaches a run, which then holds that a comment satisfies no min', async () => {
+    const { io, out } = createIO();
+    expect(await main(['--root', await project(true), '--engine', 'js', '--json'], io)).toBe(EXIT_FAILED);
+    expect(JSON.parse(out.join(''))).toMatchObject({ ok: false, config: { file: '.spec-guard.json', applied: ['specs', 'comments'] } });
+    const without = createIO();
+    expect(await main(['--root', await project(false), '--engine', 'js'], without.io)).toBe(EXIT_OK);
+  });
+
+  it('reaches prove, where the same rule is one no change can show failing', async () => {
+    const named = createIO();
+    expect(await main(['prove', '--root', await project(true), '--json'], named.io)).toBe(EXIT_OK);
+    expect(JSON.parse(named.out.join('')).summary).toMatchObject({ unprovable: 1 });
+    const unnamed = createIO();
+    expect(await main(['prove', '--root', await project(false), '--json'], unnamed.io)).toBe(EXIT_OK);
+    expect(JSON.parse(unnamed.out.join('')).summary).toMatchObject({ unprovable: 0 });
+  });
+
+  it('reaches cites, which reads the citations in such a file', async () => {
+    const named = createIO();
+    await main(['cites', '--root', await project(true), '--json'], named.io);
+    expect(JSON.parse(named.out.join('')).summary).toMatchObject({ ghosts: 1, unclassified: 0 });
+    const unnamed = createIO();
+    await main(['cites', '--root', await project(false), '--json'], unnamed.io);
+    expect(JSON.parse(unnamed.out.join('')).summary).toMatchObject({ ghosts: 0, unclassified: 2 });
+  });
+});

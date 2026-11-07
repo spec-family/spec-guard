@@ -321,6 +321,45 @@ read, whose comments were therefore counted as code. That one can only cause a
 surprising failure, never a false pass, but it explains failures that would
 otherwise look absurd.
 
+*Amended 2026-11-07.* **A project names the comment syntax of a file the table
+does not know.** The paragraph above holds for `@assert-absence` and a `max`,
+and not for a `min`: a comment counted as code is a match, so a rule that
+needs one is satisfied by a comment in a language the table does not know.
+*Claimed* by a consumer of the family, whose compiler is written in its own
+language, `.mn`, commented with `//` and `///`: a rule that a diagnostic is
+raised, `@assert-count symbol="E0501 [Totality Error]" min="1"`, passed on a
+`///` line that names the diagnostic and raises nothing, and the only way to
+teach spec-guard otherwise was a `postinstall` script patching
+`dist/comments.js`, which every upgrade undoes. *Measured* on 0.31.0: that rule
+over that file passes, and says the file could not be classified.
+
+- **`comments` in the configuration**, `.spec-guard.json` or `"specGuard"`
+  in `package.json`, maps a key to one of the profiles above by its name:
+  `javascript`, `c-like`, `c#`, `rust`, `go`, `hash`, `shell`, `yaml`,
+  `sql-like`, `markup` or `none`. `{ ".mn": "c-like", "LICENSE-MIT": "none" }`.
+- **A key is an extension or a file name.** An extension is a dot and one
+  segment, read in any case as the table reads one; anything else is a whole
+  file name, in its case, which is how a file with no extension, `LICENSE-MIT`
+  or `Makefile`, is named. A path, a pattern or an empty key is exit 2, as an
+  extension named twice in two cases is: each would be a key no file matches,
+  and a classification that silently did not happen.
+- **The project's names come first**: a file name, then an extension, then the
+  table. So a repository whose `.m` files are MATLAB rather than Objective-C
+  can say so, and a key that changes a built-in reading is the project's to
+  write.
+- **Profiles, not grammars.** A profile is what the scanner knows of a
+  language's strings, escapes, nesting and comment openers; a new one is code,
+  and its tests, here. The configuration chooses among the profiles there are,
+  and a language like none of them waits for one.
+- **Every command that reads a file's comments reads it**: a run, `prove`, a
+  watch session, the MCP server and `cites`, whose citations are found in
+  comments. `query` and `impact` read no comments and take nothing from it.
+  It has no flag: what a file's comments are is the project's, not one
+  invocation's.
+- **A scan is remembered under the table it was read with.** The table is part
+  of what a watch session's memo keys a scan by, and of what tells two requests
+  apart that may share a pass (ADR-0014).
+
 ## How ripgrep stays fast
 
 Classification needs the file's text. ripgrep's match stream does not carry it,
