@@ -10,8 +10,12 @@
 
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { javascriptEngine, resolveEngine, runSearches, type SearchRequest } from '../src/engine.js';
+import { BUILT_IN_ONLY, commentTable, type CommentTable } from '../src/comments.js';
+import { createJavaScriptEngine, javascriptEngine, resolveEngine, runSearches, type SearchRequest } from '../src/engine.js';
+import { nodeIo } from '../src/io.js';
+import { createMemo } from '../src/memo.js';
 import { runSpecGuard } from '../src/runner.js';
+import type { SearchResult } from '../src/types.js';
 import { findTestRipgrep, makeTempRepo, removeTempRepo, searchOptions } from './helpers.js';
 
 const rgPath = findTestRipgrep();
@@ -93,7 +97,69 @@ describe('the javascript engine', () => {
   });
 });
 
+describe("a file whose comment syntax the project names", () => {
+  // Mente's compiler: `.mn` files comment with `//` and `///`.
+  const MN = {
+    'docs/spec.md': '<!-- @assert-count target="compiler" symbol="E0501 [Totality Error]" min="1" -->\n',
+    'compiler/sema.mn': '/// raises E0501 [Totality Error] on a while with no decreases\nfn check() {}\n',
+  };
+
+  it('is not satisfied by a comment once the project says how the file comments', async () => {
+    const root = await repo(MN);
+    const named = await runSpecGuard({ patterns: ['docs/spec.md'], root, engine: 'javascript', comments: { '.mn': 'c-like' } });
+    expect(named.ok).toBe(false);
+    expect(named.results[0]).toMatchObject({ actual: 0, commentMatches: 1, unclassifiedFiles: 0 });
+
+    // Without it, the file is one spec-guard could not classify: its comment
+    // counts as code, and the report says so.
+    const unnamed = await runSpecGuard({ patterns: ['docs/spec.md'], root, engine: 'javascript' });
+    expect(unnamed.ok).toBe(true);
+    expect(unnamed.results[0]).toMatchObject({ actual: 1, commentMatches: 0, unclassifiedFiles: 1 });
+  });
+
+  it('counts the code of such a file, and a file named as having no comments whole', async () => {
+    const root = await repo({
+      ...MN,
+      'compiler/sema.mn': 'fn check() { raise("E0501 [Totality Error]") }\n// E0501 [Totality Error]\n',
+      'docs/spec.md': '<!-- @assert-count target="compiler" symbol="E0501 [Totality Error]" expected="2" -->\n',
+      'compiler/LICENSE-MIT': 'E0501 [Totality Error]\n',
+    });
+    const report = await runSpecGuard({ patterns: ['docs/spec.md'], root, engine: 'javascript', comments: { '.mn': 'c-like', 'LICENSE-MIT': 'none' } });
+    expect(report.ok).toBe(true);
+    expect(report.results[0]).toMatchObject({ actual: 2, commentMatches: 1, unclassifiedFiles: 0 });
+  });
+
+  it('refuses a run whose table names what is no entry, as a project exclusion that cannot be read is', async () => {
+    const root = await repo(MN);
+    await expect(runSpecGuard({ patterns: ['docs/spec.md'], root, engine: 'javascript', comments: { '.mn': 'cpp' } })).rejects.toThrow('".mn" for "cpp", which is no profile');
+  });
+
+  it('is scanned again under another table by a memo that keeps every scan', async () => {
+    const root = await repo(MN);
+    const engine = createJavaScriptEngine(nodeIo, createMemo());
+    const search = (comments: CommentTable): Promise<SearchResult> =>
+      engine.search({ root, symbol: 'E0501', targets: ['compiler'], options: searchOptions({ ignoreComments: true, comments }) });
+    expect((await search(BUILT_IN_ONLY)).count).toBe(1);
+    expect((await search(commentTable({ '.mn': 'c-like' }))).count).toBe(0);
+    expect((await search(BUILT_IN_ONLY)).count).toBe(1);
+  });
+});
+
 describe.skipIf(!rgPath)('ripgrep parity', () => {
+  it("reads a file by the project's comment table as the scanner does", async () => {
+    const root = await repo({ 'compiler/sema.mn': '/// E0501 [Totality Error]\nraise("E0501 [Totality Error]")\n' });
+    process.env.SPEC_GUARD_RG = rgPath as string;
+    const ripgrep = await resolveEngine('ripgrep');
+    const named: SearchRequest = { root, symbol: 'E0501', targets: ['compiler'], options: searchOptions({ ignoreComments: true, comments: commentTable({ '.mn': 'c-like' }) }) };
+
+    const viaRipgrep = await ripgrep.search(named);
+    const viaScanner = await javascriptEngine.search(named);
+
+    expect(viaRipgrep.engine).toBe('ripgrep');
+    expect(viaRipgrep).toMatchObject({ count: 1, commentMatches: 1, unclassifiedFiles: 0 });
+    expect(viaRipgrep.matches).toEqual(viaScanner.matches);
+  });
+
   it('answers a single search the same way as the scanner', async () => {
     // The regression: searchBatch was comment-aware and search() was not, so a
     // spec with exactly one assertion silently kept its comment matches.

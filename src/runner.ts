@@ -52,6 +52,7 @@ import {
   type ImportIndex,
   type ModuleReference,
 } from "./imports.js";
+import { BUILT_IN_ONLY, commentTable, type CommentTable } from "./comments.js";
 import { checkLayers, type LayerInput } from "./layers.js";
 import { readSpecs, specPath, unmatchedSpecs, type DocumentMemo, type SpecSet } from "./specs.js";
 import {
@@ -134,6 +135,12 @@ export interface RunOptions {
    * look at literally everything.
    */
   defaultSkips?: boolean;
+  /**
+   * The project's names for a file's comment syntax: an extension, `.mn`, or
+   * a file name, `LICENSE-MIT`, to one of `COMMENT_PROFILES`, read before the
+   * built-in table (ADR-0006, amended 2026-11-07).
+   */
+  comments?: Readonly<Record<string, string>>;
   /**
    * Paths no assertion looks at, in the gitignore form `exclude="..."` takes,
    * added to every directive that takes `exclude`. `@assert-present` names its
@@ -512,6 +519,8 @@ export interface ResolveContext {
   excludeFiles: ReadonlySet<string>;
   /** Run-level scope policy. Defaults to DEFAULT_SCOPE when unset. */
   scope?: ScopePolicy;
+  /** The project's names for a file's comment syntax. The built-in table alone when unset. */
+  comments?: CommentTable;
   /**
    * A project's exclusions, added to those of every directive that takes
    * `exclude`. A directive's description still names only its own: the
@@ -784,6 +793,7 @@ export function resolveDirective(
       globs: splitList(attributes["glob"]),
       excludeGlobs: withProjectExcludes(context.exclude, splitList(attributes["exclude"])),
       ignoreComments: comments !== "include",
+      comments: context.comments ?? BUILT_IN_ONLY,
       scope: context.scope ?? DEFAULT_SCOPE,
       excludeFiles: context.excludeFiles,
     };
@@ -1746,7 +1756,7 @@ export function checkProjectExcludes(exclude: readonly string[] | undefined): st
 export function planRun(
   specs: SpecSet,
   root: string,
-  options: Pick<RunOptions, "includeSpecs" | "defaultSkips" | "ignoreStatus" | "select" | "exclude" | "strictTargets">,
+  options: Pick<RunOptions, "includeSpecs" | "defaultSkips" | "comments" | "ignoreStatus" | "select" | "exclude" | "strictTargets">,
   /**
    * Makes the set of spec files the plan's rules leave out. A watch session
    * passes one that answers with the last run's set while the paths are the
@@ -1756,6 +1766,7 @@ export function planRun(
 ): RunPlan {
   const exclude = checkProjectExcludes(options.exclude);
   const scope = createScope(options.defaultSkips ?? true);
+  const comments = commentTable(options.comments ?? {});
   const excludeFiles = leaveOut(specs.files, options.includeSpecs ?? false);
 
   const directives: Directive[] = [];
@@ -1784,7 +1795,7 @@ export function planRun(
   const assertions: Assertion[] = [];
   let ruleInForce = false;
   for (const directive of directives) {
-    const resolved = resolveDirective(directive, { root, excludeFiles, scope, exclude });
+    const resolved = resolveDirective(directive, { root, excludeFiles, scope, comments, exclude });
     if ("error" in resolved) {
       errors.push(resolved.error);
       continue;
@@ -1805,7 +1816,7 @@ export function planRun(
   // counted it twice.
   let notRun = 0;
   for (const { directive, spec } of withheld) {
-    const resolved = resolveDirective(directive, { root, excludeFiles, scope, exclude });
+    const resolved = resolveDirective(directive, { root, excludeFiles, scope, comments, exclude });
     if ("error" in resolved) {
       errors.push(resolved.error);
     } else {

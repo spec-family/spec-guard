@@ -746,6 +746,20 @@ describe('a scan', () => {
     expect(found(everything)).toEqual(['node_modules/pkg/index.js:1:4 ghost-citation ADR-0099']);
   });
 
+  it("reads the comments of a file the project names a syntax for, and refuses a table that cannot be read", async () => {
+    const files = { 'compiler/sema.mn': '/// ADR-0099 says why\nfn f() {}\n', 'LICENSE-MIT': 'ADR-0099\n' };
+    const unnamed = await cites(files);
+    expect(found(unnamed)).toEqual([]);
+    expect(unnamed.unclassified).toEqual([
+      { extension: '(none)', files: 1 },
+      { extension: '.mn', files: 1 },
+    ]);
+    const named = await cites(files, { comments: { '.mn': 'c-like', 'LICENSE-MIT': 'none' } });
+    expect(found(named)).toEqual(['compiler/sema.mn:1:5 ghost-citation ADR-0099']);
+    expect(named.unclassified).toEqual([]);
+    await expect(cites(files, { comments: { '.mn': 'cpp' } })).rejects.toThrow(new CitesError('comments: ".mn" for "cpp", which is no profile; a profile is one of javascript, c-like, c#, rust, go, hash, shell, yaml, sql-like, markup, none'));
+  });
+
   it('counts the unclassified extensions most common first, then by name', async () => {
     const report = await cites({ 'a.png': '', 'b.png': '', 'c.bin': '', 'd.ai': '', 'src/a.ts': '// ADR-0001\n' });
     expect(report.unclassified).toEqual([

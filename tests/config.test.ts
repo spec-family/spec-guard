@@ -84,6 +84,7 @@ describe('parseConfig', () => {
       ignoreStatus: false,
       includeSpecs: true,
       defaultSkips: false,
+      comments: { '.mn': 'c-like', 'LICENSE-MIT': 'none' },
       maxSnippets: 0,
       concurrency: 1,
       cites: [{ id: 'ADR-{n}', files: 'docs/adr/{n}-*.md' }],
@@ -119,9 +120,21 @@ describe('parseConfig', () => {
     expect(refusal(manifest(true))).toBe('package.json: "specGuard" must be an object, got true.');
   });
 
+  it("reads a file's comment syntax by extension or file name, and refuses what names neither, or no profile", () => {
+    expect(parseConfig(manifest({ comments: { '.mn': 'c-like', '.MN2': 'rust', 'LICENSE-MIT': 'none' } }))).toEqual({ comments: { '.mn': 'c-like', '.MN2': 'rust', 'LICENSE-MIT': 'none' } });
+    const profiles = 'javascript, c-like, c#, rust, go, hash, shell, yaml, sql-like, markup, none';
+    expect(refusal(manifest({ comments: {} }))).toBe('package.json: "specGuard.comments" must be an object such as { ".mn": "c-like" }, got an object.');
+    expect(refusal(manifest({ comments: ['.mn'] }))).toBe('package.json: "specGuard.comments" must be an object such as { ".mn": "c-like" }, got an array.');
+    expect(refusal(manifest({ comments: '.mn' }))).toBe('package.json: "specGuard.comments" must be an object such as { ".mn": "c-like" }, got ".mn".');
+    expect(refusal(manifest({ comments: { 'src/*.mn': 'c-like' } }))).toBe('package.json: "specGuard.comments" has "src/*.mn", which is neither an extension, such as ".mn", nor a file name, such as "LICENSE-MIT".');
+    expect(refusal(manifest({ comments: { '.mn': 'cpp' } }))).toBe(`package.json: "specGuard.comments" has ".mn" for "cpp", which is no profile; a profile is one of ${profiles}.`);
+    expect(refusal(manifest({ comments: { '.mn': 'c-like', '.MN': 'c-like' } }))).toBe('package.json: "specGuard.comments" has ".MN", which names the extension .mn a second time.');
+    expect(() => parseStandaloneConfig('{"comments": {".mn": true}}')).toThrow(`.spec-guard.json: "comments" has ".mn" for no profile; a profile is one of ${profiles}.`);
+  });
+
   it('refuses an unknown key, and lists the keys there are', () => {
     expect(refusal(manifest({ stict: true }))).toBe(
-      'package.json: unknown option "stict" in "specGuard". Options are specs, exclude, engine, strict, allowMissingTargets, allowEmptyScope, ignoreStatus, includeSpecs, defaultSkips, maxSnippets, concurrency, cites.',
+      'package.json: unknown option "stict" in "specGuard". Options are specs, exclude, engine, strict, allowMissingTargets, allowEmptyScope, ignoreStatus, includeSpecs, defaultSkips, comments, maxSnippets, concurrency, cites.',
     );
     // Not a way to reach an object's prototype, either.
     expect(refusal('{"specGuard": {"__proto__": {"strict": true}}}')).toMatch(/^package\.json: unknown option "__proto__"/);
@@ -401,8 +414,8 @@ describe('flags that a configuration can set', () => {
           process.cwd(),
         ).fromCommandLine,
       ].sort(),
-      // Every key but cites, which names documents and has no flag.
-    ).toEqual(CONFIG_KEYS.filter((key) => key !== 'cites').sort());
+      // Every key but cites and comments, which name documents and files and have no flag.
+    ).toEqual(CONFIG_KEYS.filter((key) => key !== 'cites' && key !== 'comments').sort());
     expect([...parseArgs(['--spec', 'a.md'], process.cwd()).fromCommandLine]).toEqual(['specs']);
     expect([...parseArgs(['query', 'src', '--spec', 'a.md'], process.cwd()).fromCommandLine]).toEqual(['specs']);
   });
@@ -458,6 +471,7 @@ describe('applyConfig', () => {
     ignoreStatus: true,
     includeSpecs: true,
     defaultSkips: false,
+    comments: { '.mn': 'c-like' },
     maxSnippets: 9,
     concurrency: 3,
     cites: [{ id: 'ADR-{n}', files: 'docs/adr/{n}-*.md' }],
@@ -485,7 +499,8 @@ describe('applyConfig', () => {
 
   it('leaves every option the command line set, either way, and names it as overridden', () => {
     const options = parseArgs(['a.md', '--exclude=', '--engine', 'js', '--no-strict', '--no-allow-missing-targets', '--no-allow-empty-scope', '--no-ignore-status', '--no-include-specs', '--default-skips', '--max-snippets', '2', '--concurrency', '4'], cwd);
-    expect(applyConfig(options, everything, 'pkg/package.json')).toEqual({ file: 'pkg/package.json', applied: [], overridden: RUN_KEYS });
+    // comments has no flag, so no command line sets it.
+    expect(applyConfig(options, everything, 'pkg/package.json')).toEqual({ file: 'pkg/package.json', applied: ['comments'], overridden: RUN_KEYS.filter((key) => key !== 'comments') });
     expect(options).toMatchObject({
       patterns: ['a.md'],
       exclude: [],
@@ -545,13 +560,25 @@ describe('applyConfig', () => {
 
   it('applies cites to spec-guard cites alone, with what else it reads, and a copy of each family', () => {
     const options = parseArgs(['cites'], cwd);
-    expect(applyConfig(options, everything)).toEqual({ file: 'package.json', applied: ['specs', 'exclude', 'strict', 'defaultSkips', 'cites'], overridden: [] });
+    expect(applyConfig(options, everything)).toEqual({ file: 'package.json', applied: ['specs', 'exclude', 'strict', 'defaultSkips', 'comments', 'cites'], overridden: [] });
+    expect(options.comments).toEqual({ '.mn': 'c-like' });
     expect(options.cites).toEqual([{ id: 'ADR-{n}', files: 'docs/adr/{n}-*.md' }]);
     (options.cites?.[0] as { id: string }).id = 'X-{n}';
     expect(everything.cites?.[0]?.id).toBe('ADR-{n}');
     for (const argv of [[], ['query', 'src'], ['prove'], ['mcp'], ['--watch']]) {
       expect(applyConfig(parseArgs(argv, cwd), { cites: everything.cites }), argv.join(' ')).toBeUndefined();
     }
+  });
+
+  it("applies comments to every command that reads a file's comments, and to no query", () => {
+    const comments = { '.mn': 'c-like' };
+    for (const argv of [[], ['prove'], ['cites'], ['mcp'], ['--watch']]) {
+      const options = parseArgs(argv, cwd);
+      expect(applyConfig(options, { comments }), argv.join(' ')).toEqual({ file: 'package.json', applied: ['comments'], overridden: [] });
+      expect(options.comments, argv.join(' ')).toEqual(comments);
+      expect(options.comments, argv.join(' ')).not.toBe(comments);
+    }
+    for (const argv of [['query', 'src'], ['impact', 'src']]) expect(applyConfig(parseArgs(argv, cwd), { comments }), argv.join(' ')).toBeUndefined();
   });
 
   it('says nothing when a configuration had nothing for this command', () => {

@@ -22,7 +22,7 @@
 import { spawn } from 'node:child_process';
 import path from 'node:path';
 
-import { createCommentMask, type CommentMask } from './comments.js';
+import { BUILT_IN_ONLY, createCommentMask, type CommentMask, type CommentTable } from './comments.js';
 import { buildRegexRule, WORD_CHARACTER } from './dialect.js';
 import {
   createExcludeMatcher,
@@ -279,7 +279,7 @@ export function pathsKey(paths: ReadonlySet<string>): number | string[] {
  */
 export function passKey(request: SearchRequest): string {
   const { options } = request;
-  return JSON.stringify([walkKey(request), options.regex, options.word, options.ignoreCase, options.ignoreComments]);
+  return JSON.stringify([walkKey(request), options.regex, options.word, options.ignoreCase, options.ignoreComments, (options.comments ?? BUILT_IN_ONLY).key]);
 }
 
 /** One pass, plus the pattern it is looking for. */
@@ -805,14 +805,14 @@ interface FileScan {
 /**
  * Scans one file's bytes for every pattern of a pass.
  *
- * A pure function of the bytes, the path (which decides the comment syntax),
- * the patterns and how they match, which is what lets a watch session remember
+ * A pure function of the bytes, the path and the project's comment table (which
+ * decide the comment syntax), the patterns and how they match, which is what lets a watch session remember
  * it (ADR-0014).
  */
-function scanFile(buffer: Buffer, relativePath: string, regexps: ReadonlyMap<string, RegExp>, ignoreComments: boolean): FileScan {
+function scanFile(buffer: Buffer, relativePath: string, regexps: ReadonlyMap<string, RegExp>, ignoreComments: boolean, comments: CommentTable): FileScan {
   const content = buffer.toString('utf8');
   let mask: CommentMask | undefined;
-  const getMask = ignoreComments ? (): CommentMask => (mask ??= createCommentMask(content, relativePath)) : undefined;
+  const getMask = ignoreComments ? (): CommentMask => (mask ??= createCommentMask(content, relativePath, comments)) : undefined;
 
   const tallies = new Map<string, Tally>();
   for (const [pattern, regexp] of regexps) {
@@ -883,10 +883,11 @@ class JavaScriptEngine implements Engine {
       for (const entry of unreadable) ledger.add(entry, 'unreadable');
     }
     // Everything a file's scan depends on besides its bytes and its path, which
-    // decides its comment syntax. See memo.ts for why a missing input here is
-    // the one defect a memo can have.
+    // with the comment table decides its comment syntax. See memo.ts for why a
+    // missing input here is the one defect a memo can have.
     const { regex, word, ignoreCase, ignoreComments } = first.options;
-    const scanInputs = [JSON.stringify([regex, word, ignoreCase, ignoreComments]), JSON.stringify(patterns)];
+    const comments = first.options.comments ?? BUILT_IN_ONLY;
+    const scanInputs = [JSON.stringify([regex, word, ignoreCase, ignoreComments, comments.key]), JSON.stringify(patterns)];
 
     // No floor of 1: an empty file list starts no readers, and a loop that
     // never runs produces the same empty tallies as one that runs once and
@@ -911,7 +912,7 @@ class JavaScriptEngine implements Engine {
           file.relativePath,
           buffer === null
             ? null
-            : this.memo.remember(buffer, [...scanInputs, file.relativePath], () => scanFile(buffer, file.relativePath, regexps, ignoreComments)),
+            : this.memo.remember(buffer, [...scanInputs, file.relativePath], () => scanFile(buffer, file.relativePath, regexps, ignoreComments, comments)),
         );
       }
     };

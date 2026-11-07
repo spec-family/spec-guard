@@ -18,7 +18,7 @@
 
 import path from 'node:path';
 
-import { lexRanges, syntaxFor } from './comments.js';
+import { commentTable, lexRanges, syntaxFor, type CommentTable } from './comments.js';
 import { comparePaths, MAX_CONCURRENT_READS, withinSizeLimit } from './engine.js';
 import { createExcludeMatcher, createPathMatcher, globBase, isGlob, pathPatternError, toPosix, walkPaths } from './glob.js';
 import { nodeIo, type Io } from './io.js';
@@ -437,6 +437,8 @@ export interface CitesOptions {
   exclude?: readonly string[];
   /** Skip `.git`, `.hg`, `.svn` and `node_modules`, as a run does. */
   defaultSkips?: boolean;
+  /** A file's comment syntax, by extension or file name, as a run reads it (ADR-0006). */
+  comments?: Readonly<Record<string, string>>;
   /** A stale citation is an error, and so is a file whose comments could not all be read. */
   strict?: boolean;
   io?: Io;
@@ -492,6 +494,14 @@ export async function findCitations(options: CitesOptions): Promise<CitesReport>
   const io = options.io ?? nodeIo;
   const root = options.root;
   const defaultSkips = options.defaultSkips ?? true;
+  // Checked as a run checks it, and refused as a configuration that cannot be
+  // read is: a comment it would misread is a citation counted or lost.
+  let comments: CommentTable;
+  try {
+    comments = commentTable(options.comments ?? {});
+  } catch (error) {
+    throw new CitesError(`comments: ${(error as Error).message}`);
+  }
   const exclude = [...(options.exclude ?? [])];
   const specs = await readSpecs(options.patterns, root, io);
   const specFiles = new Set(specs.files);
@@ -565,7 +575,7 @@ export async function findCitations(options: CitesOptions): Promise<CitesReport>
         seen.add(relativePath);
         const extension = path.posix.extname(relativePath).toLowerCase();
         if (MARKDOWN.has(extension) || specFiles.has(absolutePath) || cited.has(relativePath) || excluded(relativePath)) continue;
-        const syntax = syntaxFor(relativePath);
+        const syntax = syntaxFor(relativePath, comments);
         if (syntax === null) {
           const name = extension === '' ? '(none)' : extension;
           unclassified.set(name, (unclassified.get(name) ?? 0) + 1);
@@ -601,7 +611,7 @@ export async function findCitations(options: CitesOptions): Promise<CitesReport>
     }
     read += 1;
     const text = bytes.toString('utf8');
-    const lexed = lexRanges(text, syntaxFor(file) as NonNullable<ReturnType<typeof syntaxFor>>);
+    const lexed = lexRanges(text, syntaxFor(file, comments) as NonNullable<ReturnType<typeof syntaxFor>>);
     if (lexed.unterminated) {
       gaps.push({ file, reason: 'lost-scan', detail: 'a string or comment was never closed, so what follows it may be misread' });
     }

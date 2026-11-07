@@ -777,6 +777,28 @@ text counts as code, and the report says which files it could not classify. A
 match wrongly kept is a visible failure you can argue with; a match wrongly
 dropped is a lie.
 
+A `min` is the exception: a comment counted as code satisfies a rule that needs
+a match. So a project names what the table does not know, in its
+[configuration](#configuration):
+
+```json
+{ "comments": { ".mn": "c-like", "LICENSE-MIT": "none" } }
+```
+
+- A key is an extension, a dot and one segment read in any case, or a whole
+  file name, which is how a file with no extension is named.
+- A value is one of the profiles: `javascript`, `c-like`, `c#`, `rust`, `go`,
+  `hash`, `shell`, `yaml`, `sql-like`, `markup` or `none`.
+- The project's names come before the built-in table, so `".m": "hash"` reads
+  `.m` otherwise than as Objective-C.
+- A path, a pattern, an unknown profile, or an extension named twice in two
+  cases is exit 2, naming the key.
+- A run, `prove`, `--watch`, the MCP server and `cites` read it; `query` and
+  `impact` read no comments.
+- A language like none of the profiles needs one of its own, which is code and
+  tests here, not configuration
+  ([ADR-0006](https://github.com/spec-family/spec-guard/blob/main/docs/adr/0006-comment-classification.md)).
+
 ### `allow-empty` - an assertion that covers nothing is a failure
 
 ```md
@@ -1531,6 +1553,7 @@ same options, at the top level, in `.spec-guard.json`:
 | `exclude` | `--exclude` | an array of paths, gitignore-style, left out of every assertion that takes `exclude`; no `!`, `..`, drive path or root |
 | `engine` | `--engine` | `"auto"`, `"rg"` or `"js"` |
 | `strict`, `allowMissingTargets`, `allowEmptyScope`, `ignoreStatus`, `includeSpecs`, `defaultSkips` | the flag of that name | `true` or `false` |
+| `comments` | none | an object from an extension (`".mn"`) or a file name (`"LICENSE-MIT"`) to a comment profile ([comments](#comments---the-note-about-a-deletion-is-not-the-deletion)) |
 | `maxSnippets` | `--max-snippets` | an integer, 0 or more |
 | `concurrency` | `--concurrency` | an integer, 1 or more |
 | `cites` | none; `spec-guard cites` reads it | a non-empty array of `{ "id": "ADR-{n}", "files": "docs/adr/{n}-*.md" }`, and no other key |

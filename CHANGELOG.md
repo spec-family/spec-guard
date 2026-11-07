@@ -10,6 +10,22 @@ what to do when upgrading; the family's policy, including how a flag or field
 is deprecated before it goes, is spec-core's
 [ADR-0009](https://github.com/spec-family/spec-core/blob/main/docs/adr/0009-versions-before-1-0.md).
 
+## Unreleased
+
+### Added
+
+- **`comments` in the configuration names a file's comment syntax.** A file
+  the built-in table does not know had its comments counted as code, so a
+  rule with a `min` was satisfied by a comment that names the symbol, and the
+  only way to say otherwise was to patch `dist/comments.js`. `{ ".mn":
+  "c-like", "LICENSE-MIT": "none" }` gives an extension or a whole file name
+  one of the profiles there are, `javascript`, `c-like`, `c#`, `rust`, `go`,
+  `hash`, `shell`, `yaml`, `sql-like`, `markup` or `none`, read before the
+  built-in table. A run, `prove`, `--watch`, the MCP server and `cites` read
+  it; a path, a pattern or a profile there is not is exit 2
+  ([ADR-0006](https://github.com/spec-family/spec-guard/blob/main/docs/adr/0006-comment-classification.md),
+  amended 2026-11-07).
+
 ## 0.31.0
 
 An import rule no longer counts a file that can hold no import as one it

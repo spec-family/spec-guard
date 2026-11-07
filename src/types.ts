@@ -1,3 +1,4 @@
+import type { CommentTable } from './comments.js';
 import type { ScopeLedger, ScopePolicy } from './scope.js';
 
 /**
@@ -175,6 +176,11 @@ export interface SearchOptions {
    * be what proves the symbol is still there.
    */
   ignoreComments: boolean;
+  /**
+   * The project's own names for a file's comment syntax, read before the
+   * built-in table; the built-in table alone where unset (ADR-0006).
+   */
+  comments?: CommentTable;
   /**
    * What the walk is allowed to look at.
    *

@@ -11,7 +11,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { commentRanges, createCommentMask, syntaxFor } from '../src/comments.js';
+import { BUILT_IN_ONLY, COMMENT_PROFILES, commentEntryError, commentRanges, commentTable, createCommentMask, syntaxFor } from '../src/comments.js';
 
 /** Whether each NEEDLE in the source was classified as comment text. */
 function classify(source: string, file: string): boolean[] {
@@ -463,6 +463,73 @@ describe('syntaxFor', () => {
   it('resolves the extension, not a dot anywhere in the path', () => {
     expect(syntaxFor('src/a.ts.snapshot')).toBeNull();
     expect(syntaxFor('my.dir/a.ts')?.name).toBe('javascript');
+  });
+});
+
+describe("a project's comment table", () => {
+  const table = commentTable({ '.mn': 'c-like', 'LICENSE-MIT': 'none', '.php': 'hash', 'build.mn': 'shell' });
+
+  it('names the profiles a project may give, the built-in table\'s own', () => {
+    expect(COMMENT_PROFILES).toEqual(['javascript', 'c-like', 'c#', 'rust', 'go', 'hash', 'shell', 'yaml', 'sql-like', 'markup', 'none']);
+  });
+
+  it('gives a file it names the profile it names: by file name first, then by extension in any case, then the built-in table', () => {
+    expect(syntaxFor('compiler/lib.mn', table)?.name).toBe('c-like');
+    expect(syntaxFor('compiler/LIB.MN', table)?.name).toBe('c-like');
+    expect(syntaxFor('LICENSE-MIT', table)?.name).toBe('none');
+    expect(syntaxFor('docs/LICENSE-MIT', table)?.name).toBe('none');
+    expect(syntaxFor('tools/build.mn', table)?.name).toBe('shell');
+    // A project may read an extension otherwise than the built-in table does.
+    expect(syntaxFor('a.php', table)?.name).toBe('hash');
+    expect(syntaxFor('a.ts', table)?.name).toBe('javascript');
+    // A file name is the whole name, in its case.
+    expect(syntaxFor('license-mit', table)).toBeNull();
+    expect(syntaxFor('LICENSE-MIT.txt', table)?.name).toBe('none');
+    expect(syntaxFor('a.unknownext', table)).toBeNull();
+  });
+
+  it('changes nothing for a project that names nothing', () => {
+    expect(syntaxFor('compiler/lib.mn')).toBeNull();
+    expect(syntaxFor('a.php')?.name).toBe('c-like');
+    expect(commentTable({})).toBe(BUILT_IN_ONLY);
+    expect(BUILT_IN_ONLY.key).toBe('');
+  });
+
+  it('reads a file\'s comments by the profile it was given', () => {
+    const mask = createCommentMask('/// E0501\nlet x = 1; // E0501\nE0501\n', 'lib.mn', table);
+    expect(mask).toMatchObject({ classified: true, syntax: 'c-like' });
+    expect(mask.isComment(4)).toBe(true);
+    expect(mask.isComment(25)).toBe(true);
+    expect(mask.isComment(31)).toBe(false);
+    expect(createCommentMask('// E0501\n', 'lib.mn').classified).toBe(false);
+  });
+
+  it('keys the same entries the same way in any order, and other entries otherwise', () => {
+    const again = commentTable({ 'build.mn': 'shell', '.PHP': 'hash', 'LICENSE-MIT': 'none', '.mn': 'c-like' });
+    expect(again.key).toBe(table.key);
+    expect(commentTable({ '.mn': 'rust' }).key).not.toBe(commentTable({ '.mn': 'c-like' }).key);
+    expect(commentTable({ '.mn': 'c-like' }).key).not.toBe(commentTable({ mn: 'c-like' }).key);
+    expect(table.key).not.toBe('');
+  });
+
+  it('takes an extension, a dot and one segment, and a file name, and nothing else', () => {
+    for (const key of ['.mn', '.MN', '.d', 'LICENSE-MIT', 'Makefile', '.gitkeep', 'build.mn']) expect(commentEntryError(key, 'c-like'), key).toBeNull();
+    const neither = (key: string): string => `"${key}", which is neither an extension, such as ".mn", nor a file name, such as "LICENSE-MIT"`;
+    for (const key of ['', '.', '.a.b', '.mn/x', '.m*', '. mn', 'src/LICENSE', 'src\\LICENSE', 'LICENSE-*', 'a?b', '[ab]']) expect(commentEntryError(key, 'c-like'), key).toBe(neither(key));
+  });
+
+  it('takes a profile by its exact name, and says which there are', () => {
+    const profiles = 'javascript, c-like, c#, rust, go, hash, shell, yaml, sql-like, markup, none';
+    expect(commentEntryError('.mn', 'C-like')).toBe(`".mn" for "C-like", which is no profile; a profile is one of ${profiles}`);
+    expect(commentEntryError('.mn', 'cpp')).toBe(`".mn" for "cpp", which is no profile; a profile is one of ${profiles}`);
+    expect(commentEntryError('.mn', 3)).toBe(`".mn" for no profile; a profile is one of ${profiles}`);
+    expect(commentEntryError('.mn', null)).toBe(`".mn" for no profile; a profile is one of ${profiles}`);
+  });
+
+  it('refuses what is not an entry, and an extension named twice in two cases', () => {
+    expect(() => commentTable({ 'src/x': 'c-like' })).toThrow('"src/x", which is neither an extension');
+    expect(() => commentTable({ '.mn': 'cpp' })).toThrow('".mn" for "cpp", which is no profile');
+    expect(() => commentTable({ '.mn': 'c-like', '.MN': 'c-like' })).toThrow('".MN", which names the extension .mn a second time');
   });
 });
 

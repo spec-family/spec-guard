@@ -10,6 +10,7 @@
  */
 
 import { citeFilesError, citeIdError } from './cites.js';
+import { commentEntryError, commentTable } from './comments.js';
 import type { EnginePreference } from './engine.js';
 import { excludeListError, patternListError, specPatternError } from './glob.js';
 import type { CiteFamily } from './types.js';
@@ -34,6 +35,8 @@ export interface ProjectConfig {
   ignoreStatus?: boolean;
   includeSpecs?: boolean;
   defaultSkips?: boolean;
+  /** A file's comment syntax, by extension or by file name: `{ ".mn": "c-like" }` (ADR-0006). */
+  comments?: Record<string, string>;
   maxSnippets?: number;
   concurrency?: number;
   /** The documents code comments cite, for `spec-guard cites`: an id template and the files it names. */
@@ -53,6 +56,7 @@ export const CONFIG_KEYS: readonly ConfigKey[] = [
   'ignoreStatus',
   'includeSpecs',
   'defaultSkips',
+  'comments',
   'maxSnippets',
   'concurrency',
   'cites',
@@ -153,6 +157,8 @@ function checkValue(key: ConfigKey, value: unknown): string | null {
       return Number.isInteger(value) && (value as number) >= 1 ? null : `must be an integer, 1 or more, got ${describe(value)}`;
     case 'cites':
       return citesIssue(value);
+    case 'comments':
+      return commentsIssue(value);
     default:
       return typeof value === 'boolean' ? null : `must be true or false, got ${describe(value)}`;
   }
@@ -186,6 +192,28 @@ function citesIssue(value: unknown): string | null {
     const files = entry['files'];
     const issue = citeIdError(id as string) ?? citeFilesError(files as string);
     if (issue !== null) return `${which}: ${issue}`;
+  }
+  return null;
+}
+
+/**
+ * What is wrong with a `comments` object, or null: each key an extension or
+ * a file name, each value a profile's name, and no extension named twice in
+ * two cases. An empty object says nothing, and is refused as a key written
+ * for nothing would be.
+ */
+function commentsIssue(value: unknown): string | null {
+  if (!isObject(value) || Object.keys(value).length === 0) {
+    return `must be an object such as { ".mn": "c-like" }, got ${describe(value)}`;
+  }
+  for (const [key, profile] of Object.entries(value)) {
+    const error = commentEntryError(key, profile);
+    if (error !== null) return `has ${error}`;
+  }
+  try {
+    commentTable(value as Record<string, string>);
+  } catch (error) {
+    return `has ${(error as Error).message}`;
   }
   return null;
 }

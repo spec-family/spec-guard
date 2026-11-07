@@ -50,6 +50,7 @@ export type ProveOptions = Pick<
   | 'allowEmptyScope'
   | 'includeSpecs'
   | 'defaultSkips'
+  | 'comments'
   | 'exclude'
   | 'ignoreStatus'
   | 'io'
