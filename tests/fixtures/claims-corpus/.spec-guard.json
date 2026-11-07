@@ -1,0 +1,11 @@
+{
+  "claims": {
+    "files": ["spec/*.md"],
+    "labels": {
+      "Implemented": { "evidence": "test" },
+      "Specified": {},
+      "Hypothesis": { "criterion": "Criterion:" }
+    },
+    "testPrefixes": ["fn test_"]
+  }
+}

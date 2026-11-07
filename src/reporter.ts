@@ -26,6 +26,7 @@ import type {
   SpecWarning,
 } from './types.js';
 import type { RunResult } from './runner.js';
+import type { ClaimsReport } from './claims.js';
 
 export interface ReporterOptions {
   color: boolean;
@@ -1662,4 +1663,124 @@ function nothingReadAnnotations(report: CitesReport): Annotation[] {
         : 'name the documents comments cite in "cites", or title numbered specs with an id such as ADR-0001',
     },
   ];
+}
+
+/* ------------------------------------------------------------------- claims */
+
+/** The labels and how many claims carry each, in the configuration's order. */
+function claimTotals(report: ClaimsReport): string {
+  return Object.entries(report.totals)
+    .map(([label, count]) => `${label} ${count}`)
+    .join(', ');
+}
+
+/**
+ * Renders what `spec-guard claims` found, for a person: each finding on the
+ * claim's line, the totals of each label, and what the check read. The totals
+ * are said here and in JSON, and never written into a document (ADR-0020).
+ */
+export function formatClaims(report: ClaimsReport, options: ReporterOptions): string {
+  const paint = createPainter(options.color);
+  const glyphs = symbols(options.ascii ?? false);
+  const lines = [`${paint('spec-guard claims', 'bold', 'blue')} ${paint(countLabel(report.files.length, 'document'), 'dim')}`, ''];
+  for (const finding of report.findings) {
+    lines.push(
+      `${paint(glyphs.fail, 'red', 'bold')} ${finding.file}:${finding.line}  ${finding.message}  ${paint(finding.rule, 'dim')}`,
+      `    ${paint(`hint: ${finding.hint}`, 'dim')}`,
+    );
+  }
+  if (report.findings.length > 0) lines.push('');
+  if (report.unmatched.length > 0) lines.push(paint(`${glyphs.skip} matched no file: ${report.unmatched.join(', ')}`, 'dim'), '');
+  if (report.config !== undefined) lines.push(formatConfigUse(report.config), '');
+  lines.push(
+    [`${countLabel(report.claims.length, 'claim')}: ${claimTotals(report)}`, paint(formatDuration(report.durationMs), 'dim')].join(paint(glyphs.between, 'dim')),
+  );
+  lines.push(
+    report.ok
+      ? paint(`${glyphs.pass} every claim has the evidence its label asks for`, 'green')
+      : paint(`${glyphs.fail} ${countLabel(report.findings.length, 'claim finding')}`, 'red', 'bold'),
+  );
+  return lines.join('\n');
+}
+
+/**
+ * The version of `spec-guard claims --json`'s document. A field removed or
+ * renamed moves it; a field added does not.
+ */
+export const CLAIMS_FORMAT_VERSION = 1;
+
+/** What `spec-guard claims` found, for a script. */
+export function formatClaimsJson(report: ClaimsReport): string {
+  return JSON.stringify(
+    {
+      formatVersion: CLAIMS_FORMAT_VERSION,
+      ok: report.ok,
+      totals: report.totals,
+      claims: report.claims,
+      findings: report.findings,
+      files: report.files,
+      unmatched: report.unmatched,
+      config: report.config,
+      durationMs: report.durationMs,
+    },
+    null,
+    2,
+  );
+}
+
+const CLAIM_SARIF_RULES: ReadonlyArray<{ id: string; text: string }> = [
+  { id: 'unevidenced-claim', text: 'A claim whose label asks for a test has no directive under it that names one and can be shown to fail.' },
+  { id: 'mixed-labels', text: 'A claim holds more than one label.' },
+  { id: 'missing-criterion', text: 'A claim whose label asks how it will be judged does not say.' },
+];
+
+/**
+ * What `spec-guard claims` found, for code scanning: each finding on the
+ * claim's line. The fingerprint is the file, the rule and the label, which
+ * survives the item moving within its document.
+ */
+export function formatClaimsSarif(report: ClaimsReport, options: { version?: string } = {}): string {
+  return JSON.stringify(
+    {
+      $schema: 'https://json.schemastore.org/sarif-2.1.0.json',
+      version: '2.1.0',
+      runs: [
+        {
+          tool: {
+            driver: {
+              name: 'spec-guard claims',
+              informationUri: 'https://github.com/spec-family/spec-guard',
+              version: options.version ?? '0.0.0',
+              rules: CLAIM_SARIF_RULES.map((rule) => ({ id: rule.id, name: rule.id, shortDescription: { text: rule.text } })),
+            },
+          },
+          results: report.findings.map((finding) => ({
+            ruleId: finding.rule,
+            level: SARIF_LEVEL,
+            message: { text: `${finding.message}\n${finding.hint}` },
+            locations: [sarifLocation(finding.file, finding.line, finding.column)],
+            partialFingerprints: { specGuardClaim: fingerprint([finding.file, finding.rule, finding.label]) },
+          })),
+        },
+      ],
+    },
+    null,
+    2,
+  );
+}
+
+/** What `spec-guard claims` found, placed for GitLab and GitHub: every finding an error. */
+export function claimsAnnotations(report: ClaimsReport): Annotation[] {
+  return report.findings.map(
+    (finding): Annotation => ({
+      rule: finding.rule,
+      identity: [finding.rule, finding.file, finding.label],
+      level: 'error',
+      severity: 'critical',
+      file: finding.file,
+      line: finding.line,
+      message: finding.message,
+      hint: finding.hint,
+    }),
+  );
 }

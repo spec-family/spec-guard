@@ -24,14 +24,17 @@
 
 import { lineStarts, locate } from './text.js';
 import {
+  findClaims,
   findEntry,
   keyName,
   readFrontMatter,
   scanMarkdown,
   titleOf,
   type Block,
+  type Claim,
   type FrontMatterBlock,
   type Heading,
+  type ListItem,
   type MarkdownScan,
   type TableCell,
 } from './vendor/spec-core/markdown/index.js';
@@ -933,4 +936,16 @@ function maskedBy(scan: MarkdownScan, offset: number): MaskedContext {
   if (offset < scan.bodyStart) return 'front matter';
   const block = scan.blocks.find((candidate) => candidate.start <= offset && offset < candidate.end);
   return block === undefined ? 'code span' : BLOCKS[block.kind];
+}
+
+export type { Claim, ListItem, MarkdownScan };
+
+/**
+ * The claims of a document, read as every document is read here, and the scan
+ * they were read from, for what `spec-guard claims` asks of each item: where a
+ * directive lies, and what the item says in its own words (ADR-0020).
+ */
+export function claimsIn(source: string, vocabulary: readonly string[]): { readonly claims: Claim[]; readonly scan: MarkdownScan } {
+  const scan = scanMarkdown(source);
+  return { claims: findClaims(scan, vocabulary), scan };
 }
