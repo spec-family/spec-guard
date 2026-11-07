@@ -759,6 +759,14 @@ describe('a scan', () => {
     expect(report.unclassified).toEqual([{ extension: '(none)', files: 3 }]);
     expect(report.gaps).toEqual([]);
     expect(report.summary).toMatchObject({ files: 3, unclassified: 3 });
+    // One that cannot be read is counted so as well, and is no gap.
+    const files = { 'bin/locked': '#!/bin/sh\n# ADR-0095\n', 'src/a.ts': '// ADR-0001\n' };
+    const base = memoryIo(ROOT, { ...DOCS, ...files });
+    const locked = await cites(files, {
+      io: { ...base, readFile: (file) => (file.endsWith('locked') ? Promise.reject(new Error('EACCES')) : base.readFile(file)) },
+    });
+    expect(locked.unclassified).toEqual([{ extension: '(none)', files: 1 }]);
+    expect(locked.gaps).toEqual([]);
   });
 
   it("reads the comments of a file the project names a syntax for, and refuses a table that cannot be read", async () => {

@@ -602,7 +602,11 @@ export function shebangSyntax(source: string): CommentSyntax | null {
   const words = source.slice(2, end === -1 ? source.length : end).trim().split(/\s+/);
   const base = (word: string): string => word.slice(word.lastIndexOf('/') + 1);
   let program = base(words[0]!);
-  if (program === 'env') program = base(words.slice(1).find((word) => !word.startsWith('-') && !word.includes('=')) ?? '');
+  if (program === 'env') {
+    const named = words.slice(1).find((word) => !word.startsWith('-') && !word.includes('='));
+    if (named === undefined) return null;
+    program = base(named);
+  }
   return BY_INTERPRETER.get(program.toLowerCase().replace(/[\d.]+$/, '')) ?? null;
 }
 

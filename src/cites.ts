@@ -601,13 +601,16 @@ export async function findCitations(options: CitesOptions): Promise<CitesReport>
   let citations = 0;
   let others = 0;
 
+  const SHEBANG_BYTES = 512;
   const scan = (file: string, bytes: Buffer | Error, sniff: boolean): void => {
     // A file with no extension is read for a `#!` line and for nothing else:
     // one that has none, or cannot be read as text, is counted as one whose
     // comments cannot be told, as it was before it was read, and is no gap.
     let syntax: CommentSyntax | null = sniff ? null : syntaxFor(file, comments);
     if (sniff) {
-      syntax = bytes instanceof Error || !withinSizeLimit(bytes.length) || isBinary(bytes) ? null : shebangSyntax(bytes.toString('utf8'));
+      // Its first bytes alone: a `#!` line is short, and a file of any size
+      // or kind that opens with none says nothing more further on.
+      syntax = bytes instanceof Error ? null : shebangSyntax(bytes.subarray(0, SHEBANG_BYTES).toString('utf8'));
       if (syntax === null) {
         unclassified.set('(none)', (unclassified.get('(none)') ?? 0) + 1);
         return;
