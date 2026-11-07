@@ -274,7 +274,7 @@ Configuration
   documents code comments cite; without it, cites reads them off the titles of
   numbered specs. "claims": { "files": ["spec/*.md"], "labels": { "Implemented":
   { "evidence": "test" } }, "testPrefixes": ["fn test_"] } names the claims spec-guard
-  claims holds to their evidence. "comments": { ".mn": "c-like", "LICENSE-MIT": "none" } names
+  claims holds to their evidence. "comments": { ".dsl": "c-like", "LICENSE-MIT": "none" } names
   the comment syntax of a file the built-in table does not know, by extension or
   file name, as one of c-like, javascript, c#, rust, go, hash, shell, yaml,
   sql-like, markup or none.

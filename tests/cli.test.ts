@@ -442,11 +442,11 @@ describe('--print-baseline', () => {
 });
 
 describe('comments in the configuration', () => {
-  // Mente's compiler: a diagnostic named in a /// line and raised nowhere.
+  // A project's own language: a diagnostic named in a /// line and raised nowhere.
   const FILES = {
-    'docs/a.md': '# A\n\nStatus: Accepted\n\n<!-- @assert-count target="compiler" symbol="E0501" min="1" -->\n',
-    'compiler/sema.mn': '/// raises E0501 when a while has no decreases\nfn verify() {}\n',
-    'compiler/cite.mn': '// ADR-0099 says why\n',
+    'docs/a.md': '# A\n\nStatus: Accepted\n\n<!-- @assert-count target="payments" symbol="E0420" min="1" -->\n',
+    'payments/sema.dsl': '/// raises E0420 when a refund is over its capture\nfn refund() {}\n',
+    'payments/cite.dsl': '// ADR-0099 says why\n',
     // A family of numbered documents, which cites reads its ids off.
     'docs/adr/0001-one.md': '# ADR-0001: One\n\nStatus: Accepted\n',
   };
@@ -454,7 +454,7 @@ describe('comments in the configuration', () => {
   async function project(comments: boolean): Promise<string> {
     const root = await makeTempRepo({
       ...FILES,
-      '.spec-guard.json': JSON.stringify({ specs: ['docs/**/*.md'], ...(comments ? { comments: { '.mn': 'c-like' } } : {}) }),
+      '.spec-guard.json': JSON.stringify({ specs: ['docs/**/*.md'], ...(comments ? { comments: { '.dsl': 'c-like' } } : {}) }),
     });
     temporary.push(root);
     return root;
@@ -492,14 +492,14 @@ describe('spec-guard claims', () => {
 
   async function project(spec: string, claims: unknown = CLAIMS): Promise<string> {
     const root = await makeTempRepo({
-      'compiler/lib.rs': 'fn test_spec_hash() {}\n',
+      'payments/lib.rs': 'fn test_refund_limit() {}\n',
       'spec/a.md': spec,
       '.spec-guard.json': JSON.stringify(claims === null ? { specs: ['spec/*.md'] } : { claims }),
     });
     temporary.push(root);
     return root;
   }
-  const HELD = '- `Implemented`: a field changes the hash.\n  <!-- @assert-count target="compiler" symbol="fn test_spec_hash" min="1" -->\n- `Specified`: units.\n';
+  const HELD = '- `Implemented`: a refund over the capture is refused.\n  <!-- @assert-count target="payments" symbol="fn test_refund_limit" min="1" -->\n- `Specified`: units.\n';
   const UNHELD = '- `Implemented`: nothing under it.\n';
 
   it('exits 0 where every claim holds, and 1 for a finding, with the totals of each label', async () => {

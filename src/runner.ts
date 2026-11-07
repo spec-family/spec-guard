@@ -136,7 +136,7 @@ export interface RunOptions {
    */
   defaultSkips?: boolean;
   /**
-   * The project's names for a file's comment syntax: an extension, `.mn`, or
+   * The project's names for a file's comment syntax: an extension, `.dsl`, or
    * a file name, `LICENSE-MIT`, to one of `COMMENT_PROFILES`, read before the
    * built-in table (ADR-0006, amended 2026-11-07).
    */

@@ -36,7 +36,7 @@ export interface ProjectConfig {
   ignoreStatus?: boolean;
   includeSpecs?: boolean;
   defaultSkips?: boolean;
-  /** A file's comment syntax, by extension or by file name: `{ ".mn": "c-like" }` (ADR-0006). */
+  /** A file's comment syntax, by extension or by file name: `{ ".dsl": "c-like" }` (ADR-0006). */
   comments?: Record<string, string>;
   maxSnippets?: number;
   concurrency?: number;
@@ -210,7 +210,7 @@ function citesIssue(value: unknown): string | null {
  */
 function commentsIssue(value: unknown): string | null {
   if (!isObject(value) || Object.keys(value).length === 0) {
-    return `must be an object such as { ".mn": "c-like" }, got ${describe(value)}`;
+    return `must be an object such as { ".dsl": "c-like" }, got ${describe(value)}`;
   }
   // The table checks each entry as it reads it, and says what it found wrong
   // in the words a run would refuse it with.

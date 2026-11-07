@@ -29,13 +29,13 @@ const CONFIG: ClaimsConfig = {
   testPrefixes: ['fn test_'],
 };
 
-const CODE = { 'compiler/lib.rs': 'fn test_spec_hash() {}\nfn verify() { raise("E0501 [Totality Error]") }\n' };
+const CODE = { 'payments/lib.rs': 'fn test_refund_limit() {}\nfn refund() { raise("E0420 [Refund Error]") }\n' };
 
-const count = (symbol: string, indent = '  '): string => `${indent}<!-- @assert-count target="compiler" symbol="${symbol}" min="1" -->`;
+const count = (symbol: string, indent = '  '): string => `${indent}<!-- @assert-count target="payments" symbol="${symbol}" min="1" -->`;
 
 describe('a claim whose label asks for a test', () => {
   it('holds where a directive under it names a test that prove shows can fail', async () => {
-    const root = await repo({ ...CODE, 'spec/a.md': ['- `Implemented`: a field changes the hash.', count('fn test_spec_hash'), ''].join('\n') });
+    const root = await repo({ ...CODE, 'spec/a.md': ['- `Implemented`: a refund over the capture is refused.', count('fn test_refund_limit'), ''].join('\n') });
     const report = await findClaimsReport({ root, config: CONFIG });
     expect(report.ok).toBe(true);
     expect(report.claims).toEqual([{ file: 'spec/a.md', line: 1, label: 'Implemented', evidence: ['spec/a.md:2'] }]);
@@ -47,7 +47,7 @@ describe('a claim whose label asks for a test', () => {
   it('fails with no directive naming a test, a token check among them, and says what it looked for', async () => {
     const root = await repo({
       ...CODE,
-      'spec/a.md': ['- `Implemented`, a token check: raises E0501.', count('E0501 [Totality Error]'), '- `Implemented`: nothing at all.', ''].join('\n'),
+      'spec/a.md': ['- `Implemented`, a token check: raises E0420.', count('E0420 [Refund Error]'), '- `Implemented`: nothing at all.', ''].join('\n'),
     });
     const report = await findClaimsReport({ root, config: CONFIG });
     expect(report.ok).toBe(false);
@@ -64,11 +64,11 @@ describe('a claim whose label asks for a test', () => {
       ...CODE,
       'spec/a.md': [
         '- `Implemented`: an absence names a test.',
-        '  <!-- @assert-absence target="compiler" symbol="fn test_spec_hash" -->',
+        '  <!-- @assert-absence target="payments" symbol="fn test_refund_limit" -->',
         '- `Implemented`: a count of at most one.',
-        '  <!-- @assert-count target="compiler" symbol="fn test_spec_hash" max="1" -->',
+        '  <!-- @assert-count target="payments" symbol="fn test_refund_limit" max="1" -->',
         '- `Implemented`: an expected count of one.',
-        '  <!-- @assert-count target="compiler" symbol="fn test_spec_hash" expected="1" -->',
+        '  <!-- @assert-count target="payments" symbol="fn test_refund_limit" expected="1" -->',
         '',
       ].join('\n'),
     });
@@ -88,7 +88,7 @@ describe('a claim whose label asks for a test', () => {
         count('#[test] fn'),
         '',
       ].join('\n'),
-      'compiler/lib.rs': '#[test] fn spec_hash() {}\n',
+      'payments/lib.rs': '#[test] fn refund_limit() {}\n',
     });
     const report = await findClaimsReport({ root, config: { ...CONFIG, testPrefixes: ['fn test_', '#[test]'] } });
     expect(report.findings.map((f) => [f.line, f.message])).toEqual([[1, '`Implemented` needs a test, and no directive under the claim names one (fn test_, #[test])']]);
@@ -96,13 +96,13 @@ describe('a claim whose label asks for a test', () => {
   });
 
   it('counts no count without a symbol, such as an import count', async () => {
-    const root = await repo({ ...CODE, 'spec/a.md': ['- `Implemented`: an import count names no test.', '  <!-- @assert-import-count target="compiler" module="x" min="1" -->', ''].join('\n') });
+    const root = await repo({ ...CODE, 'spec/a.md': ['- `Implemented`: an import count names no test.', '  <!-- @assert-import-count target="payments" module="x" min="1" -->', ''].join('\n') });
     const [finding] = (await findClaimsReport({ root, config: CONFIG })).findings;
     expect(finding?.message).toBe('`Implemented` needs a test, and no directive under the claim names one (fn test_)');
   });
 
   it('holds each directive to its own proof, one that cannot be shown failing beside one that can', async () => {
-    const root = await repo({ ...CODE, 'spec/a.md': ['- `Implemented`: not written.', count('fn test_not_written'), '- `Implemented`: written.', count('fn test_spec_hash'), ''].join('\n') });
+    const root = await repo({ ...CODE, 'spec/a.md': ['- `Implemented`: not written.', count('fn test_not_written'), '- `Implemented`: written.', count('fn test_refund_limit'), ''].join('\n') });
     const report = await findClaimsReport({ root, config: CONFIG });
     expect(report.findings.map((f) => f.line)).toEqual([1]);
     expect(report.claims.map((c) => c.evidence)).toEqual([[], ['spec/a.md:4']]);
@@ -111,7 +111,7 @@ describe('a claim whose label asks for a test', () => {
   it('gives a parent the directive written under it after an item nested under it', async () => {
     const root = await repo({
       ...CODE,
-      'spec/a.md': ['- `Implemented`: the parent.', '  - `Specified`: a child.', '', '  <!-- @assert-count target="compiler" symbol="fn test_spec_hash" min="1" -->', ''].join('\n'),
+      'spec/a.md': ['- `Implemented`: the parent.', '  - `Specified`: a child.', '', '  <!-- @assert-count target="payments" symbol="fn test_refund_limit" min="1" -->', ''].join('\n'),
     });
     const report = await findClaimsReport({ root, config: CONFIG });
     expect(report.findings).toEqual([]);
@@ -133,24 +133,24 @@ describe('a claim whose label asks for a test', () => {
   });
 
   it('gives each claim its own evidence, the first and the second alike', async () => {
-    const root = await repo({ ...CODE, 'spec/a.md': ['- `Implemented`: one.', count('fn test_spec_hash'), '- `Implemented`: two.', count('fn test_spec_hash'), ''].join('\n') });
+    const root = await repo({ ...CODE, 'spec/a.md': ['- `Implemented`: one.', count('fn test_refund_limit'), '- `Implemented`: two.', count('fn test_refund_limit'), ''].join('\n') });
     const report = await findClaimsReport({ root, config: CONFIG });
     expect(report.claims.map((c) => c.evidence)).toEqual([['spec/a.md:2'], ['spec/a.md:4']]);
   });
 
   it('counts no directive written below a claim, past a blank line, outside it', async () => {
-    const root = await repo({ ...CODE, 'spec/a.md': ['- `Implemented`: nothing under it.', '', '<!-- @assert-count target="compiler" symbol="fn test_spec_hash" min="1" -->', ''].join('\n') });
+    const root = await repo({ ...CODE, 'spec/a.md': ['- `Implemented`: nothing under it.', '', '<!-- @assert-count target="payments" symbol="fn test_refund_limit" min="1" -->', ''].join('\n') });
     const report = await findClaimsReport({ root, config: CONFIG });
     expect(report.claims).toEqual([{ file: 'spec/a.md', line: 1, label: 'Implemented', evidence: [] }]);
     expect(report.findings[0]?.hint).toBe('write a directive under the claim that counts the test, as <!-- @assert-count target="..." symbol="fn test_..." min="1" -->, or lower the label');
   });
 
   it('reads the test where the configuration says how files comment, and what it leaves out, as a run reads it', async () => {
-    const commented = { 'spec/a.md': ['- `Implemented`: in a comment only.', count('fn test_spec_hash'), ''].join('\n'), 'compiler/lib.mn': '// fn test_spec_hash\n' };
+    const commented = { 'spec/a.md': ['- `Implemented`: in a comment only.', count('fn test_refund_limit'), ''].join('\n'), 'payments/lib.dsl': '// fn test_refund_limit\n' };
     expect((await findClaimsReport({ root: await repo(commented), config: CONFIG })).ok).toBe(true);
-    expect((await findClaimsReport({ root: await repo(commented), config: CONFIG, comments: { '.mn': 'c-like' } })).ok).toBe(false);
+    expect((await findClaimsReport({ root: await repo(commented), config: CONFIG, comments: { '.dsl': 'c-like' } })).ok).toBe(false);
     expect((await findClaimsReport({ root: await repo({ ...CODE, 'spec/a.md': commented['spec/a.md'] }), config: CONFIG, exclude: ['*.rs'] })).ok).toBe(false);
-    const skipped = { 'spec/a.md': ['- `Implemented`: under node_modules.', '  <!-- @assert-count target="node_modules" symbol="fn test_spec_hash" min="1" -->', ''].join('\n'), 'node_modules/x/lib.rs': 'fn test_spec_hash() {}\n' };
+    const skipped = { 'spec/a.md': ['- `Implemented`: under node_modules.', '  <!-- @assert-count target="node_modules" symbol="fn test_refund_limit" min="1" -->', ''].join('\n'), 'node_modules/x/lib.rs': 'fn test_refund_limit() {}\n' };
     expect((await findClaimsReport({ root: await repo(skipped), config: CONFIG, defaultSkips: false })).ok).toBe(true);
   });
 });
@@ -172,7 +172,7 @@ describe('why a directive that counts a test is no evidence', () => {
   });
 
   it('fails where the document holding the directive is not in force', async () => {
-    const root = await repo({ ...CODE, 'spec/a.md': ['# A', '', 'Status: Draft', '', '- `Implemented`: a field changes the hash.', count('fn test_spec_hash'), ''].join('\n') });
+    const root = await repo({ ...CODE, 'spec/a.md': ['# A', '', 'Status: Draft', '', '- `Implemented`: a refund over the capture is refused.', count('fn test_refund_limit'), ''].join('\n') });
     const [finding] = (await findClaimsReport({ root, config: CONFIG })).findings;
     expect(finding?.message).toBe('`Implemented` needs a test, and the directive naming one at line 6 is no evidence: its document is not in force, so the rule is not run');
   });
@@ -180,7 +180,7 @@ describe('why a directive that counts a test is no evidence', () => {
   it('gives a directive to the innermost claim around it, and none to the claim above', async () => {
     const root = await repo({
       ...CODE,
-      'spec/a.md': ['1. Hashes.', '   - `Implemented`: the outer claim.', '     - `Specified`: the inner claim.', count('fn test_spec_hash', '       '), ''].join('\n'),
+      'spec/a.md': ['1. Hashes.', '   - `Implemented`: the outer claim.', '     - `Specified`: the inner claim.', count('fn test_refund_limit', '       '), ''].join('\n'),
     });
     const report = await findClaimsReport({ root, config: CONFIG });
     expect(report.findings.map((f) => [f.line, f.rule])).toEqual([[2, 'unevidenced-claim']]);
@@ -195,10 +195,10 @@ describe('what else a label asks', () => {
   it('fails a claim that holds two labels, and a hypothesis that says not how it will be judged', async () => {
     const root = await repo({
       'spec/a.md': [
-        '- `Specified`; the conversion is `Implemented`.',
-        '- `Hypothesis`: agents write fewer guards.',
+        '- `Specified`; the partial refund is `Implemented`.',
+        '- `Hypothesis`: retries cut failed captures.',
         '  - Criterion: a nested item is not the claim\'s own words.',
-        '- `Hypothesis`: agents repair less. Criterion: the repair count.',
+        '- `Hypothesis`: batching halves the fees. Criterion: the fee per capture.',
         '- `Specified`: one label.',
         '',
       ].join('\n'),

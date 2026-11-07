@@ -116,15 +116,15 @@ describe('a script with no extension', () => {
 });
 
 describe("a file whose comment syntax the project names", () => {
-  // Mente's compiler: `.mn` files comment with `//` and `///`.
-  const MN = {
-    'docs/spec.md': '<!-- @assert-count target="compiler" symbol="E0501 [Totality Error]" min="1" -->\n',
-    'compiler/sema.mn': '/// raises E0501 [Totality Error] on a while with no decreases\nfn check() {}\n',
+  // A project's own language: `.dsl` files comment with `//` and `///`.
+  const DSL = {
+    'docs/spec.md': '<!-- @assert-count target="payments" symbol="E0420 [Refund Error]" min="1" -->\n',
+    'payments/sema.dsl': '/// raises E0420 [Refund Error] on a refund over its capture\nfn check() {}\n',
   };
 
   it('is not satisfied by a comment once the project says how the file comments', async () => {
-    const root = await repo(MN);
-    const named = await runSpecGuard({ patterns: ['docs/spec.md'], root, engine: 'javascript', comments: { '.mn': 'c-like' } });
+    const root = await repo(DSL);
+    const named = await runSpecGuard({ patterns: ['docs/spec.md'], root, engine: 'javascript', comments: { '.dsl': 'c-like' } });
     expect(named.ok).toBe(false);
     expect(named.results[0]).toMatchObject({ actual: 0, commentMatches: 1, unclassifiedFiles: 0 });
 
@@ -137,38 +137,38 @@ describe("a file whose comment syntax the project names", () => {
 
   it('counts the code of such a file, and a file named as having no comments whole', async () => {
     const root = await repo({
-      ...MN,
-      'compiler/sema.mn': 'fn check() { raise("E0501 [Totality Error]") }\n// E0501 [Totality Error]\n',
-      'docs/spec.md': '<!-- @assert-count target="compiler" symbol="E0501 [Totality Error]" expected="2" -->\n',
-      'compiler/LICENSE-MIT': 'E0501 [Totality Error]\n',
+      ...DSL,
+      'payments/sema.dsl': 'fn check() { raise("E0420 [Refund Error]") }\n// E0420 [Refund Error]\n',
+      'docs/spec.md': '<!-- @assert-count target="payments" symbol="E0420 [Refund Error]" expected="2" -->\n',
+      'payments/LICENSE-MIT': 'E0420 [Refund Error]\n',
     });
-    const report = await runSpecGuard({ patterns: ['docs/spec.md'], root, engine: 'javascript', comments: { '.mn': 'c-like', 'LICENSE-MIT': 'none' } });
+    const report = await runSpecGuard({ patterns: ['docs/spec.md'], root, engine: 'javascript', comments: { '.dsl': 'c-like', 'LICENSE-MIT': 'none' } });
     expect(report.ok).toBe(true);
     expect(report.results[0]).toMatchObject({ actual: 2, commentMatches: 1, unclassifiedFiles: 0 });
   });
 
   it('refuses a run whose table names what is no entry, as a project exclusion that cannot be read is', async () => {
-    const root = await repo(MN);
-    await expect(runSpecGuard({ patterns: ['docs/spec.md'], root, engine: 'javascript', comments: { '.mn': 'cpp' } })).rejects.toThrow('".mn" for "cpp", which is no profile');
+    const root = await repo(DSL);
+    await expect(runSpecGuard({ patterns: ['docs/spec.md'], root, engine: 'javascript', comments: { '.dsl': 'cpp' } })).rejects.toThrow('".dsl" for "cpp", which is no profile');
   });
 
   it('is scanned again under another table by a memo that keeps every scan', async () => {
-    const root = await repo(MN);
+    const root = await repo(DSL);
     const engine = createJavaScriptEngine(nodeIo, createMemo());
     const search = (comments: CommentTable): Promise<SearchResult> =>
-      engine.search({ root, symbol: 'E0501', targets: ['compiler'], options: searchOptions({ ignoreComments: true, comments }) });
+      engine.search({ root, symbol: 'E0420', targets: ['payments'], options: searchOptions({ ignoreComments: true, comments }) });
     expect((await search(BUILT_IN_ONLY)).count).toBe(1);
-    expect((await search(commentTable({ '.mn': 'c-like' }))).count).toBe(0);
+    expect((await search(commentTable({ '.dsl': 'c-like' }))).count).toBe(0);
     expect((await search(BUILT_IN_ONLY)).count).toBe(1);
   });
 });
 
 describe.skipIf(!rgPath)('ripgrep parity', () => {
   it("reads a file by the project's comment table as the scanner does", async () => {
-    const root = await repo({ 'compiler/sema.mn': '/// E0501 [Totality Error]\nraise("E0501 [Totality Error]")\n' });
+    const root = await repo({ 'payments/sema.dsl': '/// E0420 [Refund Error]\nraise("E0420 [Refund Error]")\n' });
     process.env.SPEC_GUARD_RG = rgPath as string;
     const ripgrep = await resolveEngine('ripgrep');
-    const named: SearchRequest = { root, symbol: 'E0501', targets: ['compiler'], options: searchOptions({ ignoreComments: true, comments: commentTable({ '.mn': 'c-like' }) }) };
+    const named: SearchRequest = { root, symbol: 'E0420', targets: ['payments'], options: searchOptions({ ignoreComments: true, comments: commentTable({ '.dsl': 'c-like' }) }) };
 
     const viaRipgrep = await ripgrep.search(named);
     const viaScanner = await javascriptEngine.search(named);
