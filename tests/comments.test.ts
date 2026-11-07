@@ -509,6 +509,8 @@ describe("a project's comment table", () => {
     expect(again.key).toBe(table.key);
     expect(commentTable({ '.mn': 'rust' }).key).not.toBe(commentTable({ '.mn': 'c-like' }).key);
     expect(commentTable({ '.mn': 'c-like' }).key).not.toBe(commentTable({ mn: 'c-like' }).key);
+    expect(commentTable({ Brewfile: 'hash' }).key).not.toBe(commentTable({ Podfile: 'hash' }).key);
+    expect(commentTable({ Brewfile: 'hash' }).key).not.toBe(commentTable({ Brewfile: 'none' }).key);
     expect(table.key).not.toBe('');
   });
 

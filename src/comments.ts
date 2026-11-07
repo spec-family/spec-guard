@@ -473,6 +473,9 @@ register(NO_COMMENTS, ['.json', '.txt', '.csv', '.tsv', '.lock', '.log']);
 /** The profiles a project may name, in the order they are documented. */
 export const COMMENT_PROFILES: readonly string[] = [...BY_NAME.keys()];
 
+/** The same names, asked of a value that may be no string at all. */
+const PROFILE_NAMES: ReadonlySet<unknown> = new Set<unknown>(COMMENT_PROFILES);
+
 /**
  * What a project's configuration says of the files the table above does not
  * know, or knows otherwise: an extension, `.mn`, or a whole file name,
@@ -504,7 +507,7 @@ export function commentEntryError(key: string, value: unknown): string | null {
   if (key.startsWith('.') ? !/^\.[^./\\*?[\s]+$/.test(key) : key === '' || /[/\\]/.test(key) || /[*?[]/.test(key)) {
     return `"${key}", which is neither an extension, such as ".mn", nor a file name, such as "LICENSE-MIT"`;
   }
-  if (typeof value !== 'string' || !BY_NAME.has(value)) {
+  if (!PROFILE_NAMES.has(value)) {
     return `"${key}" for ${typeof value === 'string' ? `"${value}", which is no profile` : 'no profile'}; a profile is one of ${COMMENT_PROFILES.join(', ')}`;
   }
   return null;

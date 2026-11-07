@@ -10,7 +10,7 @@
  */
 
 import { citeFilesError, citeIdError } from './cites.js';
-import { commentEntryError, commentTable } from './comments.js';
+import { commentTable } from './comments.js';
 import type { EnginePreference } from './engine.js';
 import { excludeListError, patternListError, specPatternError } from './glob.js';
 import type { CiteFamily } from './types.js';
@@ -206,10 +206,8 @@ function commentsIssue(value: unknown): string | null {
   if (!isObject(value) || Object.keys(value).length === 0) {
     return `must be an object such as { ".mn": "c-like" }, got ${describe(value)}`;
   }
-  for (const [key, profile] of Object.entries(value)) {
-    const error = commentEntryError(key, profile);
-    if (error !== null) return `has ${error}`;
-  }
+  // The table checks each entry as it reads it, and says what it found wrong
+  // in the words a run would refuse it with.
   try {
     commentTable(value as Record<string, string>);
   } catch (error) {
