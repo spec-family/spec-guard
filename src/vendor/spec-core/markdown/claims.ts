@@ -1,7 +1,7 @@
 /**
  * Claims: list items that open with a label from a vocabulary the caller
  * names, the way a specification marks each thing it says with how far it
- * holds - `` - `Implemented`: the checker refuses a loop with no measure ``.
+ * holds - `` - `Implemented`: a refund over the captured amount is refused ``.
  *
  * Read here because two tools ask the same question of one document: the one
  * that holds a claim to its evidence, and the one that holds a checklist or a
