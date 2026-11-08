@@ -577,3 +577,27 @@ once held beside them; without them it holds as it did before them.
 
 On the 174 Markdown files of the five spec-* repositories every status and
 every warning is read as 0.17.0 read it: none is written in Chinese.
+
+## Amended 2026-11-08: the label is read with comments masked
+
+The label was read from the lines of the preamble with code masked and
+comments kept, as this ADR's amendment of 2026-09-26 left it. So a
+`Status: Superseded` line inside a template's multi-line comment withdrew
+the document it sat in, and its rules stopped running without anyone having
+said so: a false green. And `Status: <!-- one of: draft, accepted --> Accepted`,
+where a template's hint sits beside the value, began with no word and could
+not be read. spec-graph, compared with spec-guard over 1,428 generated label
+lines, reads the label with comments masked, as its section reader does (its
+#132): the two differences were these, and both spec-guard's.
+
+**The label is read with comments masked, as the scanner's structure mask
+has the preamble.** A `Status:` line kept in a comment is no label, and a
+label written after it is the one read; a comment on the label's line is
+not part of its value. The section's value and the table's cell are read as
+they were: a comment line under `## Status` is a status that cannot be
+read, which keeps the document in force and says so, and withdraws nothing.
+
+On the 166 Markdown files of the five spec-* repositories every status and
+every warning is read as before.
+
+<!-- @assert-count target="src/parser.ts" symbol="const view = scan.masks.structure;" expected="1" reason="the label is read with comments masked" -->

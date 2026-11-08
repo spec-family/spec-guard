@@ -370,6 +370,32 @@ describe('what is not a status', () => {
  * is its reader's (ADR-0002, amended 2026-09-26).
  */
 
+describe('a label and a comment', () => {
+  // A template keeps its hints in comments, and the label was read with them
+  // kept: a comment could withdraw the document it sat in. ADR-0010, amended
+  // 2026-11-08, as spec-graph reads the label.
+  it('reads no `Status:` line kept in a comment, which a template has not filled in', async () => {
+    const template = `# ADR-1\n\n<!--\nStatus: Superseded\n-->\n\n## Context\n\n${VIOLATION}`;
+    expect(parseStatus(template)).toBeUndefined();
+    // Its rules run, where the comment withheld them.
+    expect((await run(await repo({ 'docs/a.md': template, ...CODE }))).summary).toMatchObject({ total: 1, failed: 1, inactive: 0 });
+    // The control: out of the comment, the same line withholds the document.
+    expect(parseStatus(template.replace('<!--\n', '').replace('-->\n', ''))?.value).toBe('superseded');
+    // And a label after the comment is the one read.
+    expect(parseStatus('# ADR-1\n\n<!--\nStatus: Superseded\n-->\nStatus: Accepted\n\n## Context\n')).toMatchObject({ value: 'accepted', source: 'label' });
+  });
+
+  it('reads the label past a comment on its line, as a reader sees it', () => {
+    expect(parseStatus('# ADR-1\n\nStatus: <!-- one of: draft, accepted --> Accepted\n\n## Context\n')).toMatchObject({ value: 'accepted', label: 'Accepted', source: 'label' });
+    expect(parseStatus('# ADR-1\n\n**Status:** <!-- draft | accepted --> Draft\n')).toMatchObject({ value: 'draft', source: 'label' });
+  });
+
+  it('reads no label shown in code, as before', () => {
+    expect(parseStatus('# ADR-1\n\n```md\nStatus: superseded\n```\n\n## Context\n')).toBeUndefined();
+    expect(parseStatus('# ADR-1\n\n```md\nStatus: superseded\n```\nStatus: accepted\n')?.value).toBe('accepted');
+  });
+});
+
 describe('the headings a status is read by', () => {
   it('ignores a `## Status` kept in a comment, which is a template not yet filled in', () => {
     const template = '# ADR-1\n\n<!--\n## Status\n\nDraft\n-->\n\n## Context\n';

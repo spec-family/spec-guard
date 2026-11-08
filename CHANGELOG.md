@@ -22,6 +22,17 @@ is deprecated before it goes, is spec-core's
   reports changed. Upgrading: nothing to do; an agent connected to the MCP
   server reads the new first sentence of its instructions.
 
+- **A `Status:` label is read with comments masked, as a reader sees it.**
+  A `Status: Superseded` line inside a template's multi-line `<!-- ... -->`
+  in the preamble withdrew the document, and its rules stopped running, and
+  `Status: <!-- one of: draft, accepted --> Accepted` could not be read. The
+  first is now no label and the second reads `Accepted`, as spec-graph
+  reads them
+  ([ADR-0010](https://github.com/spec-family/spec-guard/blob/main/docs/adr/0010-spec-status.md),
+  amended 2026-11-08). Upgrading: a document withdrawn only by a status in a
+  comment is in force again and its rules run, so they may fail; write the
+  status outside the comment to withhold it.
+
 ## 0.32.0
 
 `spec-guard claims` holds each claim a specification labels, such as
