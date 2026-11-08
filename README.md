@@ -1453,6 +1453,7 @@ spec-guard query <paths...> [options]  # the rules in force for files or directo
 spec-guard mcp [options]               # serve the rules over MCP on stdio
 spec-guard prove [patterns...]         # show each rule a violation of itself, in memory
 spec-guard cites [paths...]            # check each spec a code comment cites exists and is in force
+spec-guard claims [options]            # hold each claim a specification labels to the evidence its label asks for
 spec-guard impact <paths...>           # the files that depend on each path, and the rules in play there
 ```
 
