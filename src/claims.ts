@@ -181,7 +181,8 @@ function ownText(scan: MarkdownScan, item: ListItem): string {
 function proseLabels(scan: MarkdownScan, claims: readonly Claim[], vocabulary: readonly string[]): Array<{ offset: number; label: string }> {
   const found: Array<{ offset: number; label: string }> = [];
   const known = new Set(vocabulary);
-  const claimed = new Set(claims.map((claim) => claim.item));
+  // No item around a span, undefined, is no claim's.
+  const claimed = new Set<ListItem | undefined>(claims.map((claim) => claim.item));
   for (const span of scan.codeSpans) {
     let run = 0;
     while (scan.text.charAt(span.start + run) === '`') run += 1;
@@ -193,7 +194,7 @@ function proseLabels(scan: MarkdownScan, claims: readonly Claim[], vocabulary: r
     // terminator: `<` for the `<=` and `<=` for the `<` answer alike, and
     // those mutants are equivalent.
     const item = scan.listItems.findLast((candidate) => candidate.start <= span.start && span.start < candidate.end);
-    if (item === undefined || !claimed.has(item)) found.push({ offset: span.start, label });
+    if (!claimed.has(item)) found.push({ offset: span.start, label });
   }
   for (const label of vocabulary) {
     // The structure mask has code spans blanked, so none is counted twice.

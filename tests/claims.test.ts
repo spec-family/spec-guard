@@ -331,6 +331,11 @@ describe('a label in prose', () => {
     ]);
   });
 
+  it('reads a span after a list as no item\'s, where the claim before it has ended', async () => {
+    const root = await repo({ 'spec/a.md': '- `Specified`: one.\n\nThe `Target` here is prose.\n' });
+    expect(where(await findClaimsReport({ root, config: CONFIG }))).toEqual([['spec/a.md', 3, 5, 'Target']]);
+  });
+
   it('is none in a document that writes each label only to open a claim', async () => {
     const root = await repo({ 'spec/a.md': '- `Specified`: one.\n- [ ] `Target`: two.\n' });
     expect((await findClaimsReport({ root, config: CONFIG })).prose).toEqual([]);
