@@ -8,6 +8,7 @@
  * each way of not being one sweep must be refused rather than scored.
  */
 
+import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
@@ -22,6 +23,8 @@ import {
   reportHtml,
   SHARD_COUNT,
   ShardError,
+  TOOLCHAIN,
+  toolchainKey,
   type Mutant,
   type Report,
 } from '../scripts/mutation-shards.mjs';
@@ -211,6 +214,43 @@ describe('cacheFor', () => {
   });
 });
 
+describe('toolchainKey', () => {
+  const versions: Record<string, string> = {
+    '@stryker-mutator/core': '10.1.1',
+    '@stryker-mutator/vitest-runner': '10.1.1',
+    vitest: '4.1.12',
+  };
+  const keyWith = (name: string, version: string | undefined) =>
+    toolchainKey((asked) => (asked === name ? version : versions[asked]));
+
+  it('names the three packages that decide what a test is to an incremental run, each at its version', () => {
+    expect(TOOLCHAIN).toEqual(['@stryker-mutator/core', '@stryker-mutator/vitest-runner', 'vitest']);
+    expect(toolchainKey((name) => versions[name])).toBe('core-10.1.1+vitest-runner-10.1.1+vitest-4.1.12');
+  });
+
+  it('moves with each of them, and no key followed by a dash starts another', () => {
+    // restore-keys match by prefix, and the workflow ends the key with a dash
+    // there, so vitest 4.1.1 must not restore what 4.1.12 published.
+    const keys = [
+      toolchainKey((name) => versions[name]),
+      keyWith('@stryker-mutator/core', '10.0.0'),
+      keyWith('@stryker-mutator/vitest-runner', '10.1.10'),
+      keyWith('vitest', '4.1.1'),
+      keyWith('vitest', '5.0.0-beta.2'),
+    ];
+    expect(new Set(keys).size).toBe(keys.length);
+    for (const a of keys) for (const b of keys) if (a !== b) expect(`${b}-`.startsWith(`${a}-`), `${a} / ${b}`).toBe(false);
+  });
+
+  it('refuses a package with no version, rather than key on nothing', () => {
+    expect(() => keyWith('vitest', undefined)).toThrow(
+      new ShardError('No version of vitest to key the incremental file on, got undefined: run npm ci first.'),
+    );
+    expect(() => keyWith('@stryker-mutator/core', '')).toThrow('No version of @stryker-mutator/core to key the incremental file on, got "": run npm ci first.');
+    expect(() => keyWith('@stryker-mutator/vitest-runner', 'latest')).toThrow('got "latest"');
+  });
+});
+
 describe('mergeReports', () => {
   it('merges the shards back into the sweep they were split from', () => {
     const original = unsplit();
@@ -309,7 +349,9 @@ describe('mergeReports', () => {
     const shards = split(unsplit());
     const tests = shards[1]!.report.testFiles!['tests/a.test.ts']!.tests;
     tests.push({ ...tests[0]!, id: '998' });
-    expect(refused(shards)).toBe(`Shard 2 has two tests named "${tests[0]!.name}" in tests/a.test.ts, so its tests cannot be matched by name.`);
+    expect(refused(shards)).toBe(
+      `Shard 2 has two tests named "${tests[0]!.name}" in tests/a.test.ts, so its tests cannot be matched by name. A run started from an incremental file another Stryker or vitest wrote reports every test twice; see toolchainKey.`,
+    );
   });
 
   it('refuses a mutant that names a test its report does not define', () => {
@@ -402,5 +444,26 @@ describe('this repository', () => {
     expect(/^\s+shard: \[([\d, ]+)\]$/m.exec(workflow)?.[1]).toBe(
       Array.from({ length: SHARD_COUNT }, (_, index) => index + 1).join(', '),
     );
+  });
+
+  it('keys the incremental file on the Stryker and vitest the lockfile installs', () => {
+    const lock = JSON.parse(readFileSync('package-lock.json', 'utf8')) as { packages: Record<string, { version?: string }> };
+    const printed = execFileSync(process.execPath, ['scripts/mutation-shards.mjs', 'toolchain'], { encoding: 'utf8' }).trim();
+    expect(printed).toBe(toolchainKey((name) => lock.packages[`node_modules/${name}`]?.version));
+  });
+
+  it('restores the incremental file only under the toolchain that published it', () => {
+    const workflow = readFileSync('.github/workflows/mutation.yml', 'utf8');
+    const naming = 'run: echo "key=$(node scripts/mutation-shards.mjs toolchain)" >> "$GITHUB_OUTPUT"';
+    expect(workflow.split(naming)).toHaveLength(3);
+    const keyed = workflow.split('\n').filter((line) => line.includes('stryker-incremental-'));
+    expect(keyed).toHaveLength(3);
+    for (const line of keyed) expect(line.trim()).toMatch(/^(key: )?stryker-incremental-\$\{\{ steps\.toolchain\.outputs\.key \}\}-/);
+    // Each job names it before its cache step reads the output.
+    const first = workflow.indexOf('id: toolchain');
+    const second = workflow.indexOf('id: toolchain', first + 1);
+    expect(first).toBeLessThan(workflow.indexOf('actions/cache/restore'));
+    expect(workflow.indexOf('actions/cache/restore')).toBeLessThan(second);
+    expect(second).toBeLessThan(workflow.indexOf('actions/cache/save'));
   });
 });

@@ -11,7 +11,8 @@ name: Mutation
 # So: pull requests run Stryker in incremental mode, which reuses the verdicts
 # for mutants whose source and covering tests are both unchanged. main, the
 # weekly schedule and any manual run do the full sweep and publish the
-# incremental file the pull requests start from.
+# incremental file the pull requests start from, each from the one published
+# with its own Stryker and vitest.
 #
 # The honest caveat, which belongs in the file rather than in a footnote: an
 # incremental result is only as trustworthy as its cache. Stryker invalidates on
@@ -113,18 +114,29 @@ jobs:
       # 11 run none either (tests/npm.test.ts).
       - run: npm ci --ignore-scripts
 
-      # A pull request starts from whatever main last published. The
-      # restore-keys fallback matters more than the exact key: a run that finds
-      # nothing simply does a full run and is correct, only slower. A full
-      # sweep restores nothing: it re-derives every verdict from the code.
+      # The versions of Stryker and vitest that npm ci installed. An incremental
+      # file matches its tests to this run's by what those versions make of a
+      # test, so it is restored only by the toolchain that wrote it
+      # (scripts/mutation-shards.mjs, toolchainKey; ADR-0003, amended
+      # 2026-11-08). It runs in a full sweep too, which publishes under it.
+      - name: Name the toolchain
+        id: toolchain
+        run: echo "key=$(node scripts/mutation-shards.mjs toolchain)" >> "$GITHUB_OUTPUT"
+
+      # A pull request starts from whatever main last published with its
+      # toolchain. The restore-keys fallback matters more than the exact key: a
+      # run that finds nothing simply does a full run and is correct, only
+      # slower, so a pull request that moves Stryker or vitest sweeps every
+      # mutant. A full sweep restores nothing: it re-derives every verdict from
+      # the code.
       - name: Restore the incremental file
         if: env.FULL != 'true'
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: reports/stryker-incremental.json
-          key: stryker-incremental-${{ github.sha }}
+          key: stryker-incremental-${{ steps.toolchain.outputs.key }}-${{ github.sha }}
           restore-keys: |
-            stryker-incremental-
+            stryker-incremental-${{ steps.toolchain.outputs.key }}-
 
       # The file holds the whole sweep, and Stryker reports the verdicts it
       # holds for files a run does not mutate as though the run had produced
@@ -184,6 +196,11 @@ jobs:
       # The merge scores with Stryker's own metrics library.
       - run: npm ci --ignore-scripts
 
+      # The key the shards restored by, from the same lockfile.
+      - name: Name the toolchain
+        id: toolchain
+        run: echo "key=$(node scripts/mutation-shards.mjs toolchain)" >> "$GITHUB_OUTPUT"
+
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: mutation-shard-*
@@ -200,7 +217,7 @@ jobs:
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: reports/stryker-incremental.json
-          key: stryker-incremental-${{ github.sha }}
+          key: stryker-incremental-${{ steps.toolchain.outputs.key }}-${{ github.sha }}
 
       # A score is of the mutants a sweep made, and Stryker makes none of what
       # stands under a TypeScript `as`. This counts the places a mutator would
