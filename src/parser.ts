@@ -635,9 +635,15 @@ function fromTable(scan: MarkdownScan): StatusReading | undefined {
  * tool that accepts one anywhere in a long document will eventually find one in
  * a sentence. The first such line decides, and one whose value cannot be read
  * says so, as a section does.
+ *
+ * Read with comments masked, as a reader sees the preamble. With them kept, a
+ * `Status: Superseded` line in a template's multi-line comment withdrew the
+ * document it sits in, and `Status: <!-- draft, accepted --> Accepted` began
+ * with no word. spec-graph reads the label so (its #132): one reading for the
+ * family (ADR-0010, amended 2026-11-08).
  */
 function fromLabel(scan: MarkdownScan): StatusReading | undefined {
-  const view = scan.masks.directives;
+  const view = scan.masks.structure;
   for (const line of scan.lines.slice(0, preambleEnd(scan) - 1)) {
     const found = STATUS_LABEL_RE.exec(view.slice(line.start, line.end));
     if (found) return decided(toStatus(found[2] as string, 'label'), line.line, (found[2] as string).trim(), 'the status label', '');
