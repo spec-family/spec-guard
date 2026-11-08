@@ -16,12 +16,13 @@
 
 import path from 'node:path';
 
+import { escapeRegExp } from './engine.js';
 import { nodeIo, readText, type Io } from './io.js';
 import { proveSpecGuard } from './prove.js';
 import { elapsed } from './runner.js';
 import { readSpecs, specPath } from './specs.js';
 import type { ConfigUse, Directive, ProveResult } from './types.js';
-import { claimsIn, type ListItem, type MarkdownScan } from './parser.js';
+import { claimsIn, type Claim, type ListItem, type MarkdownScan } from './parser.js';
 import { patternListError, specPatternError } from './glob.js';
 
 /** What a label asks of a claim that carries it. */
@@ -100,6 +101,18 @@ export interface ClaimFinding {
   readonly hint: string;
 }
 
+/**
+ * A label of the vocabulary written where no claim reads it: in a sentence,
+ * `(Implemented)`, in a heading or a table, or as a code span that opens no
+ * list item. No check holds it, and the report says so in a note.
+ */
+export interface ProseLabel {
+  readonly file: string;
+  readonly line: number;
+  readonly column: number;
+  readonly label: string;
+}
+
 /** One claim, as the report lists it. */
 export interface ClaimEntry {
   readonly file: string;
@@ -116,6 +129,8 @@ export interface ClaimsReport {
   readonly totals: Readonly<Record<string, number>>;
   readonly claims: readonly ClaimEntry[];
   readonly findings: readonly ClaimFinding[];
+  /** The labels of the vocabulary that stand in prose and are not claims, in document order. */
+  readonly prose: readonly ProseLabel[];
   /** The documents read, root-relative. */
   readonly files: readonly string[];
   /** Patterns of `files` that matched nothing, as written. */
@@ -157,6 +172,39 @@ function ownText(scan: MarkdownScan, item: ListItem): string {
 }
 
 /**
+ * Where a scanned document writes a label of the vocabulary that is no
+ * claim's: as a word of its own in the text, exact in case, outside code,
+ * comments and front matter, and as a code span that holds the label and is
+ * no claim's own text. A claim's spans are its label and, where it holds
+ * two, a finding of its own. Offsets, in document order.
+ */
+function proseLabels(scan: MarkdownScan, claims: readonly Claim[], vocabulary: readonly string[]): Array<{ offset: number; label: string }> {
+  const found: Array<{ offset: number; label: string }> = [];
+  const known = new Set(vocabulary);
+  const claimed = new Set(claims.map((claim) => claim.item));
+  for (const span of scan.codeSpans) {
+    let run = 0;
+    while (scan.text.charAt(span.start + run) === '`') run += 1;
+    const label = scan.text.slice(span.start + run, span.end - run).trim();
+    if (!known.has(label)) continue;
+    // The innermost item around the span is the last of those around it to
+    // open, and a span in a claim's own text is that claim's. No span opens
+    // at an item's start, its indent or marker, nor at its end, a line's
+    // terminator: `<` for the `<=` and `<=` for the `<` answer alike, and
+    // those mutants are equivalent.
+    const item = scan.listItems.findLast((candidate) => candidate.start <= span.start && span.start < candidate.end);
+    if (item === undefined || !claimed.has(item)) found.push({ offset: span.start, label });
+  }
+  for (const label of vocabulary) {
+    // The structure mask has code spans blanked, so none is counted twice.
+    for (const match of scan.masks.structure.matchAll(new RegExp(`(?<![\\p{L}\\p{N}_])${escapeRegExp(label)}(?![\\p{L}\\p{N}_])`, 'gu'))) {
+      found.push({ offset: match.index, label });
+    }
+  }
+  return found.sort((a, b) => a.offset - b.offset);
+}
+
+/**
  * Whether a directive counts a test: a symbol that starts as a test's name, and
  * a `min` or `expected` of at least 1. Only a count of a symbol takes both, so
  * no kind is asked.
@@ -195,9 +243,14 @@ export async function findClaimsReport(options: ClaimsOptions): Promise<ClaimsRe
   type Pending = { entry: Omit<ClaimEntry, 'evidence'>; candidates: Directive[]; rule: ClaimLabelRule; text: string; column: number };
   const pending: Pending[] = [];
   const findings: ClaimFinding[] = [];
+  const prose: ProseLabel[] = [];
   for (const document of set.documents) {
     const source = await readText(io, document.file);
     const { claims, scan } = claimsIn(source, vocabulary);
+    for (const { offset, label } of proseLabels(scan, claims, vocabulary)) {
+      const { line, column } = scan.index.positionAt(offset);
+      prose.push({ file: document.relativeFile, line, column, label });
+    }
     // The innermost claim around a directive is the one it is written under,
     // and the last of those around it to open. A directive opens at its `<!--`,
     // never at an item's first or last offset, so `<` for the `<=` and `<=`
@@ -279,6 +332,7 @@ export async function findClaimsReport(options: ClaimsOptions): Promise<ClaimsRe
     totals,
     claims,
     findings,
+    prose,
     files: set.files.map((file) => specPath(root, file)),
     unmatched: set.unmatched!,
     durationMs: elapsed(started),

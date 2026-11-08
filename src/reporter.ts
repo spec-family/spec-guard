@@ -1675,6 +1675,21 @@ function claimTotals(report: ClaimsReport): string {
 }
 
 /**
+ * The note a claims report closes with: how many labels of the vocabulary
+ * stand in prose, where no check holds them, and under `--verbose` where each
+ * is. A note, not a finding: such a label may be a word of a sentence, and
+ * the exit code does not change for it (ADR-0020, amended 2026-11-08).
+ */
+function proseNote(report: ClaimsReport, verbose: boolean, skip: string): string[] {
+  const count = report.prose.length;
+  if (count === 0) return [];
+  const one = count === 1;
+  const note = `${skip} ${countLabel(count, 'label')} of the vocabulary ${one ? 'stands' : 'stand'} in prose and ${one ? 'is no claim' : 'are no claims'}, which only a list item that opens with one is`;
+  if (!verbose) return [`${note}; --verbose says where`];
+  return [`${note}:`, ...report.prose.map((label) => `    ${label.file}:${label.line}:${label.column}  ${label.label}`)];
+}
+
+/**
  * Renders what `spec-guard claims` found, for a person: each finding on the
  * claim's line, the totals of each label, and what the check read. The totals
  * are said here and in JSON, and never written into a document (ADR-0020).
@@ -1700,6 +1715,7 @@ export function formatClaims(report: ClaimsReport, options: ReporterOptions): st
       ? paint(`${glyphs.pass} every claim has the evidence its label asks for`, 'green')
       : paint(`${glyphs.fail} ${countLabel(report.findings.length, 'claim finding')}`, 'red', 'bold'),
   );
+  for (const line of proseNote(report, options.verbose, glyphs.skip)) lines.push(paint(line, 'dim'));
   return lines.join('\n');
 }
 
@@ -1718,6 +1734,7 @@ export function formatClaimsJson(report: ClaimsReport): string {
       totals: report.totals,
       claims: report.claims,
       findings: report.findings,
+      prose: report.prose,
       files: report.files,
       unmatched: report.unmatched,
       config: report.config,

@@ -1374,6 +1374,11 @@ x 1 claim finding
   `mixed-labels`.
 - **The totals** of each label are in the report and in JSON, never in a
   document.
+- **A label in prose**, written where no claim reads it, `(Implemented)` in
+  a sentence, a heading, a table cell or a code span that opens no item, is
+  no claim, and no check holds it. The report closes with how many there
+  are, `--verbose` says where, and JSON lists them as `prose`; they change
+  no exit code.
 - `--format json`, `sarif`, `github` and `gitlab`, as `cites`. No `claims`
   in the configuration, or `files` that match nothing, is exit 2.
 
@@ -1455,7 +1460,7 @@ spec-guard impact <paths...>           # the files that depend on each path, and
 | --- | --- |
 | `-r, --root <path>` | Codebase root that assertions resolve against, a directory (default: cwd). One that is not there, or is a file, is exit 2 from every command |
 | `--spec <pattern>` | A spec glob or path, repeatable. `query` and `mcp` take their specs only from here. An empty one is refused: `.` is every Markdown file under the root. So is one that matches no file beside others that do (below) |
-| `-v, --verbose` | Print passing assertions too |
+| `-v, --verbose` | Print passing assertions too; for `claims`, where each label in prose is |
 | `--watch` | Report, then report again as the tree changes, until Ctrl+C |
 | `--fail-fast` | Stop at the first failing assertion |
 | `--json` | Machine-readable report on stdout (same as `--format json`), versioned by `formatVersion`. Beside a `--format` that names another format it is refused (below) |

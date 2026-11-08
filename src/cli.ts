@@ -430,7 +430,6 @@ const NOT_FOR: Record<Exclude<Command, 'check'>, ReadonlySet<string>> = {
     '--no-allow-missing-targets',
     '--allow-empty-scope',
     '--no-allow-empty-scope',
-    '--verbose',
     '--watch',
     '--fail-fast',
     '--engine',
@@ -1333,9 +1332,8 @@ async function runClaims(options: CliOptions, io: CliIO, use: ConfigUse | undefi
             ? formatGithub(claimsAnnotations(report))
             : formatClaims(report, {
                 color: shouldUseColor({ isTTY: io.isTTY }, options.color, io.env),
-                // A claims report shows no passing rule, so it reads no verbose,
-                // and the mutant that sets it is equivalent.
-                verbose: false,
+                // Where each label in prose is.
+                verbose: options.verbose,
                 ascii: options.ascii ?? shouldUseAscii(io.env),
               });
   if (written !== '') io.stdout(written);

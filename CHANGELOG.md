@@ -22,6 +22,18 @@ is deprecated before it goes, is spec-core's
   reports changed. Upgrading: nothing to do; an agent connected to the MCP
   server reads the new first sentence of its instructions.
 
+### Added
+
+- **`spec-guard claims` says how many labels stand in prose and are not
+  claims.** A label of the vocabulary written in a sentence,
+  `(Implemented)`, in a heading, in a table or as a code span that opens no
+  list item is no claim, and no check holds it, and nothing said so. The
+  report closes with a note of how many there are, `--verbose`, which
+  `claims` now takes, says where, and JSON lists them in `prose`. The exit
+  code does not change for them
+  ([ADR-0020](https://github.com/spec-family/spec-guard/blob/main/docs/adr/0020-a-claim-is-held-to-its-evidence.md),
+  amended 2026-11-08).
+
 ## 0.32.0
 
 `spec-guard claims` holds each claim a specification labels, such as
