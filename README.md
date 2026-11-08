@@ -641,10 +641,26 @@ alone, as ripgrep refuses it. What the crate reads and JavaScript would
 read otherwise is an invalid directive that names it: `\A`, `\z`, `\<`,
 `\>`, `\b{...}`, `\a`, `\x{...}`, `\U`, `\pL`, a class inside a class such
 as `[[:alpha:]]`, `&&`, `--` or `~~` in a class, and a count with blanks
-in it, `{2, 3}`. An escaped sign such as `\-` or `\#`, a lone `]` or `}`,
+in it, `{2, 3}`; so is a group with flags, `(?i:...)`, which Node 22 does
+not read. An escaped sign such as `\-` or `\#`, a lone `]` or `}`,
 and `[\w-.]` read as they did
 ([ADR-0007](https://github.com/spec-family/spec-guard/blob/main/docs/adr/0007-search-scope.md),
 amended 2026-10-24).
+
+A byte that is no UTF-8, in a Latin-1 file say, is no character to a rule,
+as ripgrep reads a file's bytes: neither `.` nor any class matches it, `\b`
+reads it as no word character, and `\B` and `word="true"` meet no boundary
+beside it ([what gets searched](#what-gets-searched)).
+
+The classes read Unicode as each engine has it. On Node 24 and later the
+scanner reads Unicode 17.0, and takes 4,803 code points that version added
+for assigned, which ripgrep 15, reading 16.0, does not: the scripts Sidetic,
+Tolong Siki, Beria Erfe and Tai Yo, CJK Extension J, and some symbols and
+Latin letters. For text in those, `\w`, `\p{L}`, a negated class or
+`ignore-case` can answer differently under each engine; `--engine rg` gives
+one answer wherever ripgrep is installed
+([ADR-0007](https://github.com/spec-family/spec-guard/blob/main/docs/adr/0007-search-scope.md),
+amended 2026-11-08).
 
 ### `exclude` - everywhere except
 
@@ -897,6 +913,18 @@ means a rule silently stops covering anything.
 rule covers - and ripgrep applies it only inside a git repository, so honouring
 it made the same tree answer differently depending on whether a `.git` directory
 happened to exist above it.
+
+**A file that is not valid UTF-8 is matched as ripgrep matches it**, with
+either engine: a byte outside UTF-8, in a Latin-1 file say, is no character,
+so neither `.` nor any class matches it. Only a pattern that could match a
+character there, or meet a boundary beside one, can answer otherwise than
+the text a person reads: a character outside ASCII, `.`, a class or its
+negation, `\w`, `\b`, `\B` and `word="true"`. A rule's notes name each file
+it matched in that holds such a byte, under `--verbose` for a passing rule;
+a file it found nothing in is not named, as ripgrep names the scanner only
+the files that match
+([ADR-0007](https://github.com/spec-family/spec-guard/blob/main/docs/adr/0007-search-scope.md),
+amended 2026-11-08).
 
 To narrow scope, say so in the assertion:
 
@@ -2010,11 +2038,10 @@ Two honest caveats:
   from every case that used to split them. A regex rule kept two readings
   until its dialect was one, and ripgrep took a byte order mark off a file's
   start: `foo\b` over `fooé` was counted by the scanner and passed under
-  ripgrep. What still splits them is a file that is not UTF-8, which the
-  scanner reads with U+FFFD for each byte it cannot, and a character newer
-  than one of the two engines' Unicode
+  ripgrep. What still splits them is a character newer than one of the two
+  engines' Unicode
   ([ADR-0007](https://github.com/spec-family/spec-guard/blob/main/docs/adr/0007-search-scope.md),
-  amended 2026-10-24).
+  amended 2026-11-08).
 
 ## Programmatic API
 

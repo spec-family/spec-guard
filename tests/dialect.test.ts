@@ -16,7 +16,9 @@
 import { afterAll, describe, expect, it } from 'vitest';
 
 import { createCommentMask } from '../src/comments.js';
+import { readBytes } from '../src/dialect.js';
 import { buildJsRegExp, javascriptEngine, resolveEngine, scanContent, type SearchRequest } from '../src/engine.js';
+import { formatJson, formatReport } from '../src/reporter.js';
 import { runSpecGuard } from '../src/runner.js';
 import type { SearchOptions } from '../src/types.js';
 import { findTestRipgrep, makeTempRepo, removeTempRepo, searchOptions } from './helpers.js';
@@ -302,9 +304,43 @@ describe('what the two engines would read apart', () => {
     }
   });
 
+  it('refuses flags and a group with flags, which ripgrep reads and Node 22 does not', () => {
+    const without = 'write ignore-case="true" for the whole rule, or the cases as a class, as [Aa]';
+    const grouped: Array<[string, string]> = [
+      ['(?i:abc)', '(?i:'],
+      ['x(?-i:abc)', '(?-i:'],
+      ['(?s:.)', '(?s:'],
+      ['(?m:^a)', '(?m:'],
+      ['(?i-s:a)', '(?i-s:'],
+      ['(?-:a)', '(?-:'],
+      ['(?u:a)', '(?u:'],
+    ];
+    for (const [symbol, flags] of grouped) {
+      expect(refusal(symbol), symbol).toBe(`Invalid regular expression: /${symbol}/: "${flags}" is a group with flags to ripgrep, and to JavaScript only from Node 23, where spec-guard runs on Node 22 too: ${without}`);
+    }
+    const alone: Array<[string, string]> = [
+      ['(?i)abc', '(?i)'],
+      ['a(?x)b', '(?x)'],
+      ['(?-u)a', '(?-u)'],
+      ['(?ims-U)a', '(?ims-U)'],
+    ];
+    for (const [symbol, flags] of alone) {
+      expect(refusal(symbol), symbol).toBe(`Invalid regular expression: /${symbol}/: "${flags}" sets flags for the rest of the rule to ripgrep, and is no group to JavaScript: ${without}`);
+    }
+    // A group with no flags, a group's name and a look-around are no flags.
+    expect(count('x(?:ab)y', 'xaby')).toBe(1);
+    expect(count('(?<i>a)b', 'ab')).toBe(1);
+    expect(count('(?=a)a', 'a')).toBe(1);
+    expect(count('(?<!b)a', 'a')).toBe(1);
+    expect(count(String.raw`\(\?i\)`, '(?i)')).toBe(1);
+    expect(count('[(?i)]', 'i')).toBe(1);
+    expect(refusal('(?)')).toBe('Invalid regular expression: /(?)/: Invalid group');
+  });
+
   it('names the rule, not its reading, where JavaScript refuses it', () => {
     expect(refusal('(')).toBe('Invalid regular expression: /(/: Unterminated group');
     expect(refusal('[a')).toBe('Invalid regular expression: /[a/: Unterminated character class');
+    expect(refusal('x[^ab')).toBe('Invalid regular expression: /x[^ab/: Unterminated character class');
     expect(refusal(String.raw`x\ey`)).toBe(String.raw`Invalid regular expression: /x\ey/: Invalid escape`);
     expect(refusal('[z-a]')).toBe('Invalid regular expression: /[z-a]/: Range out of order in character class');
     expect(refusal('x\\')).toBe('Invalid regular expression: /x\\/: \\ at end of pattern');
@@ -321,6 +357,144 @@ describe('what the two engines would read apart', () => {
       expect(() => buildJsRegExp(symbol, searchOptions({ regex: true })), symbol).not.toThrow(/to ripgrep/);
     }
     expect(refusal(String.raw`x[\A-]`)).toBe(String.raw`Invalid regular expression: /x[\A-]/: Invalid escape`);
+  });
+});
+
+describe('a byte that is no UTF-8, as ripgrep reads its bytes', () => {
+  /** How many matches a rule over a file of these bytes counts. */
+  const inBytes = (symbol: string, bytes: number[], options: Partial<SearchOptions> = {}): number => count(symbol, readBytes(Buffer.from(bytes)).text, options);
+  const x = 0x78;
+  const y = 0x79;
+  const LATIN_1_E_ACUTE = 0xe9;
+  const alone = (...bytes: number[]): string => bytes.map((byte) => String.fromCharCode(0xd800 | byte)).join('');
+
+  it('is no character to ., to a class or to a negated one, where a character between is', () => {
+    for (const symbol of ['x.y', 'x[^a]y', String.raw`x\Wy`, String.raw`x\Dy`, String.raw`x\Sy`, String.raw`x\P{L}y`, String.raw`x\p{Any}y`, String.raw`x[\W]y`, String.raw`x[\s\S]y`, 'x[^]y', String.raw`x[^\w]y`]) {
+      expect(inBytes(symbol, [x, LATIN_1_E_ACUTE, y]), symbol).toBe(0);
+      expect(inBytes(symbol, [x, 0x2d, y]), symbol).toBe(1);
+    }
+    expect(inBytes('x[^a]y', [x, LATIN_1_E_ACUTE, y], { ignoreCase: true })).toBe(0);
+    expect(inBytes('x.*y', [x, 0x61, LATIN_1_E_ACUTE, 0x62, y])).toBe(0);
+    // A greedy run stops at the byte, and what it took before is a match.
+    expect(inBytes('xa.*', [x, 0x61, 0x62, LATIN_1_E_ACUTE, 0x63])).toBe(1);
+  });
+
+  it('is no word character to \\b, and no place for \\B or word, which need a character on either side', () => {
+    const foo = [0x66, 0x6f, 0x6f];
+    expect(inBytes(String.raw`\bfoo`, [LATIN_1_E_ACUTE, ...foo])).toBe(1);
+    expect(inBytes(String.raw`foo\b`, [...foo, LATIN_1_E_ACUTE])).toBe(1);
+    expect(inBytes(String.raw`foo\B`, [...foo, LATIN_1_E_ACUTE])).toBe(0);
+    expect(inBytes(String.raw`\Bfoo`, [LATIN_1_E_ACUTE, ...foo])).toBe(0);
+    expect(inBytes(String.raw`\B`, [LATIN_1_E_ACUTE, LATIN_1_E_ACUTE, 0x0a])).toBe(0);
+    // Two bytes it can read either side, a blank and a line end, and only those.
+    expect(inBytes(String.raw` \B`, [LATIN_1_E_ACUTE, 0x20, 0x0a])).toBe(1);
+    expect(inBytes(String.raw`\B `, [LATIN_1_E_ACUTE, 0x20, 0x0a])).toBe(0);
+    for (const regex of [false, true]) {
+      expect(inBytes('foo', [LATIN_1_E_ACUTE, ...foo, 0x20], { regex, word: true }), String(regex)).toBe(0);
+      expect(inBytes('foo', [0x20, ...foo, LATIN_1_E_ACUTE], { regex, word: true }), String(regex)).toBe(0);
+      expect(inBytes('foo', [0x20, ...foo, 0x20, LATIN_1_E_ACUTE], { regex, word: true }), String(regex)).toBe(1);
+    }
+  });
+
+  it('ends no line', () => {
+    const foo = [0x66, 0x6f, 0x6f];
+    expect(inBytes('foo$', [...foo, LATIN_1_E_ACUTE, 0x0a])).toBe(0);
+    // The byte is a line's text, and that line has a start.
+    expect(inBytes('^', [0x61, 0x0a, LATIN_1_E_ACUTE])).toBe(2);
+    expect(inBytes('^$', [LATIN_1_E_ACUTE, 0x0a])).toBe(0);
+  });
+
+  it('leaves U+FFFD written in UTF-8 the character it is', () => {
+    const replacement = [0xef, 0xbf, 0xbd];
+    expect(inBytes('x.y', [x, ...replacement, y])).toBe(1);
+    expect(inBytes(String.raw`x\u{FFFD}y`, [x, ...replacement, y, 0xff])).toBe(1);
+    expect(inBytes('x.y', [x, ...replacement, y, 0xff])).toBe(1);
+  });
+
+  it('reads each sequence Unicode calls well-formed as its character, and each other byte alone', () => {
+    const cases: Array<[number[], string]> = [
+      [[0x41], 'A'],
+      [[0x7f], at(0x7f)],
+      [[0xc2, 0x80], at(0x80)],
+      [[0xc3, 0xa9], E_ACUTE],
+      [[0xdf, 0xbf], at(0x7ff)],
+      [[0xe0, 0xa0, 0x80], at(0x800)],
+      [[0xe1, 0x80, 0x80], at(0x1000)],
+      [[0xec, 0xbf, 0xbf], at(0xcfff)],
+      [[0xed, 0x9f, 0xbf], at(0xd7ff)],
+      [[0xee, 0x80, 0x80], at(0xe000)],
+      [[0xef, 0xbf, 0xbf], at(0xffff)],
+      [[0xf0, 0x90, 0x80, 0x80], at(0x10000)],
+      [[0xf0, 0x9f, 0x98, 0x80], SMILE],
+      [[0xf1, 0x80, 0x80, 0x80], at(0x40000)],
+      [[0xf3, 0xbf, 0xbf, 0xbf], at(0xfffff)],
+      [[0xf4, 0x8f, 0xbf, 0xbf], at(0x10ffff)],
+      // A byte that only continues a sequence, and the leads that start none.
+      [[0x80], alone(0x80)],
+      [[0xbf], alone(0xbf)],
+      [[0xc0, 0x80], alone(0xc0, 0x80)],
+      [[0xc1, 0xbf], alone(0xc1, 0xbf)],
+      [[0xf5, 0x80, 0x80, 0x80], alone(0xf5, 0x80, 0x80, 0x80)],
+      [[0xff], alone(0xff)],
+      // A shorter form of a character, a surrogate, and what is past U+10FFFF.
+      [[0xe0, 0x9f, 0xbf], alone(0xe0, 0x9f, 0xbf)],
+      [[0xed, 0xa0, 0x80], alone(0xed, 0xa0, 0x80)],
+      [[0xf0, 0x8f, 0xbf, 0xbf], alone(0xf0, 0x8f, 0xbf, 0xbf)],
+      [[0xf4, 0x90, 0x80, 0x80], alone(0xf4, 0x90, 0x80, 0x80)],
+      // A sequence cut short, by the end of the file and by a byte it cannot hold.
+      [[0xc3], alone(0xc3)],
+      [[0xe2, 0x82], alone(0xe2, 0x82)],
+      [[0xf0, 0x9f, 0x98], alone(0xf0, 0x9f, 0x98)],
+      [[0xe2, 0x82, 0x41], `${alone(0xe2, 0x82)}A`],
+      [[0xe2, 0x41, 0x82], `${alone(0xe2)}A${alone(0x82)}`],
+      [[0xe2, 0xc0, 0x82], alone(0xe2, 0xc0, 0x82)],
+      [[0xf0, 0x9f, 0x41, 0x80], `${alone(0xf0, 0x9f)}A${alone(0x80)}`],
+      [[0xc3, 0xc3, 0xa9], `${alone(0xc3)}${E_ACUTE}`],
+    ];
+    for (const [bytes, text] of cases) {
+      const valid = !new RegExp(String.raw`\p{Cs}`, 'v').test(text);
+      expect(readBytes(Buffer.from(bytes)), bytes.join(' ')).toEqual({ text, utf8: valid });
+      // With a byte that is no UTF-8 after it, the file is read a byte at a time.
+      expect(readBytes(Buffer.from([...bytes, 0xff])), `${bytes.join(' ')} ff`).toEqual({ text: `${text}${alone(0xff)}`, utf8: false });
+    }
+    expect(readBytes(Buffer.alloc(0))).toEqual({ text: '', utf8: true });
+    // A byte order mark stays a character of the first line.
+    expect(readBytes(Buffer.from([0xef, 0xbb, 0xbf, 0xff]))).toEqual({ text: `${BOM}${alone(0xff)}`, utf8: false });
+  });
+
+  it('shows such a byte as U+FFFD in a line a report shows', () => {
+    const text = readBytes(Buffer.from([LATIN_1_E_ACUTE, ...Buffer.from(' foo')])).text;
+    const tally = scanContent(text, 'a.txt', buildJsRegExp('foo', searchOptions({})));
+    expect(tally.locations.map((location) => location.text)).toEqual([`${at(0xfffd)} foo`]);
+  });
+
+  it('refuses half a character written as an escape, which ripgrep refuses and no UTF-8 holds, two halves in a row among them', () => {
+    // Built, so that each escape stands in the source as an escape.
+    const unit = (hex: string): string => `${'\\'}u${hex}`;
+    const cases: Array<[string, string]> = [
+      [`${unit('D83D')}${unit('DE00')}`, unit('D83D')],
+      [`x[${unit('D83D')}${unit('DE00')}]y`, unit('D83D')],
+      [`${unit('DBFF')}${unit('DFFF')}`, unit('DBFF')],
+      [String.raw`\uD800`, String.raw`\uD800`],
+      [String.raw`x\udfffy`, String.raw`\udfff`],
+      [String.raw`x[\uDC00]y`, String.raw`\uDC00`],
+      [String.raw`\uD83Dx`, String.raw`\uD83D`],
+      [String.raw`\uDE00\uD83D`, String.raw`\uDE00`],
+      [String.raw`\uD83D\uD83D`, String.raw`\uD83D`],
+      [String.raw`\u{D800}`, String.raw`\u{D800}`],
+      [String.raw`x[\u{dfff}]y`, String.raw`\u{dfff}`],
+    ];
+    for (const [symbol, escape] of cases) {
+      expect(refusal(symbol), symbol).toBe(`Invalid regular expression: /${symbol}/: "${escape}" is half a character to JavaScript, and ripgrep refuses it: no UTF-8 text holds one, so write the whole character, as ${'\\'}u{1F600}`);
+    }
+    expect(count(String.raw`\u{1F600}`, `x${SMILE}y`)).toBe(1);
+    expect(count(String.raw`x[\u{1F600}]y`, `x${SMILE}y`)).toBe(1);
+    expect(count(`x${unit('0041')}${unit('0042')}y`, 'xABy')).toBe(1);
+    expect(count(`x[${unit('0041')}-${unit('0043')}]y`, 'xBy')).toBe(1);
+    expect(count(`x[${unit('0041')}-${unit('0043')}]y`, 'xDy')).toBe(0);
+    // The last character before the surrogates, and the first after them.
+    expect(count(`${unit('D7FF')}${unit('E000')}`, `${at(0xd7ff)}${at(0xe000)}`)).toBe(1);
+    expect(count(String.raw`\u{D7FF}\u{E000}`, `${at(0xd7ff)}${at(0xe000)}`)).toBe(1);
   });
 });
 
@@ -349,6 +523,21 @@ describe.skipIf(!rgPath)('one reading, through both engines', () => {
     'long-s': `x ${LONG_S} y`,
     dash: 'x foo-bar y',
     'lone-a': 'a',
+  };
+  // Bytes that are no UTF-8, which ripgrep reads as bytes and its classes match
+  // none of: a Latin-1 é after a word, alone and before one, a sequence cut
+  // short, a shorter form of a character, a surrogate, past U+10FFFF, a byte
+  // that only continues one, and U+FFFD written in UTF-8, which is a character.
+  const BYTES: Record<string, number[]> = {
+    'latin-1-after': [...Buffer.from('x foo'), 0xe9, ...Buffer.from(' y')],
+    'latin-1-alone': [...Buffer.from('x '), 0xe9, ...Buffer.from(' y')],
+    'latin-1-before': [...Buffer.from('x '), 0xe9, ...Buffer.from('foo y')],
+    'cut-short': [...Buffer.from('x '), 0xe2, 0x82, ...Buffer.from(' y')],
+    overlong: [...Buffer.from('x '), 0xc0, 0xaf, ...Buffer.from(' y')],
+    surrogate: [...Buffer.from('x '), 0xed, 0xa0, 0x80, ...Buffer.from(' y')],
+    'past-the-last': [...Buffer.from('x '), 0xf4, 0x90, 0x80, 0x80, ...Buffer.from(' y')],
+    continuation: [...Buffer.from('x '), 0x80, ...Buffer.from(' y')],
+    replacement: [...Buffer.from('x '), 0xef, 0xbf, 0xbd, ...Buffer.from(' y'), 0x0a, 0xff],
   };
   const RULES: Array<Partial<SearchOptions> & { symbol: string }> = [
     { symbol: String.raw`foo\b`, regex: true },
@@ -379,6 +568,12 @@ describe.skipIf(!rgPath)('one reading, through both engines', () => {
     { symbol: String.raw`^\S`, regex: true },
     { symbol: 'x*', regex: true },
     { symbol: String.raw`\B`, regex: true },
+    { symbol: 'x [^a] y', regex: true },
+    { symbol: String.raw`x \S y`, regex: true },
+    { symbol: String.raw`x \P{L} y`, regex: true },
+    { symbol: String.raw`x [\s\S]+ y`, regex: true },
+    { symbol: 'foo.', regex: true },
+    { symbol: 'x .* y', regex: true },
   ];
 
   const temporary: string[] = [];
@@ -389,6 +584,7 @@ describe.skipIf(!rgPath)('one reading, through both engines', () => {
   it('names to the scanner every file the scanner counts in, and counts the same matches in the same places', async () => {
     const root = await makeTempRepo({
       ...Object.fromEntries(Object.entries(SAMPLES).map(([name, text]) => [`data/${name}.txt`, `${text}\n`])),
+      ...Object.fromEntries(Object.entries(BYTES).map(([name, bytes]) => [`data/${name}.txt`, Buffer.from([...bytes, 0x0a])])),
       'data/starts-with-a-mark.txt': Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), Buffer.from('x foo y\n')]),
       'data/empty.txt': '',
     });
@@ -434,6 +630,72 @@ describe.skipIf(!rgPath)('one reading, through both engines', () => {
       expect(report.warnings, engine).toEqual([]);
       expect(report.results.map((result) => result.actual), engine).toEqual([0, 0, 0, 0, 0, 2]);
     }
+  });
+
+  it('counts no match across a byte that is no UTF-8, and names each matching file that holds one, with either engine', async () => {
+    const root = await makeTempRepo({
+      'docs/rules.md': '# Rules\n\n<!-- @assert-count target="data" symbol="caf." regex="true" max="9" -->\n',
+      // A Latin-1 é, which ends no match, beside a match of its own.
+      'data/latin.txt': Buffer.from([...Buffer.from('caf'), 0xe9, ...Buffer.from(' cafe\n')]),
+      'data/utf8.txt': `caf${E_ACUTE}\n`,
+      // Matched by nothing, so not named, as ripgrep names it to no engine.
+      'data/quiet.txt': Buffer.from([...Buffer.from('caf'), 0xe9, 0x0a]),
+    });
+    temporary.push(root);
+
+    for (const engine of ['javascript', 'ripgrep'] as const) {
+      process.env.SPEC_GUARD_RG = rgPath as string;
+      const report = await runSpecGuard({ root, patterns: ['docs/rules.md'], engine });
+      expect(report.engine, engine).toBe(engine);
+      expect(report.results.map((result) => [result.actual, result.notUtf8Files]), engine).toEqual([[2, ['data/latin.txt']]]);
+      const note = '1 matching file holds bytes that are not UTF-8, which no character of a rule matches: data/latin.txt';
+      expect(formatReport(report, { color: false, verbose: true }), engine).toContain(note);
+      // A passing rule's notes are said under --verbose.
+      expect(formatReport(report, { color: false, verbose: false }), engine).not.toContain('not UTF-8');
+      const json = JSON.parse(formatJson(report)) as { results: Array<{ notUtf8Files?: string[] }> };
+      expect(json.results.map((result) => result.notUtf8Files), engine).toEqual([['data/latin.txt']]);
+    }
+
+    // A failure says it whether or not --verbose was given, as it says its other notes.
+    const failing = await makeTempRepo({
+      'docs/rules.md': '# Rules\n\n<!-- @assert-absence target="data" symbol="cafe" -->\n',
+      'data/a.txt': Buffer.from([0xe9, ...Buffer.from(' cafe\n')]),
+      'data/b.txt': Buffer.from([0xff, ...Buffer.from(' cafe\n')]),
+      'data/c.txt': Buffer.from([0xfe, ...Buffer.from(' cafe\n')]),
+      'data/d.txt': Buffer.from([0xc0, ...Buffer.from(' cafe\n')]),
+    });
+    temporary.push(failing);
+    const failed = await runSpecGuard({ root: failing, patterns: ['docs/rules.md'], engine: 'javascript' });
+    // The first three are named, as every note names its paths.
+    expect(formatReport(failed, { color: false, verbose: false })).toContain('4 matching files hold bytes that are not UTF-8, which no character of a rule matches: data/a.txt, data/b.txt, data/c.txt\n');
+  });
+
+  it('reads a character Unicode 17.0 added as the Unicode of each engine has it, as the README says', async () => {
+    // The limit the README and ADR-0007 state, through the two engines; how
+    // many code points it covers, and which Node and ripgrep read which
+    // Unicode, tests/unicode-version.test.ts measures and holds.
+    const unicode = Number(process.versions.unicode!.split('.')[0]);
+    const SIDETIC = at(0x10940); // a letter Unicode 17.0 added
+    const root = await makeTempRepo({ 'data/new.txt': `a${SIDETIC}b\n`, 'data/old.txt': `a${E_ACUTE}b\n` });
+    temporary.push(root);
+    process.env.SPEC_GUARD_RG = rgPath as string;
+    const ripgrep = await resolveEngine('ripgrep');
+    const request: SearchRequest = { root, symbol: String.raw`a\wb`, targets: ['data'], options: searchOptions({ regex: true }) };
+    const files = async (engine: typeof javascriptEngine | typeof ripgrep): Promise<string[]> => (await engine.search(request)).matches.map((match) => match.file);
+    expect(await files(javascriptEngine)).toEqual(unicode >= 17 ? ['data/new.txt', 'data/old.txt'] : ['data/old.txt']);
+    expect(await files(ripgrep)).toEqual(['data/old.txt']);
+  });
+
+  it('writes no list of such files into the JSON of a run over UTF-8', async () => {
+    const root = await makeTempRepo({
+      'docs/rules.md': '# Rules\n\n<!-- @assert-count target="data" symbol="cafe" max="9" -->\n',
+      'data/a.txt': 'cafe\n',
+    });
+    temporary.push(root);
+    const report = await runSpecGuard({ root, patterns: ['docs/rules.md'], engine: 'javascript' });
+    expect(report.results[0]?.notUtf8Files).toEqual([]);
+    expect(formatJson(report)).not.toContain('notUtf8Files');
+    expect(formatReport(report, { color: false, verbose: true })).not.toContain('not UTF-8');
   });
 
   it('refuses a rule the two would read apart, with either engine, before it searches', async () => {

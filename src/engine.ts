@@ -23,7 +23,7 @@ import { spawn } from 'node:child_process';
 import path from 'node:path';
 
 import { BUILT_IN_ONLY, createCommentMask, type CommentMask, type CommentTable } from './comments.js';
-import { buildRegexRule, WORD_CHARACTER } from './dialect.js';
+import { buildRegexRule, readBytes, shownLine, WORD_END, WORD_START } from './dialect.js';
 import {
   createExcludeMatcher,
   createGlobMatcher,
@@ -781,7 +781,7 @@ export function buildJsRegExp(symbol: string, options: SearchOptions): RegExp {
   const flags = `g${options.ignoreCase ? 'i' : ''}`;
   if (options.regex) return buildRegexRule(symbol, flags, options.word);
   const escaped = escapeRegExp(symbol);
-  const source = options.word ? `(?<!${WORD_CHARACTER})(?:${escaped})(?!${WORD_CHARACTER})` : escaped;
+  const source = options.word ? `${WORD_START}(?:${escaped})${WORD_END}` : escaped;
   return new RegExp(source, `${flags}u`);
 }
 
@@ -795,6 +795,8 @@ interface CandidateFile {
 interface FileScan {
   tallies: Map<string, Tally>;
   binary: boolean;
+  /** Whether every byte of the file was UTF-8. */
+  utf8: boolean;
   /**
    * Whether the file's comments could be told from its code, or undefined when
    * no pattern matched and so nobody asked.
@@ -810,7 +812,7 @@ interface FileScan {
  * it (ADR-0014).
  */
 function scanFile(buffer: Buffer, relativePath: string, regexps: ReadonlyMap<string, RegExp>, ignoreComments: boolean, comments: CommentTable): FileScan {
-  const content = buffer.toString('utf8');
+  const { text: content, utf8 } = readBytes(buffer);
   let mask: CommentMask | undefined;
   const getMask = ignoreComments ? (): CommentMask => (mask ??= createCommentMask(content, relativePath, comments)) : undefined;
 
@@ -820,7 +822,7 @@ function scanFile(buffer: Buffer, relativePath: string, regexps: ReadonlyMap<str
   }
   // Read after the loop, where every pattern has had its chance to ask.
   const built = mask as CommentMask | undefined;
-  return { tallies, binary: isBinary(buffer), classified: built?.classified };
+  return { tallies, binary: isBinary(buffer), utf8, classified: built?.classified };
 }
 
 class JavaScriptEngine implements Engine {
@@ -876,6 +878,7 @@ class JavaScriptEngine implements Engine {
     // session, which runs each rule alone, to a plain run.
     const ledgers = new Map(patterns.map((pattern) => [pattern, new LedgerBuilder()]));
     const unclassified = new Map(patterns.map((pattern) => [pattern, 0]));
+    const notUtf8 = new Map(patterns.map((pattern): [string, string[]] => [pattern, []]));
     for (const ledger of ledgers.values()) {
       // What every rule shares: what the walk could not list, and what ripgrep
       // could not read.
@@ -949,6 +952,10 @@ class JavaScriptEngine implements Engine {
         if (scan.classified === false && tally.count > 0) {
           unclassified.set(pattern, (unclassified.get(pattern) as number) + 1);
         }
+        // Named only where the rule matched, as a binary file is, and for the
+        // same reason: ripgrep names the scanner no other file, so a list of
+        // every file read would be another list under each engine.
+        if (!scan.utf8 && tally.count > 0) notUtf8.get(pattern)!.push(file.relativePath);
         const total = tallies.get(pattern) as Tally;
         total.count += tally.count;
         total.commentCount += tally.commentCount;
@@ -965,6 +972,7 @@ class JavaScriptEngine implements Engine {
         count: tally.count,
         commentMatches: tally.commentCount,
         unclassifiedFiles: unclassified.get(request.symbol) as number,
+        notUtf8Files: notUtf8.get(request.symbol)!,
         matches: tally.locations,
         fileCounts: byFile.get(request.symbol) as Map<string, number>,
         scope: (ledgers.get(request.symbol) as LedgerBuilder).build(),
@@ -1135,7 +1143,8 @@ export function scanContent(
   // over a class holding such characters meets an empty match there, the
   // boundaries of `\b` and of `word="true"` among them; ripgrep, which reads
   // code points, meets none. Text read from a file holds no second unit
-  // without its first: UTF-8 that would encode one is read as U+FFFD.
+  // without its first: a byte that is no UTF-8 is read as a lone first unit
+  // (`readBytes`), and UTF-8 that would encode a second is such bytes.
   const splits = (index: number): boolean => (content.charCodeAt(index) & 0xfc00) === 0xdc00;
   let match: RegExpExecArray | null;
   while ((match = regexp.exec(content)) !== null && match.index !== lineless) {
@@ -1160,7 +1169,7 @@ export function scanContent(
         file: relativePath,
         line,
         column,
-        text: truncate(content.slice(start, end === -1 ? content.length : end)),
+        text: truncate(shownLine(content.slice(start, end === -1 ? content.length : end))),
         count: 1,
       });
     }

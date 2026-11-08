@@ -5,9 +5,17 @@
  * here are pinned, and a pin copied by hand stays where it was copied:
  * Dependabot moves .github/workflows and reads no Markdown. A week after the
  * examples were pinned, upload-sarif had moved here and not there. So each
- * action a guide shows must carry the commit and the version a workflow here
- * has for it, and the next bump fails here until the example follows
- * (.github/dependabot.yml says what to do then).
+ * action a guide shows must carry the major version a workflow here runs,
+ * and never a version ahead of it, which nothing here has run.
+ *
+ * The major and no closer (the maintainer's choice, 2026-11-02): held to the
+ * commit, every patch Dependabot proposed for upload-sarif failed here until
+ * someone copied it into the README by hand, and a README a patch behind
+ * shows a reader nothing wrong. A pin at the version the workflows run must
+ * still carry their commit, since one version has one commit; a pin behind
+ * them carries a commit this test cannot check without the network. A major
+ * bump still fails here until the example follows (.github/dependabot.yml
+ * says what to do then). spec-core's test holds its guide the same way.
  */
 
 import { readdirSync, readFileSync } from 'node:fs';
@@ -34,15 +42,32 @@ function usesOf(text: string, file: string): Use[] {
 /** `owner/action@commit # version`: the action, and the pin a reader copies. */
 function pinOf(written: string): { action: string; pin: string } | null {
   const match = /^([\w.-]+(?:\/[\w.-]+)+)@([0-9a-f]{40} # v\d+\.\d+\.\d+)$/.exec(written);
-  return match === null ? null : { action: match[1] as string, pin: match[2] as string };
+  return match === null ? null : { action: match[1]!, pin: match[2]! };
 }
+
+const commitOf = (pin: string): string => pin.slice(0, pin.indexOf(' # v'));
+const versionOf = (pin: string): number[] => pin.slice(pin.indexOf('# v') + 3).split('.').map(Number);
 
 /** Whether pin `a` carries a later version than pin `b`. */
 function newer(a: string, b: string): boolean {
-  const parts = (pin: string): number[] => pin.slice(pin.indexOf('# v') + 3).split('.').map(Number);
-  const [x, y] = [parts(a), parts(b)];
+  const [x, y] = [versionOf(a), versionOf(b)];
   const at = x.findIndex((part, index) => part !== y[index]);
-  return at !== -1 && (x[at] as number) > (y[at] as number);
+  return at !== -1 && x[at]! > y[at]!;
+}
+
+/**
+ * What is wrong with a guide's pin `shown` of an action the workflows here pin
+ * at `here`, or null: another major, a version ahead of theirs, or their
+ * version at another commit.
+ */
+function faultOf(shown: string, here: string): string | null {
+  const [major, theirs] = [versionOf(shown)[0], versionOf(here)[0]];
+  if (major !== theirs) return `v${major}, where the workflows run v${theirs} (${here})`;
+  if (newer(shown, here)) return `ahead of the workflows, which run ${here}`;
+  if (versionOf(shown).join('.') === versionOf(here).join('.') && commitOf(shown) !== commitOf(here)) {
+    return `another commit than the workflows have for that version (${here})`;
+  }
+  return null;
 }
 
 const read = (path: string): string => readFileSync(join(ROOT, path), 'utf8');
@@ -61,6 +86,31 @@ function guides(): string[] {
   const top = readdirSync(ROOT).filter((name) => name.endsWith('.md') && name !== 'CHANGELOG.md');
   return [...top, ...below('docs')].sort();
 }
+
+describe('a pin a guide shows, beside the pin the workflows have', () => {
+  const A = 'a'.repeat(40);
+  const B = 'b'.repeat(40);
+
+  it('passes at the major the workflows run, behind them or at their pin', () => {
+    expect(faultOf(`${A} # v4.39.1`, `${B} # v4.40.0`)).toBeNull();
+    expect(faultOf(`${A} # v4.39.1`, `${B} # v4.39.2`)).toBeNull();
+    expect(faultOf(`${B} # v4.39.1`, `${B} # v4.39.1`)).toBeNull();
+  });
+
+  it('fails another major, either way', () => {
+    expect(faultOf(`${A} # v3.29.0`, `${B} # v4.39.1`)).toBe(`v3, where the workflows run v4 (${B} # v4.39.1)`);
+    expect(faultOf(`${A} # v5.0.0`, `${B} # v4.39.1`)).toBe(`v5, where the workflows run v4 (${B} # v4.39.1)`);
+  });
+
+  it('fails a version ahead of the workflows, by a minor or a patch', () => {
+    expect(faultOf(`${A} # v4.40.0`, `${B} # v4.39.9`)).toBe(`ahead of the workflows, which run ${B} # v4.39.9`);
+    expect(faultOf(`${A} # v4.39.2`, `${B} # v4.39.1`)).toBe(`ahead of the workflows, which run ${B} # v4.39.1`);
+  });
+
+  it("fails the workflows' version at another commit", () => {
+    expect(faultOf(`${A} # v4.39.1`, `${B} # v4.39.1`)).toBe(`another commit than the workflows have for that version (${B} # v4.39.1)`);
+  });
+});
 
 describe('the workflows the guides show', () => {
   const shown = guides().flatMap((file) => usesOf(read(file), file));
@@ -91,13 +141,14 @@ describe('the workflows the guides show', () => {
     expect(shown.filter((use) => pinOf(use.written) === null).map((use) => `${use.where}: ${use.written}`)).toEqual([]);
   });
 
-  it('pin each action as the workflows here pin it', () => {
-    const behind = shown.flatMap((use) => {
+  it('pin each action at the major the workflows here run, and never ahead of them', () => {
+    const faults = shown.flatMap((use) => {
       const { action, pin } = pinOf(use.written) ?? { action: '', pin: '' };
       const here = pinned.get(action);
-      return here === undefined || here === pin ? [] : [`${use.where}: ${action}@${pin}, where the workflows have ${here}`];
+      const fault = here === undefined ? null : faultOf(pin, here);
+      return fault === null ? [] : [`${use.where}: ${action}@${pin} is ${fault}`];
     });
-    expect(behind).toEqual([]);
+    expect(faults).toEqual([]);
   });
 
   it('show no action that no workflow here runs', () => {

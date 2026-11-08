@@ -1139,6 +1139,7 @@ async function prepareAssertion(
         // run and JSON consumers can act on them.
         commentMatches: search.commentMatches,
         unclassifiedFiles: search.unclassifiedFiles,
+        notUtf8Files: search.notUtf8Files,
         scope: search.scope,
         engine: search.engine,
         durationMs: elapsed(startedAt),
