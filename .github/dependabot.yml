@@ -64,12 +64,13 @@ updates:
       include: scope
   # Dependabot moves the pins in .github/workflows and reads no Markdown. The
   # README shows workflows with the same actions, and
-  # tests/action-pins.test.ts holds each to the pin the workflows here have.
-  # So a bump of checkout, setup-node or upload-sarif fails that test until
-  # the README follows: copy the new commit and version into its `uses:`
-  # line, on Dependabot's branch. spec-core's docs/adopting.md and
-  # spec-graph's README show upload-sarif too, and no workflow of theirs runs
-  # it: when it moves here, move it there by hand.
+  # tests/action-pins.test.ts holds each to the major the workflows here run,
+  # never ahead of them. So a patch or a minor of checkout, setup-node or
+  # upload-sarif passes and leaves the README where it was, and a major fails
+  # that test until the README follows: copy the new commit and version into
+  # its `uses:` line, on Dependabot's branch. spec-core's docs/adopting.md
+  # and spec-graph's README show upload-sarif too, and no workflow of theirs
+  # runs it: when it moves a major here, move it there by hand.
   - package-ecosystem: github-actions
     directory: /
     schedule:
