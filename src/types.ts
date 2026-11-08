@@ -251,6 +251,13 @@ export interface SearchResult {
   commentMatches: number;
   /** Files whose language has no known comment syntax, so nothing was excluded. */
   unclassifiedFiles: number;
+  /**
+   * Matching files that hold a byte that is no UTF-8, which no character of a
+   * rule matches, as ripgrep reads it (ADR-0007, amended 2026-11-08). A file
+   * the rule found nothing in is not named, so that the list is the same
+   * whichever engine searched and whichever rules shared the pass.
+   */
+  notUtf8Files?: readonly string[];
   /** Up to `maxSnippets` match locations, in file order. */
   matches: MatchLocation[];
   /**
@@ -349,6 +356,8 @@ export interface AssertionResult {
   commentMatches: number;
   /** Matching files whose language is unknown, so their comments counted as code. */
   unclassifiedFiles: number;
+  /** Matching files that hold a byte that is no UTF-8; see `SearchResult`. */
+  notUtf8Files?: readonly string[];
   /** What this assertion did not inspect, and why. */
   scope: ScopeLedger;
   /**
