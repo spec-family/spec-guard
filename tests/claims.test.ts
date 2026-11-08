@@ -257,6 +257,91 @@ describe('what else a label asks', () => {
   });
 });
 
+describe('a label in prose', () => {
+  const where = (report: { prose: readonly { file: string; line: number; column: number; label: string }[] }): Array<[string, number, number, string]> =>
+    report.prose.map((label) => [label.file, label.line, label.column, label.label]);
+
+  it('is each label written where no claim reads it, in a sentence, a heading, a table or a span that opens no item', async () => {
+    const root = await repo({
+      'spec/a.md': [
+        '---',
+        'status: Implemented',
+        '---',
+        '# Refunds',
+        '',
+        'The checker is Implemented (Implemented) in round 3, and implemented again.',
+        'Implementedness, reImplemented, Implemented_x, x_Implemented, Implemented2 and 2Implemented are no label, nor is `Implemented later`.',
+        '',
+        '## Specified',
+        '',
+        '| Item | Status |',
+        '| --- | --- |',
+        '| refunds | Target |',
+        '',
+        '- `Implemented`: a refund over the capture is refused.',
+        '- `Specified`; the partial refund is `Implemented`.',
+        '- an item that opens with prose, then `Hypothesis` as a span.',
+        '  - `Target`: a nested claim.',
+        '- `Specified`: a claim, with Target. in its words.',
+        '',
+        '```text',
+        'Implemented in a code block',
+        '```',
+        '<!-- Implemented in a comment -->',
+        '',
+      ].join('\n'),
+      'spec/b.md': '`Specified` opens a paragraph, not an item, and `` Target `` is read as a span reads.\n',
+      'docs/c.md': 'Implemented in a document the claims files do not name.\n',
+    });
+    const report = await findClaimsReport({ root, config: CONFIG });
+    expect(where(report)).toEqual([
+      ['spec/a.md', 6, 16, 'Implemented'],
+      ['spec/a.md', 6, 29, 'Implemented'],
+      ['spec/a.md', 9, 4, 'Specified'],
+      ['spec/a.md', 13, 13, 'Target'],
+      ['spec/a.md', 17, 39, 'Hypothesis'],
+      ['spec/a.md', 19, 30, 'Target'],
+      ['spec/b.md', 1, 1, 'Specified'],
+      ['spec/b.md', 1, 49, 'Target'],
+    ]);
+    // The claims are what they were, and a label in prose is no finding.
+    expect(report.totals).toEqual({ Implemented: 1, Specified: 2, Target: 1, Hypothesis: 0 });
+    expect(report.findings.map((f) => [f.line, f.rule])).toEqual([
+      [15, 'unevidenced-claim'],
+      [16, 'mixed-labels'],
+    ]);
+  });
+
+  it('changes no verdict: a document whose claims hold passes with labels in prose', async () => {
+    const root = await repo({ 'spec/a.md': '- `Specified`: one.\n\nThe rest is Specified (Target).\n' });
+    const report = await findClaimsReport({ root, config: CONFIG });
+    expect(report.ok).toBe(true);
+    expect(where(report)).toEqual([
+      ['spec/a.md', 3, 13, 'Specified'],
+      ['spec/a.md', 3, 24, 'Target'],
+    ]);
+  });
+
+  it('reads a label as written, signs and all, and none that is not whole', async () => {
+    const root = await repo({ 'spec/a.md': 'Is it Done? Done, or Done?! No: xDone? and Done?x.\n\n- `Done?`: a claim.\n' });
+    const report = await findClaimsReport({ root, config: { files: ['spec/*.md'], labels: { 'Done?': {} } } });
+    expect(where(report)).toEqual([
+      ['spec/a.md', 1, 7, 'Done?'],
+      ['spec/a.md', 1, 22, 'Done?'],
+    ]);
+  });
+
+  it('reads a span after a list as no item\'s, where the claim before it has ended', async () => {
+    const root = await repo({ 'spec/a.md': '- `Specified`: one.\n\nThe `Target` here is prose.\n' });
+    expect(where(await findClaimsReport({ root, config: CONFIG }))).toEqual([['spec/a.md', 3, 5, 'Target']]);
+  });
+
+  it('is none in a document that writes each label only to open a claim', async () => {
+    const root = await repo({ 'spec/a.md': '- `Specified`: one.\n- [ ] `Target`: two.\n' });
+    expect((await findClaimsReport({ root, config: CONFIG })).prose).toEqual([]);
+  });
+});
+
 describe('a claims entry in the configuration', () => {
   it('takes files, labels and testPrefixes', () => {
     expect(claimsConfigError(CONFIG)).toBeNull();

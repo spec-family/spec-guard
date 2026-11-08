@@ -18,6 +18,7 @@ const REPORT: ClaimsReport = {
     { file: 'spec/a.md', line: 5, label: 'Specified', evidence: [] },
   ],
   findings: [{ rule: 'unevidenced-claim', file: 'spec/a.md', line: 1, column: 3, label: 'Implemented', message: 'M1', hint: 'H1' }],
+  prose: [],
   files: ['spec/a.md'],
   unmatched: ['spec/none/*.md', 'specs/*.md'],
   durationMs: 12,
@@ -61,6 +62,44 @@ describe('the report for a person', () => {
   });
 });
 
+describe('the note on labels in prose', () => {
+  const PROSE: ClaimsReport = {
+    ...HELD,
+    prose: [
+      { file: 'spec/a.md', line: 7, column: 16, label: 'Implemented' },
+      { file: 'spec/b.md', line: 2, column: 1, label: 'Specified' },
+    ],
+  };
+
+  it('closes the report with how many there are, and says where under --verbose', () => {
+    expect(formatClaims(PROSE, { color: false, verbose: false, ascii: true })).toBe(
+      [
+        'spec-guard claims 1 document',
+        '',
+        '3 claims: Implemented 2, Specified 1 - 12ms',
+        '+ every claim has the evidence its label asks for',
+        'o 2 labels of the vocabulary stand in prose and are no claims, which only a list item that opens with one is; --verbose says where',
+      ].join('\n'),
+    );
+    expect(formatClaims(PROSE, { color: false, verbose: true, ascii: true }).split('\n').slice(4)).toEqual([
+      'o 2 labels of the vocabulary stand in prose and are no claims, which only a list item that opens with one is:',
+      '    spec/a.md:7:16  Implemented',
+      '    spec/b.md:2:1  Specified',
+    ]);
+  });
+
+  it('says one in the singular, dim, after the verdict of a report with findings', () => {
+    const one: ClaimsReport = { ...REPORT, prose: [{ file: 'spec/a.md', line: 7, column: 16, label: 'Implemented' }] };
+    const painted = formatClaims(one, { color: true, verbose: false });
+    expect(painted.endsWith('\u001b[2m○ 1 label of the vocabulary stands in prose and is no claim, which only a list item that opens with one is; --verbose says where\u001b[0m')).toBe(true);
+    expect(painted).toContain('\u001b[31m\u001b[1m✖ 1 claim finding\u001b[0m\n');
+  });
+
+  it('writes each in JSON, beside the claims and the findings', () => {
+    expect(JSON.parse(formatClaimsJson(PROSE)).prose).toEqual(PROSE.prose);
+  });
+});
+
 describe('the report for a script', () => {
   it('is a versioned document of the verdict, the totals, the claims, the findings and what was read', () => {
     expect(JSON.parse(formatClaimsJson(REPORT))).toEqual({
@@ -69,6 +108,7 @@ describe('the report for a script', () => {
       totals: { Implemented: 2, Specified: 1 },
       claims: REPORT.claims,
       findings: REPORT.findings,
+      prose: [],
       files: ['spec/a.md'],
       unmatched: ['spec/none/*.md', 'specs/*.md'],
       config: { file: '.spec-guard.json', applied: ['claims'], overridden: [] },

@@ -112,3 +112,29 @@ check that fails where a specification says more than its evidence shows,
 with the claim's line, and the consumer's specifications are expected to fail
 it in many places until they move to one label per item and name a test under
 each `Implemented`: those are true findings.
+
+## Amended 2026-11-08: a label in prose is said
+
+A claim is a list item that opens with a label as a code span, so a label
+written anywhere else was read as nothing, and nothing said so:
+`(Implemented)` in a sentence, `## Specified` over a list, a `Target` cell
+in a status table, a span that opens no item. A document could mark part of
+itself implemented in words the check never held. The maintainer decided on
+2026-11-08 that the report says so in a note, and that the exit code does
+not change for it.
+
+<!-- @assert-count target="src/claims.ts" symbol="proseLabels(scan, claims, vocabulary)" expected="1" reason="the claims report reads the labels in prose" -->
+
+- **A label in prose** is a label of the vocabulary, exact in case, written
+  as a word of its own in a claims file outside code, comments and front
+  matter, or as a code span that holds it and is no claim's own text. A
+  claim's opening span is its label, and a second span in its own words is
+  `mixed-labels` already, so neither is counted.
+- **The report closes with a note** of how many there are, and under
+  `--verbose`, which `claims` now takes, with each one's `file:line:column`
+  and label. JSON lists them as `prose`, a field added, so `formatVersion`
+  stays 1. SARIF and the annotations carry findings, and none of these.
+- **A note, not a finding**, because such a word is as often a sentence's
+  own, "it is Implemented in round 3", and a finding would fail a run on
+  prose nobody meant as a claim. The note lets a reader see what the check
+  does not hold, and decide.

@@ -537,10 +537,23 @@ describe('spec-guard claims', () => {
     expect(JSON.parse(gitlab.out.join(''))[0]).toMatchObject({ check_name: 'unevidenced-claim', severity: 'critical' });
   });
 
+  it('says how many labels stand in prose, and under --verbose where, with the exit code their claims have', async () => {
+    const root = await project(`${HELD}\nThe rest is Specified.\n`);
+    const plain = createIO();
+    expect(await main(['claims', '--root', root, '--ascii'], plain.io)).toBe(EXIT_OK);
+    expect(plain.out.join('\n')).toContain('o 1 label of the vocabulary stands in prose and is no claim, which only a list item that opens with one is; --verbose says where');
+    const verbose = createIO();
+    expect(await main(['claims', '--root', root, '--verbose', '--ascii'], verbose.io)).toBe(EXIT_OK);
+    expect(verbose.out.join('\n')).toContain('stands in prose and is no claim, which only a list item that opens with one is:\n    spec/a.md:5:13  Specified');
+    const json = createIO();
+    await main(['claims', '--root', root, '--format', 'json'], json.io);
+    expect(JSON.parse(json.out.join('')).prose).toEqual([{ file: 'spec/a.md', line: 5, column: 13, label: 'Specified' }]);
+  });
+
   it('refuses each option about running rules it does not take, by name', async () => {
     const root = await project(HELD);
     const refused = [
-      '--allow-missing-targets', '--no-allow-missing-targets', '--allow-empty-scope', '--no-allow-empty-scope', '--verbose', '--watch', '--fail-fast',
+      '--allow-missing-targets', '--no-allow-missing-targets', '--allow-empty-scope', '--no-allow-empty-scope', '--watch', '--fail-fast',
       '--engine=js', '--print-baseline', '--ignore-status', '--no-ignore-status', '--include-specs', '--no-include-specs', '--max-snippets=1', '--concurrency=1', '--allow-empty',
     ];
     for (const option of refused) {
