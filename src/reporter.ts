@@ -251,6 +251,19 @@ function scopeNotes(ledger: ScopeLedger): string[] {
   return notes;
 }
 
+/**
+ * The files a rule matched in that hold a byte that is no UTF-8, which no
+ * character of a rule matches, as ripgrep reads it: said, so that a count
+ * read from bytes is not taken for one read from text. ADR-0007, amended
+ * 2026-11-08.
+ */
+function byteNotes(result: { notUtf8Files?: readonly string[] | undefined }): string[] {
+  const files = result.notUtf8Files ?? [];
+  if (files.length === 0) return [];
+  const one = files.length === 1;
+  return [`${countLabel(files.length, 'matching file')} ${one ? 'holds' : 'hold'} bytes that are not UTF-8, which no character of a rule matches: ${files.slice(0, 3).join(', ')}`];
+}
+
 function formatFailure(
   result: AssertionResult,
   paint: ReturnType<typeof createPainter>,
@@ -265,7 +278,7 @@ function formatFailure(
   lines.push(`    ${paint(result.message, 'red')}`);
   if (result.reason) lines.push(`    ${paint(`reason: ${result.reason}`, 'dim')}`);
 
-  for (const note of [...commentNotes(result), ...scopeNotes(result.scope)]) {
+  for (const note of [...commentNotes(result), ...byteNotes(result), ...scopeNotes(result.scope)]) {
     lines.push(`    ${paint(`${glyphs.warn} ${note}`, 'yellow')}`);
   }
 
@@ -445,7 +458,7 @@ export function formatReport(report: RunResult, options: ReporterOptions, maxSni
   // are listed per assertion under --verbose.
   // Set off from what follows by a blank line, as every other block is.
   const passNotes = passes.flatMap((result) =>
-    (options.verbose ? [...commentNotes(result), ...scopeNotes(result.scope), ...result.warnings] : result.warnings).map(
+    (options.verbose ? [...commentNotes(result), ...byteNotes(result), ...scopeNotes(result.scope), ...result.warnings] : result.warnings).map(
       (note) => `${paint(glyphs.warn, 'yellow')} ${paint(`${formatLocation(result)}  ${note}`, 'yellow')}`,
     ),
   );
@@ -628,6 +641,9 @@ export function formatJson(report: RunResult): string {
         warnings: result.warnings,
         commentMatches: result.commentMatches,
         unclassifiedFiles: result.unclassifiedFiles,
+        // Written only where a matching file held such a byte, as JSON leaves
+        // out what is undefined: a run over UTF-8 writes the document it did.
+        notUtf8Files: result.notUtf8Files?.length === 0 ? undefined : result.notUtf8Files,
         baselinedMatches: result.baselinedMatches,
         staleBaseline: result.staleBaseline,
         fileMatches: result.fileMatches,
@@ -1675,6 +1691,21 @@ function claimTotals(report: ClaimsReport): string {
 }
 
 /**
+ * The note a claims report closes with: how many labels of the vocabulary
+ * stand in prose, where no check holds them, and under `--verbose` where each
+ * is. A note, not a finding: such a label may be a word of a sentence, and
+ * the exit code does not change for it (ADR-0020, amended 2026-11-08).
+ */
+function proseNote(report: ClaimsReport, verbose: boolean, skip: string): string[] {
+  const count = report.prose.length;
+  if (count === 0) return [];
+  const one = count === 1;
+  const note = `${skip} ${countLabel(count, 'label')} of the vocabulary ${one ? 'stands' : 'stand'} in prose and ${one ? 'is no claim' : 'are no claims'}, which only a list item that opens with one is`;
+  if (!verbose) return [`${note}; --verbose says where`];
+  return [`${note}:`, ...report.prose.map((label) => `    ${label.file}:${label.line}:${label.column}  ${label.label}`)];
+}
+
+/**
  * Renders what `spec-guard claims` found, for a person: each finding on the
  * claim's line, the totals of each label, and what the check read. The totals
  * are said here and in JSON, and never written into a document (ADR-0020).
@@ -1700,6 +1731,7 @@ export function formatClaims(report: ClaimsReport, options: ReporterOptions): st
       ? paint(`${glyphs.pass} every claim has the evidence its label asks for`, 'green')
       : paint(`${glyphs.fail} ${countLabel(report.findings.length, 'claim finding')}`, 'red', 'bold'),
   );
+  for (const line of proseNote(report, options.verbose, glyphs.skip)) lines.push(paint(line, 'dim'));
   return lines.join('\n');
 }
 
@@ -1718,6 +1750,7 @@ export function formatClaimsJson(report: ClaimsReport): string {
       totals: report.totals,
       claims: report.claims,
       findings: report.findings,
+      prose: report.prose,
       files: report.files,
       unmatched: report.unmatched,
       config: report.config,

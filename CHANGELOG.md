@@ -22,6 +22,34 @@ is deprecated before it goes, is spec-core's
   reports changed. Upgrading: nothing to do; an agent connected to the MCP
   server reads the new first sentence of its instructions.
 
+- **A byte that is no UTF-8 is no character to a regex rule, with either
+  engine, as ripgrep reads it.** The scanner read such a byte as U+FFFD,
+  which `.` and every negated class match, and ripgrep's match no such byte:
+  `x.y` over a Latin-1 `xéy` was counted by `--engine js` in a file
+  `--engine rg` never named. Now no class matches one, `\b` reads it as no
+  word character, and `\B` and `word="true"` meet no boundary beside it, as
+  the regex crate meets none. A rule's notes name each file it matched in
+  that holds such a byte, under `--verbose` for a passing rule, and JSON
+  names them in a result's `notUtf8Files`, written only where there is one.
+  `\uD800` and `\u{DC00}`, half a character, are invalid directives, as is
+  `\uD83D\uDE00`, which ripgrep refused already
+  ([ADR-0007](https://github.com/spec-family/spec-guard/blob/main/docs/adr/0007-search-scope.md),
+  amended 2026-11-08). Upgrading: a rule over files that are not UTF-8, a
+  Latin-1 or Windows-1252 file among them, counts no match that crosses a
+  byte outside UTF-8, so a `min` such a match met may now fail and a `max`
+  or an absence it broke may pass; save such files as UTF-8 to have their
+  text read. A rule with half a character in an escape is exit 1; write the
+  character, or its code point, `\u{1F600}`.
+- **A group with flags, `(?i:...)`, is an invalid directive on every Node.**
+  Node 23 and later read `(?i:...)`, `(?-i:...)`, `(?s:...)` and `(?m:...)`,
+  and Node 22 refused them, so one rule passed on one Node and was an
+  invalid directive on another. The directive names the group, and says so
+  of `(?i)` too, which every Node refused as an invalid group
+  ([ADR-0007](https://github.com/spec-family/spec-guard/blob/main/docs/adr/0007-search-scope.md),
+  amended 2026-11-08). Upgrading: a rule with a group with flags is exit 1
+  on Node 23 and later as well; write `ignore-case="true"` to fold the whole
+  rule, or the cases as a class, `[Ff]oo`.
+
 - **A `Status:` label is read with comments masked, as a reader sees it.**
   A `Status: Superseded` line inside a template's multi-line `<!-- ... -->`
   in the preamble withdrew the document, and its rules stopped running, and
@@ -32,6 +60,18 @@ is deprecated before it goes, is spec-core's
   amended 2026-11-08). Upgrading: a document withdrawn only by a status in a
   comment is in force again and its rules run, so they may fail; write the
   status outside the comment to withhold it.
+
+### Added
+
+- **`spec-guard claims` says how many labels stand in prose and are not
+  claims.** A label of the vocabulary written in a sentence,
+  `(Implemented)`, in a heading, in a table or as a code span that opens no
+  list item is no claim, and no check holds it, and nothing said so. The
+  report closes with a note of how many there are, `--verbose`, which
+  `claims` now takes, says where, and JSON lists them in `prose`. The exit
+  code does not change for them
+  ([ADR-0020](https://github.com/spec-family/spec-guard/blob/main/docs/adr/0020-a-claim-is-held-to-its-evidence.md),
+  amended 2026-11-08).
 
 ## 0.32.0
 
