@@ -10,7 +10,13 @@ what to do when upgrading; the family's policy, including how a flag or field
 is deprecated before it goes, is spec-core's
 [ADR-0009](https://github.com/spec-family/spec-core/blob/main/docs/adr/0009-versions-before-1-0.md).
 
-## Unreleased
+## 0.33.0
+
+spec-guard says it holds code to what any Markdown document says about
+it. A regex rule reads a byte that is no UTF-8 as ripgrep does, with either
+engine, and a group with flags is refused on every Node; a `Status:` label
+is read with comments masked; and `spec-guard claims` says how many labels
+stand in prose and are not claims.
 
 ### Changed
 

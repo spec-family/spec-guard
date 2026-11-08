@@ -1555,6 +1555,41 @@ ran high where they were least measured: `runner.ts` and `text.ts` took 7m35s
 against 15.2 minutes, and `cli.ts` alone 8m18s against 15.1, so the next
 split starts from this run's logs rather than 398fe94's.
 
+### 0.33.0: bytes that are no UTF-8, labels in prose, and three survivors more, each equivalent
+
+CI's full sweep of 28a061c (run 42522801335) came out at **99.26% over
+15,677 mutants with 115 survivors and 1 without coverage**, 236 of them
+detected by timeout and one an error; the shards took from 9m45s to
+23m58s. Against 0.32.0's sweep of f7325e0 (run 42375576626), 114
+survivors and 1 without coverage over 15,398:
+
+- the release has 279 mutants more: 168 in `src/dialect.ts` and 10 in
+  `src/engine.ts`, a byte that is no UTF-8 and the escapes and groups
+  refused (ADR-0007, amended 2026-11-08); 42 in `src/claims.ts` and 45
+  in `src/reporter.ts`, the labels in prose (ADR-0020, amended
+  2026-11-08) and the notes for both; 2 fewer in `src/cli.ts`, where
+  `claims` takes `--verbose`; and 16 in `src/cites.ts`,
+  `src/imports.ts` and `src/polyglot.ts`, on lines that did not change,
+  which the Stryker group bump (f9b06a3) now mutates: a pattern with the
+  `u` flag and a `\p{...}`;
+- 3 survivors are new and 2 are gone. Two are #93's, each said
+  equivalent beside its code: in the item around a span, `<` for `<=` at
+  the item's start and `<=` for `<` at its end, since no span opens at an
+  item's first offset or at its terminator. The third is the possessive
+  in `src/cites.ts` without its `^`, equivalent beside its code, since a
+  name holds no line terminator; the same pattern without its `$`
+  survived main's sweep of ab14d03 and is killed by a name with an
+  apostrophe inside it (#97). The claims report's `verbose: false` made
+  `true` is gone with the line, and `target === '.'` made `true` in
+  `src/impact.ts`, the equivalent its comment names, was detected in this
+  sweep and not in 0.32.0's;
+- the error is the same `||` made `&&` in `src/structure.ts`'s walk that
+  0.32.0 recorded.
+
+Each of the release's six pull requests was swept incrementally before
+it merged, and each ended with every undetected mutant of its own lines
+killed or said equivalent beside its code.
+
 ### 0.32.0: claims and a wider table, and nine survivors more, each equivalent
 
 CI's full sweep of f7325e0 (run 42375576626) came out at **99.25% over
