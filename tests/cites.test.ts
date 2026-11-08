@@ -200,7 +200,7 @@ describe('an id another owner qualifies', () => {
 
   it('is this project\'s after an ordinary word, punctuation, or nothing', () => {
     // Must-not-match.
-    for (const text of ['see ADR-7', 'per ADR-7', '(ADR-7)', 'e.g. ADR-7', 'ADR-7', 'and ADR-7', 're: ADR-7', 'it ADR-7', 'itself ADR-7', 'cf. ADR-7', 's ADR-7', "' ADR-7", "'s ADR-7", '- ADR-7', 'a- ADR-7', 'spec-core,ADR-7', 'spec-coreADR-7', 'bits ADR-7', "it's ADR-7", "That's ADR-7", 'here’s ADR-7', "let's ADR-7", "this's ADR-7", "there's ADR-7", "what's ADR-7", "who's ADR-7", "where's ADR-7", "how's ADR-7", "when's ADR-7", "why's ADR-7", "he's ADR-7", "she's ADR-7"]) {
+    for (const text of ['see ADR-7', 'per ADR-7', '(ADR-7)', 'e.g. ADR-7', 'ADR-7', 'and ADR-7', 're: ADR-7', 'it ADR-7', 'itself ADR-7', 'cf. ADR-7', 's ADR-7', "' ADR-7", "'s ADR-7", '- ADR-7', 'a- ADR-7', 'spec-core,ADR-7', 'spec-coreADR-7', 'bits ADR-7', "o'sullivan ADR-7", "it's ADR-7", "That's ADR-7", 'here’s ADR-7', "let's ADR-7", "this's ADR-7", "there's ADR-7", "what's ADR-7", "who's ADR-7", "where's ADR-7", "how's ADR-7", "when's ADR-7", "why's ADR-7", "he's ADR-7", "she's ADR-7"]) {
       expect(at(text), text).toBe(false);
     }
   });
