@@ -251,6 +251,19 @@ function scopeNotes(ledger: ScopeLedger): string[] {
   return notes;
 }
 
+/**
+ * The files a rule matched in that hold a byte that is no UTF-8, which no
+ * character of a rule matches, as ripgrep reads it: said, so that a count
+ * read from bytes is not taken for one read from text. ADR-0007, amended
+ * 2026-11-08.
+ */
+function byteNotes(result: { notUtf8Files?: readonly string[] | undefined }): string[] {
+  const files = result.notUtf8Files ?? [];
+  if (files.length === 0) return [];
+  const one = files.length === 1;
+  return [`${countLabel(files.length, 'matching file')} ${one ? 'holds' : 'hold'} bytes that are not UTF-8, which no character of a rule matches: ${files.slice(0, 3).join(', ')}`];
+}
+
 function formatFailure(
   result: AssertionResult,
   paint: ReturnType<typeof createPainter>,
@@ -265,7 +278,7 @@ function formatFailure(
   lines.push(`    ${paint(result.message, 'red')}`);
   if (result.reason) lines.push(`    ${paint(`reason: ${result.reason}`, 'dim')}`);
 
-  for (const note of [...commentNotes(result), ...scopeNotes(result.scope)]) {
+  for (const note of [...commentNotes(result), ...byteNotes(result), ...scopeNotes(result.scope)]) {
     lines.push(`    ${paint(`${glyphs.warn} ${note}`, 'yellow')}`);
   }
 
@@ -445,7 +458,7 @@ export function formatReport(report: RunResult, options: ReporterOptions, maxSni
   // are listed per assertion under --verbose.
   // Set off from what follows by a blank line, as every other block is.
   const passNotes = passes.flatMap((result) =>
-    (options.verbose ? [...commentNotes(result), ...scopeNotes(result.scope), ...result.warnings] : result.warnings).map(
+    (options.verbose ? [...commentNotes(result), ...byteNotes(result), ...scopeNotes(result.scope), ...result.warnings] : result.warnings).map(
       (note) => `${paint(glyphs.warn, 'yellow')} ${paint(`${formatLocation(result)}  ${note}`, 'yellow')}`,
     ),
   );
@@ -628,6 +641,9 @@ export function formatJson(report: RunResult): string {
         warnings: result.warnings,
         commentMatches: result.commentMatches,
         unclassifiedFiles: result.unclassifiedFiles,
+        // Written only where a matching file held such a byte, as JSON leaves
+        // out what is undefined: a run over UTF-8 writes the document it did.
+        notUtf8Files: result.notUtf8Files?.length === 0 ? undefined : result.notUtf8Files,
         baselinedMatches: result.baselinedMatches,
         staleBaseline: result.staleBaseline,
         fileMatches: result.fileMatches,

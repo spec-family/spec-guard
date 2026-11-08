@@ -567,3 +567,89 @@ What this leaves as it was:
 
 <!-- @assert-present file="src/dialect.ts, tests/dialect.test.ts" reason="one reading of a regex rule, and the two engines held to it" -->
 <!-- @assert-count target="src/engine.ts" symbol="'--encoding=none'," expected="1" reason="ripgrep reads a file's bytes as the scanner does, a byte order mark among them" -->
+
+## Amended 2026-11-08: a byte that is no UTF-8, a group with flags, and Unicode's version
+
+The amendment of 2026-10-24 left three differences between the engines
+undecided. The maintainer decided the first on 2026-11-08: ripgrep's reading
+is the reference.
+
+### A byte that is no UTF-8
+
+ripgrep reads a file's bytes (`--encoding=none`), and the regex crate's `.`,
+its classes and their negations match only a character's UTF-8, so no such
+class matches a byte that is not part of one. The scanner decoded a file
+with Node's decoder, which reads each such byte as U+FFFD, and U+FFFD is a
+character every negated class matches: `x.y` over a Latin-1 `xéy` was
+counted by `--engine js` in a file `--engine rg` never named.
+
+The scanner now reads such a byte as ripgrep does (`readBytes` in
+`src/dialect.ts`). Each byte outside a well-formed sequence, by Unicode's
+table of them (chapter 3, table 3-7), is read as a lone surrogate, which no
+text decoded from UTF-8 holds, and every class a rule is read into leaves
+those out: `.`, a class in brackets and its negation, `\W`, `\D`, `\S`,
+`\p{...}` and `\P{...}`. A file of UTF-8 is decoded as before. A boundary
+reads such a byte as the crate does: no word character to `\b`, and no place
+for `\B` or for the half boundaries `word="true"` puts round a pattern,
+which the crate meets only between characters it can read on both sides.
+A line end is not one. U+FFFD written in UTF-8 is a character, as it is to
+ripgrep. A UTF-16 escape for half a character, `\uD800` or `\u{DC00}`, which
+ripgrep refuses and which could match nothing but such a byte, is refused
+naming it, and so is the first of two halves in a row, `\uD83D\uDE00`,
+which ripgrep refuses too: the character is written whole, or as
+`\u{1F600}`.
+
+A rule's report names, under each rule that matched in it, a file that holds
+such a byte: under `--verbose` for a passing rule and always for a failing
+one, as it says a match in a binary file, and in JSON as `notUtf8Files`,
+which is written only where there is one. A file the rule found nothing in
+is not named. ripgrep names the scanner only the files that match, so a list
+of every file read would be another list under each engine, and under
+ripgrep would hold the files other rules of the same pass matched.
+
+Measured with ripgrep 15.0.0 from `@vscode/ripgrep`, each rule over a file
+of its own, before the change and after it:
+
+| Rule, file | 0.32.0, `js` | 0.32.0, `rg` | Now, both |
+| --- | --- | --- | --- |
+| `x.y` over a Latin-1 `xéy` | 1 | 0 | 0 |
+| `x[^a]y`, `x\Wy`, `x\P{L}y` over the same | 1 | 0 | 0 |
+| `[^\x00-\x7F]` over a Latin-1 `é` | 1 | 0 | 0 |
+| `foo`, `word="true"`, over a Latin-1 `fooé` | 1 | 0 | 0 |
+| `\bfoo` over a Latin-1 `éfoo` | 1 | 1 | 1 |
+| `\Bfoo` over the same | 0 | 0 | 0 |
+| `x.y` over `x`, U+FFFD in UTF-8, `y` | 1 | 1 | 1 |
+
+`tests/dialect.test.ts` holds each class, boundary and byte in the scanner,
+and the two engines to the same places for 32 rules over 29 files, nine of
+them of bytes that are no UTF-8: a Latin-1 letter, a sequence cut short, a
+shorter form of a character, a surrogate, a code point past U+10FFFF and a
+byte that only continues a sequence.
+
+### A group with flags
+
+`(?i:...)`, `(?-i:...)`, `(?s:...)` and `(?m:...)` were read by Node 23 and
+later and refused by Node 22, which `package.json` supports, so one rule was
+an invalid directive on one Node and read on another. Reading them on Node 22
+would mean folding the case of every class by hand, which JavaScript gives
+no table for. So a group with flags is refused on every Node, naming it, as
+`(?i)` was refused already, by V8, as an invalid group: the refusal now
+names that too. `ignore-case="true"` folds a whole rule, and a class, `[Aa]`,
+says the rest.
+
+### Unicode's version
+
+This is not changed, and is stated in the README beside the dialect. Node
+24.22.1 reads Unicode 17.0, and ripgrep 15.0.0 reads 16.0, as Node 22.16.0
+did. Read through both, 4,803 code points in 47 ranges are a character to
+Node 24 and unassigned to ripgrep, and none the other way: the scripts
+Sidetic, Tolong Siki, Beria Erfe and Tai Yo, CJK Unified Ideographs Extension
+J, symbols, and five Latin letters, two of them a case pair. A class or a
+fold that reads Unicode's properties may count such a character under the
+scanner where ripgrep names no file. Having the scanner read those code
+points as unassigned would need a table that moves with each release of
+Node and of ripgrep, for characters few files hold, so the limit is stated,
+and `tests/dialect.test.ts` fails when either engine the suite runs reads
+another version, so that it is measured again.
+
+<!-- @assert-count target="src/engine.ts" symbol="readBytes(buffer)" expected="1" reason="the scanner reads a file's bytes as ripgrep does" -->

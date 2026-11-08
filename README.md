@@ -641,10 +641,22 @@ alone, as ripgrep refuses it. What the crate reads and JavaScript would
 read otherwise is an invalid directive that names it: `\A`, `\z`, `\<`,
 `\>`, `\b{...}`, `\a`, `\x{...}`, `\U`, `\pL`, a class inside a class such
 as `[[:alpha:]]`, `&&`, `--` or `~~` in a class, and a count with blanks
-in it, `{2, 3}`. An escaped sign such as `\-` or `\#`, a lone `]` or `}`,
+in it, `{2, 3}`; so is a group with flags, `(?i:...)`, which Node 22 does
+not read. An escaped sign such as `\-` or `\#`, a lone `]` or `}`,
 and `[\w-.]` read as they did
 ([ADR-0007](https://github.com/spec-family/spec-guard/blob/main/docs/adr/0007-search-scope.md),
 amended 2026-10-24).
+
+A byte that is no UTF-8, in a Latin-1 file say, is no character to a rule,
+as ripgrep reads a file's bytes: neither `.` nor any class matches it, `\b`
+reads it as no word character, and `\B` and `word="true"` meet no boundary
+beside it. A rule's notes name each file it matched in that holds one. The
+classes read Unicode as each engine has it: Node 24 reads Unicode 17.0 and
+ripgrep 15 reads 16.0, so `\w` or `\p{L}` over a character 17.0 added, a
+letter of the Sidetic script or of CJK Extension J, may be counted by the
+scanner in a file ripgrep does not name
+([ADR-0007](https://github.com/spec-family/spec-guard/blob/main/docs/adr/0007-search-scope.md),
+amended 2026-11-08).
 
 ### `exclude` - everywhere except
 
@@ -2004,11 +2016,10 @@ Two honest caveats:
   from every case that used to split them. A regex rule kept two readings
   until its dialect was one, and ripgrep took a byte order mark off a file's
   start: `foo\b` over `fooé` was counted by the scanner and passed under
-  ripgrep. What still splits them is a file that is not UTF-8, which the
-  scanner reads with U+FFFD for each byte it cannot, and a character newer
-  than one of the two engines' Unicode
+  ripgrep. What still splits them is a character newer than one of the two
+  engines' Unicode
   ([ADR-0007](https://github.com/spec-family/spec-guard/blob/main/docs/adr/0007-search-scope.md),
-  amended 2026-10-24).
+  amended 2026-11-08).
 
 ## Programmatic API
 
