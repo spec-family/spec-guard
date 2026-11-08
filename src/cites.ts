@@ -270,6 +270,9 @@ export function qualified(text: string, start: number): boolean {
   while (NAME.test(text[begin - 1]!)) begin -= 1;
   const word = text.slice(begin, end);
   if (/^(?:its|their)$/i.test(word)) return true;
+  // Without its `^` the pattern reads the same words, an equivalent mutant: a
+  // name holds no line terminator, so `.*` reaches back to its first character
+  // from wherever a match could start.
   const possessive = /^(.*\p{L})['’]s$/u.exec(word);
   if (possessive !== null && !CONTRACTED.has((possessive[1] as string).toLowerCase())) return true;
   return /\p{L}[-/]\p{L}/u.test(word);
