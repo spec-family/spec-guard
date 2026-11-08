@@ -2721,3 +2721,46 @@ took 86 ms (`tests/engine-contracts.test.ts`), 240 ms
 the reading was measured over stretches of a few milliseconds, and twenty
 of each size would add from two to twenty seconds a test. Measured on this
 workstation's Node 24.22.1 with other work running.
+
+## Amended 2026-11-08: an incremental file is its toolchain's
+
+**Stryker 10.1.1 read 10.0.0's incremental file as a suite that did not
+run.** Dependabot's pull request 85 moved `@stryker-mutator/core` and its
+vitest runner from 10.0.0 to 10.1.1, and the merge refused its sweep (run
+42368657529): shard 1 had two tests named "literal hands back the table it
+was given, and not a copy" in `tests/literal.test.ts`. It had two of every
+test. Each shard's report listed the suite's 5,317 tests at the lines they
+start on, and then each again at line 1, column 1, numbered after them, and
+no mutant named one of the second. spec-graph's pull request 115 had the
+same, its 2,315 tests twice.
+
+An incremental run matches the last sweep's tests to its own by file, name
+and the place a test starts (`testToIdentifyingKey` in Stryker's
+`incremental-differ.js`), and carries every test of the last sweep it did
+not match into the report as passed, so that a test that did not run is not
+forgotten. The vitest runner says where a test starts from 10.1 on. The
+file main's last sweep published, 10.0.0's, gives no test a location, which
+the differ reads as line 0, column 0. So no test matched, and every one was
+carried in beside the run's own. spec-core and spec-harness merge their
+shards the same way and passed on 10.1.1: their pull requests sweep in
+full, and a full sweep restores nothing.
+
+The merge was right to refuse, since by name the report held two suites.
+Holding 10.0.0 would only wait for the next release that changes what a test
+is called or where it starts, and one is known: on vitest 5 the runner joins
+a test's suites with ` > ` (the 2026-10-07 amendment). Every name changes
+there, nothing collides, and the old suite would be carried in unseen beside
+the new one, with vitest 4's verdicts reused, as pull request 31's were. So
+the incremental file is keyed on the versions of the three packages that
+decide what a test is to the match, `@stryker-mutator/core`,
+`@stryker-mutator/vitest-runner` and `vitest`, as `npm ci` installed them:
+`node scripts/mutation-shards.mjs toolchain` prints them, and the restore
+and the publish both put them in the key, before the commit. A pull request
+that moves any of the three restores nothing and sweeps every mutant, and
+the full sweep on main after it publishes under the new key. That does what
+the 2026-10-07 amendment asked a dispatch for: the pull request that lifts
+the pin sweeps in full on its own.
+
+`tests/mutation-shards.test.ts` holds the key to the lockfile's versions, a
+key followed by a dash to starting no other, and both cache steps to it. The
+merge's refusal of two tests of one name now says where they can come from.
