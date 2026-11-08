@@ -1,14 +1,17 @@
 {
   "name": "@spec-family/spec-guard",
   "version": "0.32.0",
-  "description": "Executable architecture assertions for Markdown specs & ADRs.",
+  "description": "Hold your code to what your Markdown says about it: the claims specs, ADRs, READMEs and agent instructions make about your codebase, as assertions that run in CI.",
   "keywords": [
     "adr",
+    "agents",
     "architecture",
+    "claims",
     "documentation",
     "drift",
     "lint",
     "markdown",
+    "mcp",
     "ripgrep",
     "spec"
   ],

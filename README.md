@@ -1,9 +1,10 @@
 # spec-guard
 
-**Executable architecture assertions for Markdown specs & ADRs.**
+**Hold your code to what your Markdown says about it.**
 
-Turn the claims your design documents make about your codebase into assertions
-that run in CI, in milliseconds, with no runtime dependencies.
+Specs, ADRs, READMEs, agent instructions: the claims they make about your
+codebase become assertions that run in CI, in milliseconds, with no runtime
+dependencies.
 
 ```md
 The retired payment gateway is gone from the service layer.
