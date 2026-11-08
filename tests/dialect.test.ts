@@ -671,12 +671,10 @@ describe.skipIf(!rgPath)('one reading, through both engines', () => {
   });
 
   it('reads a character Unicode 17.0 added as the Unicode of each engine has it, as the README says', async () => {
-    // The limit the README and ADR-0007 state, held to the Node and the
-    // ripgrep that run the suite: when either reads another version of
-    // Unicode, this fails, and what they say is measured again. Node 22 read
-    // 16.0 and Node 24 17.0 when it was written; ripgrep 15.0.0 reads 16.0.
+    // The limit the README and ADR-0007 state, through the two engines; how
+    // many code points it covers, and which Node and ripgrep read which
+    // Unicode, tests/unicode-version.test.ts measures and holds.
     const unicode = Number(process.versions.unicode!.split('.')[0]);
-    expect([16, 17]).toContain(unicode);
     const SIDETIC = at(0x10940); // a letter Unicode 17.0 added
     const root = await makeTempRepo({ 'data/new.txt': `a${SIDETIC}b\n`, 'data/old.txt': `a${E_ACUTE}b\n` });
     temporary.push(root);

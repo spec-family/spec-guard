@@ -605,7 +605,14 @@ one, as it says a match in a binary file, and in JSON as `notUtf8Files`,
 which is written only where there is one. A file the rule found nothing in
 is not named. ripgrep names the scanner only the files that match, so a list
 of every file read would be another list under each engine, and under
-ripgrep would hold the files other rules of the same pass matched.
+ripgrep would hold the files other rules of the same pass matched: a laptop
+without ripgrep and a runner with it would disagree about one run's notes.
+Nor would it name the file that matters most, a Latin-1 file a rule found
+nothing in, wherever ripgrep searched. That case is said in words instead:
+the README's "What gets searched" says that such a file is matched as
+ripgrep matches it, and which patterns can answer there otherwise than the
+text a person reads. The maintainer chose the list of matching files on
+2026-11-08, and no second ripgrep pass to find the rest.
 
 Measured with ripgrep 15.0.0 from `@vscode/ripgrep`, each rule over a file
 of its own, before the change and after it:
@@ -646,10 +653,16 @@ Node 24 and unassigned to ripgrep, and none the other way: the scripts
 Sidetic, Tolong Siki, Beria Erfe and Tai Yo, CJK Unified Ideographs Extension
 J, symbols, and five Latin letters, two of them a case pair. A class or a
 fold that reads Unicode's properties may count such a character under the
-scanner where ripgrep names no file. Having the scanner read those code
-points as unassigned would need a table that moves with each release of
-Node and of ripgrep, for characters few files hold, so the limit is stated,
-and `tests/dialect.test.ts` fails when either engine the suite runs reads
-another version, so that it is measured again.
+scanner where ripgrep names no file, and `--engine rg` gives one answer
+wherever ripgrep is installed. Having the scanner read those code points as
+unassigned would need a table that moves with each release of Node and of
+ripgrep, for characters few files hold, so the maintainer chose on
+2026-11-08 to state the limit and hold it; the table waits for a user who
+writes rules over those scripts. `tests/unicode-version.test.ts` measures
+the difference through every code point on each Node of the CI matrix,
+against the ripgrep `@vscode/ripgrep` pins, and holds it to its figure for
+that Node's Unicode, 0 for 16.0 and 4,803 for 17.0: a Node or a ripgrep
+that reads another version fails it, with a message that says what moved
+and that this paragraph and the README's are what to update.
 
 <!-- @assert-count target="src/engine.ts" symbol="readBytes(buffer)" expected="1" reason="the scanner reads a file's bytes as ripgrep does" -->
