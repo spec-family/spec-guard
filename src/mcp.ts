@@ -70,7 +70,7 @@ export type { Era, ErrorObject, OutgoingMessage, RequestId } from './vendor/spec
 export const SERVER_NAME = 'spec-guard';
 
 export const INSTRUCTIONS =
-  'spec-guard enforces the architecture decisions written in this project\'s Markdown specs and ADRs. ' +
+  'spec-guard enforces what this project\'s Markdown documents - specs, ADRs, READMEs and the like - say about its code. ' +
   'Before creating or changing a file, call get_architectural_rules with its path to learn the rules in force there: ' +
   'imports it must not make, the layer it belongs to, what it must be named and the files it needs beside it, text it must not contain. ' +
   'Before changing a file that other files import - renaming or removing an export, changing what a function takes or returns - ' +

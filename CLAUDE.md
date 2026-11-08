@@ -5,7 +5,8 @@ Working agreements for this repository. Short on purpose: the ADRs in
 spec-core's [ADR-0005](https://github.com/spec-family/spec-core/blob/main/docs/adr/0005-the-family-contract.md)
 is the contract every spec-* tool keeps.
 
-spec-guard makes the claims Markdown specs and ADRs make about a codebase
+spec-guard holds a codebase to what its Markdown says about it: the claims
+specs, ADRs, READMEs and agent instructions make about the code become
 executable. Directives written as HTML comments (`@assert-absence`,
 `@assert-count`, the import, layer, cycle and structure rules, `@assert-present`)
 are checked against the tree in CI, by ripgrep or a built-in scanner that give

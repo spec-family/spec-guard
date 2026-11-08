@@ -185,7 +185,7 @@ export function version(manifest = '../package.json'): string {
   }
 }
 
-export const HELP = `spec-guard - Executable architecture assertions for Markdown specs & ADRs
+export const HELP = `spec-guard - hold your code to what your Markdown says about it
 
 Usage
   spec-guard [patterns...] [options]     execute the directives in the specs

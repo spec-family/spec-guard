@@ -10,6 +10,18 @@ what to do when upgrading; the family's policy, including how a flag or field
 is deprecated before it goes, is spec-core's
 [ADR-0009](https://github.com/spec-family/spec-core/blob/main/docs/adr/0009-versions-before-1-0.md).
 
+## Unreleased
+
+### Changed
+
+- **spec-guard says what it is for in the words its checks have grown
+  into.** The README, the package description, `--help` and the MCP
+  server's instructions say it holds code to what any Markdown document says
+  about it - specs, ADRs, READMEs, agent instructions - rather than
+  "architecture assertions for Markdown specs & ADRs". Nothing it checks or
+  reports changed. Upgrading: nothing to do; an agent connected to the MCP
+  server reads the new first sentence of its instructions.
+
 ## 0.32.0
 
 `spec-guard claims` holds each claim a specification labels, such as

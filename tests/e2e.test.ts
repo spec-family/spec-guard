@@ -87,7 +87,7 @@ describe.skipIf(!built)('spec-guard executable', () => {
     const result = await run(['--help']);
 
     expect(result.code).toBe(0);
-    expect(result.stdout).toContain('Executable architecture assertions');
+    expect(result.stdout).toContain('hold your code to what your Markdown says about it');
   });
 
   it('emits parseable JSON', async () => {
