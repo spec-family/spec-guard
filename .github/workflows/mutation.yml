@@ -33,7 +33,7 @@ name: Mutation
 # applies the gate to the merged score. ADR-0003 has the measurements.
 #
 # There is no paths filter. A dependency bump can move the score as easily as a
-# source edit can (vitest itself is pinned for exactly that reason - see
+# source edit can (vitest 5 read a few percent under Stryker 10.0.0 - see
 # ADR-0003), and filtering on src/** would miss it.
 on:
   # A pull request's sweep gates it, and main's feeds the release commit

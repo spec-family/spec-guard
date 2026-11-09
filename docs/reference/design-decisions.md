@@ -14,7 +14,7 @@ each:
   of their own searches.
 - [ADR-0003](https://github.com/spec-family/spec-guard/blob/main/docs/adr/0003-mutation-testing.md) -
   mutation testing in CI gates the build, every survivor is replayed rather
-  than excused, and vitest is pinned to 4.x until Stryker's runner reads 5.
+  than excused, and vitest was held on 4 until Stryker's runner read 5.
 - [ADR-0004](https://github.com/spec-family/spec-guard/blob/main/docs/adr/0004-adaptive-engine.md) -
   `--engine auto` chooses per search group, by walking the target with a
   budget: the scanner under it, ripgrep over it.

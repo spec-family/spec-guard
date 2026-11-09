@@ -56,13 +56,13 @@
     "prepublishOnly": "node -e \"if (process.env.GITHUB_ACTIONS !== 'true') { console.error('npm publish is refused outside GitHub Actions: a release is a v* tag, staged by CI with provenance.'); process.exit(1) }\" && npm run clean && npm run build"
   },
   "devDependencies": {
-    "@stryker-mutator/core": "^10.0.0",
-    "@stryker-mutator/vitest-runner": "^10.0.0",
+    "@stryker-mutator/core": "^10.1.1",
+    "@stryker-mutator/vitest-runner": "^10.1.1",
     "@types/node": "^22.20.4",
-    "@vitest/coverage-v8": "^4.1.11",
+    "@vitest/coverage-v8": "^5.0.5",
     "@vscode/ripgrep": "^1.18.0",
     "typescript": "^7.0.2",
-    "vitest": "^4.1.11"
+    "vitest": "^5.0.5"
   },
   "repository": {
     "type": "git",
