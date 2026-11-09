@@ -163,7 +163,7 @@ describe('the masking of 0.11.0, against the scanner that replaced it', () => {
     }
     // The control: the corpus holds such lines, so the loop above was asked
     // something. ADR-0003 quotes a terminal session as indented code.
-    expect(unknown).toContain(path.join('docs', 'adr', '0003-mutation-testing.md:483'));
+    expect(unknown).toContain(path.join('docs', 'adr', '0003-mutation-testing.md:486'));
   }, 120_000);
 
   it('masks random documents built from lines both read alike exactly as 0.11.0 did', () => {

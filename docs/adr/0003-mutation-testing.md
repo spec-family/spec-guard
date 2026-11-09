@@ -1,4 +1,4 @@
-# ADR-0003: Mutation testing, and why vitest is pinned to 4.x
+# ADR-0003: Mutation testing, and why vitest was pinned to 4.x
 
 ## Status
 
@@ -21,6 +21,10 @@ Run Stryker over `src/`, with the vitest test runner and `perTest` coverage
 analysis, and **pin vitest to 4.x**.
 
 The pin exists because of a silent failure, not a preference.
+
+*Amended 2026-11-09*: the pin is lifted. Stryker 10.1.1 reads vitest 5, and
+vitest is on 5.0.5 here; the amendment of that date has the change and the
+sweep that accepted it.
 
 On vitest 5, `@stryker-mutator/vitest-runner` reports a score without ever
 activating the mutants. The evidence was unambiguous: a mutant that replaced
@@ -48,7 +52,6 @@ The cost is that the everyday suite is slower on vitest 4 than on 5 (roughly 7s
 versus 3s here). That is a real regression, accepted knowingly: a working
 measurement of test strength is worth four seconds per run.
 
-<!-- @assert-count target="package.json" symbol='"vitest": "^4' expected="1" reason="vitest 5 makes Stryker report a fictional score; see this ADR" -->
 <!-- @assert-present file="stryker.config.mjs,vitest.mutation.config.ts,.github/workflows/mutation.yml" -->
 <!-- @assert-present file="scripts/mutation-equivalence.mjs,scripts/mutation-probe.mjs" reason="the equivalence measurement in this ADR must stay reproducible" -->
 <!-- @assert-count target="tests" symbol="ANY_FILE_PROBE" min="1" reason="its contract is a cost, which no output assertion reaches; see the any-file probe below" -->
@@ -2077,7 +2080,8 @@ Whoever bumps vitest to 5 will fail CI on the assertion above, and land on this
 document explaining what breaks and how to check whether it is fixed: run
 Stryker over a small range of a pure function and confirm the killed/survived
 split matches the command runner. When the runner supports vitest 5, delete the
-pin and this ADR's assertion.
+pin and this ADR's assertion. *Amended 2026-11-09*: both are deleted, with the
+`ignore` entries that kept Dependabot from proposing vitest's majors.
 
 Mutation testing runs on every push, breaking the build below the gate -
 incrementally on a branch, in full on `main`. It was first held back to a weekly schedule on
