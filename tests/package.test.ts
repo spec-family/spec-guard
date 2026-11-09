@@ -120,8 +120,18 @@ describe('the reference', () => {
   it('is a page for each topic, and the README links every one of them', () => {
     // A page added and never linked would be shipped and never found.
     const linked = new Set(linksOf('README.md').map(({ target }) => target.split('#')[0]));
-    expect(REFERENCE.length).toBeGreaterThanOrEqual(19);
+    expect(REFERENCE.length).toBeGreaterThanOrEqual(20);
     expect(REFERENCE.filter((page) => !linked.has(page))).toEqual([]);
+  });
+
+  it('opens with an index, docs/reference/README.md, that links every other page', () => {
+    // The family's name for it: GitHub shows it when the folder is opened,
+    // and the site starts from it.
+    const index = 'docs/reference/README.md';
+    expect(REFERENCE).toContain(index);
+    const linked = new Set(linksOf(index).map(({ target }) => path.posix.join('docs/reference', target.split('#')[0] as string)));
+    expect(REFERENCE.filter((page) => page !== index && !linked.has(page))).toEqual([]);
+    expect(linked).toContain('README.md');
   });
 
   it('holds every command, every directive and every option --help names', () => {
