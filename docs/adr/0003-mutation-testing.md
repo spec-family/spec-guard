@@ -2874,4 +2874,54 @@ here.
 pull request's sweep reused vitest 4's verdicts. Since the amendment of
 2026-11-08 the incremental file is keyed on the versions of Stryker and
 vitest, so this pull request restored none and swept all 15,677 mutants
-without one.
+without one: each of its eight shards logged "No incremental file ...
+tests every mutant".
+
+**What it measured.** The pull request's sweep, run 42609729351 at
+84d10d1, beside main's newest full sweep, run 42578702344 at ad69852, the
+commit the branch starts from, with the same source under `src/`:
+
+| Vitest | Score | Mutants | Killed | Timed out | Survived | No coverage | Survived, covered, untested | Runtime errors |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 4.1.12 | 99.26% | 15,677 | 15,321 | 240 | 115 | 1 | 0 | 0 |
+| 5.0.5 | 99.26% | 15,677 | 15,324 | 237 | 115 | 1 | 0 | 0 |
+
+Both conditions of spec-core's ADR-0008 hold: the same score, and no
+survivor that ran no test. No survivor is new and none is gone, the same
+116 undetected by file, mutated text and replacement. Seven mutants have
+another verdict, five timed out on main and killed here and two the other
+way, each detected either way; main's sweeps of 31ce51f and ad69852, of one
+source, differ in eight, all between those two.
+
+The third condition is the tests a killed mutant completed, beside main's
+last four sweeps on vitest 4, of ad69852, 31ce51f, ae0b850 and 28a061c (runs
+42578702344, 42575665016, 42525713398 and 42522801335):
+
+| Sweep | Tests to a kill | Not static | Static, in all | Killed by the first test | Eight shards | Shard 6 |
+| --- | --- | --- | --- | --- | --- | --- |
+| main, vitest 4 | 49.71 to 56.98 | 8.92 to 9.32 | 647,610 to 755,265 | 7,575 to 7,595 | 105m52s to 124m51s | 20m37s to 28m06s |
+| this, vitest 5 | 78.88 | 9.36 | 1,090,439 | 7,609 | 124m32s | 27m41s |
+
+- **The mutants that are not static read 9.36, 0.04 above the range.** Of
+  the 12,639 killed in both sweeps, 912 ran more tests than on main and 925
+  fewer, and 7,450 were killed by their first test, against 7,403. The
+  4,408 tests more come from `src/runner.ts`, 5,844 more, and
+  `src/engine.ts`, 1,763, against fewer in most other files. Mutants of
+  `src/runner.ts` that many files cover, such as the
+  absolute-path check at line 271, were killed by
+  `tests/runner-contracts.test.ts` after 630 tests where main's took 31 to
+  38. Between two sweeps on vitest 4 the same file moved by 1,214.
+- **The static mutants ran 1,090,439 tests before their kills, about half as
+  many again as on vitest 4**, as spec-core's did (its ADR-0007, 2026-11-09,
+  where why is not explained). Here most of it is `src/cli.ts`, 175,731 more:
+  its option tables are killed only by the files that run whole commands,
+  `tests/impact.test.ts`, `tests/cites.test.ts` and `tests/prove.test.ts`,
+  among the longest in the suite. A static mutant runs every file, and after
+  the file that failed last the order is the cache's times, on vitest 5 each
+  whole file's from the dry run, so those files run last: the string at
+  line 392 was killed after 5,020 tests, where main's took 43. 462 static
+  mutants ran more tests and 240 fewer.
+- **The shards took no longer.** The eight took 124m32s, within main's
+  range, as each run costs less on vitest 5. Shard 6, which holds 917 static
+  mutants, took 27m41s; on main it has taken 20m37s to 28m37s over six
+  sweeps, against the job's 30 minutes.

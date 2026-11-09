@@ -23,9 +23,13 @@ is deprecated before it goes, is spec-core's
   tests until a run of the whole file passes, so the sweep's order in
   `vitest.mutation.config.ts` keeps its own record of each file's verdict,
   by a reporter, `lastRun`, as spec-core's does (ADR-0003, amended
-  2026-11-09). Development tooling only: nothing spec-guard checks or
-  reports changed, and the package still installs nothing, so no release is
-  needed for it. Upgrading: nothing to do.
+  2026-11-09). The pull request's full sweep read 99.26% over 15,677
+  mutants, as main's last did, with the same 116 undetected and no
+  survivor that ran no test; its static mutants ran about half as many
+  tests again before their kills, in the same shard time. Development
+  tooling only: nothing spec-guard checks or reports changed, and the
+  package still installs nothing, so no release is needed for it.
+  Upgrading: nothing to do.
 
 ## 0.33.1
 
