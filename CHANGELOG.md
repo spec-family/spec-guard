@@ -10,6 +10,23 @@ what to do when upgrading; the family's policy, including how a flag or field
 is deprecated before it goes, is spec-core's
 [ADR-0009](https://github.com/spec-family/spec-core/blob/main/docs/adr/0009-versions-before-1-0.md).
 
+## Unreleased
+
+### Changed
+
+- **The suite runs on vitest 5, and the mutation sweep keeps its own record
+  of the test file that failed last.** `vitest` and `@vitest/coverage-v8`
+  are at 5.0.5, the version spec-core runs, now that Stryker 10.1's vitest
+  runner reads vitest 5's test names. The pin on 4 is lifted: Dependabot
+  proposes vitest's majors again, and ADR-0003's assertion no longer fails
+  one. Vitest 5's cache keeps a failure from a run narrowed to a mutant's
+  tests until a run of the whole file passes, so the sweep's order in
+  `vitest.mutation.config.ts` keeps its own record of each file's verdict,
+  by a reporter, `lastRun`, as spec-core's does (ADR-0003, amended
+  2026-11-09). Development tooling only: nothing spec-guard checks or
+  reports changed, and the package still installs nothing, so no release is
+  needed for it. Upgrading: nothing to do.
+
 ## 0.33.1
 
 The README is a front page, and the full reference ships in the package, in

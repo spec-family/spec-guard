@@ -2813,3 +2813,65 @@ the pin sweeps in full on its own.
 `tests/mutation-shards.test.ts` holds the key to the lockfile's versions, a
 key followed by a dash to starting no other, and both cache steps to it. The
 merge's refusal of two tests of one name now says where they can come from.
+
+## Amended 2026-11-09: vitest 5, and the pin lifted
+
+Stryker 10.1.0, of 2026-10-23, names stryker-js #6214, "support vitest v5",
+in its notes, and 10.1.1 followed within the hour. Its vitest runner joins a
+test's suites and name with ` > ` where it finds vitest 5 or later, which is
+what #6210 asked for. Pull request 85 brought both packages to 10.1.1 here
+(the amendment of 2026-11-08). spec-core took vitest 5 first, by the
+procedure in its
+[ADR-0008](https://github.com/spec-family/spec-core/blob/main/docs/adr/0008-toolchain.md)
+(amended 2026-11-08 and 2026-11-09), and this is that procedure's step 4
+here.
+
+**What changed.**
+
+- `vitest` and `@vitest/coverage-v8` went to 5.0.5, of 2026-10-15, the
+  version spec-core runs; 5.1 is another change. The lockfile keeps vite at
+  8.3.4, where it was: npm would have taken 8.3.7, released that morning.
+  Both Stryker packages ask for `^10.1.1`, the first runner that reads
+  vitest 5, where they asked for `^10.0.0`.
+- The pin went in the same change: the assertion under the Decision and the
+  two `ignore` entries for vitest's majors in `.github/dependabot.yml`.
+  Dependabot proposes a major of vitest as it proposes any other, after its
+  month, and the group keeps vitest's packages together.
+- `tests/mutation-order.test.ts` failed on vitest 5 where spec-core's test
+  of the same order did, on three changes of vitest's own. The cache is
+  asked by a file's specification, `getTestSpecificationResult`, and keeps
+  no sizes, which vitest's own sequencer reads from the disk where a file
+  has no time: `QuickestFirst` asks what vitest's sequencer asks and reads a
+  size as it does, and the test writes files of the sizes it names, under
+  `tests/fixtures/.tmp`. `resolveConfig` returns Vite's configuration, with
+  vitest's under `test`. And the reporters a suite that names none is given
+  are decided when vitest is first imported, so the test resolves the suite
+  in a process started with `GITHUB_ACTIONS` set.
+- The order keeps its own record of whether each file failed when the
+  worker last ran it, spec-core's, copied whole. Vitest 5's cache keeps a
+  failure from a run narrowed by a test name pattern, or stopped at its
+  first failure, until a run of the whole file passes, and shares it between
+  Stryker's workers, so the order had lost the file that killed the last
+  mutant. A reporter, `lastRun`, records each file's verdict at its end, in
+  the memory of the process that drives the worker, and the rank reads that
+  record where it read the cache's `failed`; the times stay the cache's.
+  `lastRun` has no `onInit`: vitest 5 calls it at the start of every run, and
+  spec-core's two sweeps with one that emptied the record sorted every run
+  with it empty. It is named after `'default'` in `reporters`, which the two
+  tests of the sweep's reporters now expect.
+- The test runs vitest as Stryker's runner does, five runs narrowed by a
+  test name pattern in a process of its own, and takes the order the
+  sequencer gives inside each run. With an emptying `onInit` added back by
+  hand it fails, and so does each of seven other hand-made breaks: the rank
+  reading the cache's `failed`, the record taking a skipped file's state or
+  never written, `lastRun` not named, no size from the disk, the larger
+  untimed file first, and the longest first. A file that has not run goes
+  after those that have, the smaller first, as it did here on vitest 4, where
+  spec-core's runs the larger first.
+
+**The pull request swept every mutant on its own.** The amendment of
+2026-10-07 asked for a dispatch of the full sweep on the branch, since a
+pull request's sweep reused vitest 4's verdicts. Since the amendment of
+2026-11-08 the incremental file is keyed on the versions of Stryker and
+vitest, so this pull request restored none and swept all 15,677 mutants
+without one.

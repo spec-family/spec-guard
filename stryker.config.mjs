@@ -6,7 +6,8 @@
  * actually pinned down by an assertion. For a tool whose whole premise is
  * "assertions that really catch drift", that distinction is the product.
  *
- * See docs/adr/0003-mutation-testing.md for why vitest is pinned to 4.x.
+ * See docs/adr/0003-mutation-testing.md for how a sweep is read, and why
+ * vitest was held on 4 until Stryker's runner read 5.
  *
  * @type {import('@stryker-mutator/api/core').PartialStrykerOptions}
  */

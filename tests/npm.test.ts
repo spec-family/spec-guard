@@ -124,7 +124,7 @@ describe('a contributor, with any npm from 10 to 12', () => {
  * none it fetches the registry's package of that name and runs it, unasked
  * when no terminal is attached. Here that is a worktree before `npm ci`, and
  * the names are other people's: `tsc` on the registry is not the `typescript`
- * package, and `vitest` there is a major this repository holds back. So
+ * package, and `vitest` there is whatever major the registry has newest. So
  * `.npmrc` has npm fetch nothing for a command, and each line that runs a
  * tool through npx says `--no-install` as well: the reason is then on the
  * line, and the flag holds where the environment says `npm_config_yes=true`,

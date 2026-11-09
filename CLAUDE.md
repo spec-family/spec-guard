@@ -87,11 +87,15 @@ A mutant's test files run the quickest first in a sweep
 fails. A static mutant that survives or times out still runs them all, so a
 second added to the suite is a second for each of those in every sweep.
 
-Vitest is pinned to 4 by that ADR, and stays there while Stryker's runner
-runs no test against a mutant on 5: a sweep then reads a few percent, and a
-pull request's incremental sweep does not notice. Dependabot proposes no
-major of it, the ADR's assertion fails one made by hand, and its amendment
-of 2026-10-07 says what lifts the pin.
+Vitest is on 5. ADR-0003 held it on 4 while Stryker's runner ran no test
+against a mutant on 5, and its amendment of 2026-11-09 lifts the hold:
+Stryker 10.1.1 reads vitest 5, and this repository's full sweep on 5 met
+spec-core's
+[ADR-0008](https://github.com/spec-family/spec-core/blob/main/docs/adr/0008-toolchain.md)
+conditions. A pull request that moves Stryker or vitest sweeps every mutant,
+since an incremental file is restored only by the toolchain that wrote it.
+The order keeps its own record of the file that failed last
+(`lastRun`), as vitest 5's cache does not.
 
 The mutation `break` and the coverage floors in `vitest.config.ts` sit below
 the last measurement. They move up with the measurement and never down to make
