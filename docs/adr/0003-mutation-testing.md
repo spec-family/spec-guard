@@ -1555,6 +1555,16 @@ ran high where they were least measured: `runner.ts` and `text.ts` took 7m35s
 against 15.2 minutes, and `cli.ts` alone 8m18s against 15.1, so the next
 split starts from this run's logs rather than 398fe94's.
 
+### 0.33.1: the same survivors
+
+CI's full sweep of 31ce51f (run 42575665016) came out at **99.26% over
+15,677 mutants with 115 survivors and 1 without coverage**, mutant for
+mutant what 0.33.0's sweep of 28a061c (run 42522801335) left; the shards
+took from 8m31s to 21m17s. The release moved the README's reference to
+`docs/reference/` and changed documents and tests alone. The error 0.33.0
+counted among its 15,677, `||` made `&&` in `src/structure.ts`'s walk, was
+killed this time, so every one of them is scored.
+
 ### 0.33.0: bytes that are no UTF-8, labels in prose, and three survivors more, each equivalent
 
 CI's full sweep of 28a061c (run 42522801335) came out at **99.26% over

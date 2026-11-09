@@ -10,24 +10,28 @@ what to do when upgrading; the family's policy, including how a flag or field
 is deprecated before it goes, is spec-core's
 [ADR-0009](https://github.com/spec-family/spec-core/blob/main/docs/adr/0009-versions-before-1-0.md).
 
-## Unreleased
+## 0.33.1
+
+The README is a front page, and the full reference ships in the package, in
+`docs/reference/`, so the copy a project installs describes the release it
+runs. Nothing spec-guard checks or reports changed.
 
 ### Documentation
 
 - **The README is a front page, and the full reference ships in
-  `docs/reference/`.** The README keeps what spec-guard is, a quick start
-  with the output a run prints, the directives and the commands at a glance,
-  the least configuration, a CI job, and the mutation figures. Every command,
+  `docs/reference/`.** The README keeps what spec-guard is, a quick start with
+  the output a run prints, the directives and the commands at a glance, the
+  least configuration, a CI job, and the mutation figures. Every command,
   directive, attribute, regular-expression rule, option, configuration key and
   output format, and the reasoning beside each, moved to nineteen pages under
-  `docs/reference/`, word for word but for the links and a sentence that
-  named the README. The package ships them, and the README links each one
-  relatively, beside `docs/reference/README.md`, an index with a line for
-  each page, which GitHub shows when the folder is opened. The CLI page's
-  options table gains rows for `--help` and `--version`. Nothing spec-guard checks or reports changed. Upgrading:
-  nothing to do; a link to a heading of the README that moved now lands at
-  the top of the README, and the heading is on the page of the reference
-  that the README links for it.
+  `docs/reference/`, word for word but for the links and a sentence that named
+  the README. The package ships them, and the README links each one
+  relatively, beside `docs/reference/README.md`, an index with a line for each
+  page, which GitHub shows when the folder is opened. The CLI page's options
+  table gains rows for `--help` and `--version`. Nothing spec-guard checks or
+  reports changed. Upgrading: nothing to do; a link to a heading of the README
+  that moved now lands at the top of the README, and the heading is on the
+  page of the reference that the README links for it.
 
 ## 0.33.0
 
