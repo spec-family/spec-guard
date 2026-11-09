@@ -641,9 +641,10 @@ export function parseArgs(argv: readonly string[], cwd: string): CliOptions {
       case '--exclude': {
         const value = nextValue();
         const patterns = splitList(value);
-        // Nothing at all clears the list, as the README says. Separators with
-        // nothing between them are a list somebody built from values that were
-        // not there, and clearing the configuration's for it widened the run.
+        // Nothing at all clears the list, as docs/reference/cli.md says.
+        // Separators with nothing between them are a list somebody built from
+        // values that were not there, and clearing the configuration's for it
+        // widened the run.
         if (patterns.length === 0 && value.trim() !== '') {
           throw new UsageError(`Option --exclude names no path in ${JSON.stringify(value)}. Give it paths or globs, or --exclude= with nothing to clear the list.`);
         }

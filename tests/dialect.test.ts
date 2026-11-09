@@ -670,10 +670,10 @@ describe.skipIf(!rgPath)('one reading, through both engines', () => {
     expect(formatReport(failed, { color: false, verbose: false })).toContain('4 matching files hold bytes that are not UTF-8, which no character of a rule matches: data/a.txt, data/b.txt, data/c.txt\n');
   });
 
-  it('reads a character Unicode 17.0 added as the Unicode of each engine has it, as the README says', async () => {
-    // The limit the README and ADR-0007 state, through the two engines; how
-    // many code points it covers, and which Node and ripgrep read which
-    // Unicode, tests/unicode-version.test.ts measures and holds.
+  it('reads a character Unicode 17.0 added as the Unicode of each engine has it, as the reference says', async () => {
+    // The limit docs/reference/regex.md and ADR-0007 state, through the two
+    // engines; how many code points it covers, and which Node and ripgrep
+    // read which Unicode, tests/unicode-version.test.ts measures and holds.
     const unicode = Number(process.versions.unicode!.split('.')[0]);
     const SIDETIC = at(0x10940); // a letter Unicode 17.0 added
     const root = await makeTempRepo({ 'data/new.txt': `a${SIDETIC}b\n`, 'data/old.txt': `a${E_ACUTE}b\n` });

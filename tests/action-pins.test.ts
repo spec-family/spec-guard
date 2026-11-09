@@ -1,8 +1,9 @@
 /**
  * The workflow a guide shows is held to the workflows this repository runs.
  *
- * The README pins the actions of its workflows by commit, as the workflows
- * here are pinned, and a pin copied by hand stays where it was copied:
+ * The README and the CI reference (docs/reference/ci.md) pin the actions of
+ * their workflows by commit, as the workflows here are pinned, and a pin
+ * copied by hand stays where it was copied:
  * Dependabot moves .github/workflows and reads no Markdown. A week after the
  * examples were pinned, upload-sarif had moved here and not there. So each
  * action a guide shows must carry the major version a workflow here runs,
@@ -133,7 +134,11 @@ describe('the workflows the guides show', () => {
   it('are found, and so are the workflows they are held to', () => {
     // A guide that moved, or a line this file no longer reads, would leave
     // the checks below nothing to fail on.
-    expect(shown.map((use) => use.where.split(':')[0])).toContain('README.md');
+    // The README shows the job, and the CI reference shows it with the SARIF
+    // upload beside it.
+    const where = (action: string): string[] => shown.filter((use) => pinOf(use.written)?.action === action).map((use) => use.where.split(':')[0]!);
+    expect(where('actions/checkout')).toEqual(expect.arrayContaining(['README.md', 'docs/reference/ci.md']));
+    expect(where('github/codeql-action/upload-sarif')).toContain('docs/reference/ci.md');
     expect([...pinned.keys()]).toEqual(expect.arrayContaining(['actions/checkout', 'actions/setup-node', 'github/codeql-action/upload-sarif']));
   });
 

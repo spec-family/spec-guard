@@ -118,9 +118,9 @@ has the labels and the steps that move an image.
 - **New behaviour needs a test that fails without it**, and a new heuristic a
   test for the case that must **not** match - those are the ones that matter.
 - **Assert decisions, not shapes.** A test states behaviour a caller can
-  observe, taken from the README, an ADR or a documented message. Padding the
-  mutation score with assertions that restate the implementation is worse than
-  a lower number.
+  observe, taken from the README, the reference, an ADR or a documented
+  message. Padding the mutation score with assertions that restate the
+  implementation is worse than a lower number.
 - **A genuinely equivalent mutant gets no test** and a comment beside the code
   saying why.
 - **A test that writes to disk uses `makeTempRepo`** from `tests/helpers.ts`,
@@ -128,10 +128,14 @@ has the labels and the steps that move an image.
   the process, and never changes a shared fixture: Stryker runs one test file
   in several workers at once. A test that need not touch the disk reads an
   in-memory tree through `memoryIo`.
-- **Some tests read the README.** `tests/package.test.ts` requires every link
-  to a file the package does not ship to be an absolute GitHub URL, and
-  `tests/spec-status.test.ts` reads the `--ignore-status` row of the options
-  table. Fix the README, not the test.
+- **Some tests read the README and the reference.** The README is a front
+  page, and the full reference is `docs/reference/`, which the package ships.
+  `tests/package.test.ts` requires every link to a file the package does not
+  ship to be an absolute GitHub URL, every link to a heading to find it, every
+  page of the reference to be linked from the README, and every option
+  `--help` names to have a row in `docs/reference/cli.md`, whose
+  `--ignore-status` row `tests/spec-status.test.ts` reads. Fix the documents,
+  not the test.
 
 ## Versions and releases
 

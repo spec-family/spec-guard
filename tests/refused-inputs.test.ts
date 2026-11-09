@@ -103,7 +103,7 @@ describe('an option that is set and names nothing', () => {
     expect(parseArgs(['impact', 'src', '--depth=1'], DEMO_REPO).depth).toBe(1);
   });
 
-  it('still clears the exclusions for --exclude given nothing, which the README says it does', () => {
+  it('still clears the exclusions for --exclude given nothing, which the CLI reference says it does', () => {
     // Whitespace alone is nothing: only separators around nothing are a list
     // that was meant to name something.
     for (const nothing of [['--exclude='], ['--exclude', ''], ['--exclude', ' '], ['--exclude', TAB]]) {
