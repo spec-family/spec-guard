@@ -1643,12 +1643,12 @@ describe('--ignore-status', () => {
     };
   }
 
-  it('is described by every word that withholds a document, in --help and in the README', async () => {
+  it('is described by every word that withholds a document, in --help and in the CLI reference', async () => {
     // Both said "draft, proposed and superseded" for two releases after
     // rejected, deprecated and archived joined the list.
     const directives = HELP.slice(HELP.indexOf('\nDirectives\n'));
-    const readme = await fs.readFile(path.join(PROJECT_ROOT, 'README.md'), 'utf8');
-    const row = readme.split('\n').find((line) => line.startsWith('| `--ignore-status`')) as string;
+    const reference = await fs.readFile(path.join(PROJECT_ROOT, 'docs/reference/cli.md'), 'utf8');
+    const row = reference.split('\n').find((line) => line.startsWith('| `--ignore-status`')) as string;
     for (const word of INACTIVE_STATUSES) {
       expect(directives, word).toContain(word);
       expect(row, word).toContain(word);

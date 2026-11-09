@@ -247,6 +247,7 @@ describe('the commands this repository writes', () => {
         'CONTRIBUTING.md',
         'SECURITY.md',
         'docs/adr/0019-releases-are-staged-by-ci.md',
+        'docs/reference/ci.md',
         '.github/workflows/ci.yml',
         '.github/workflows/release.yml',
         'package.json',
@@ -255,8 +256,12 @@ describe('the commands this repository writes', () => {
         'src/cli.ts',
       ]),
     );
-    // The README is where the commands are: the quick start, the two forms under Names, and the CI jobs.
-    expect(readme.match(/npx --no-install @spec-family\/spec-guard\b/g)?.length ?? 0).toBeGreaterThanOrEqual(7);
+    // The commands are where a reader copies them from: in the README the
+    // quick start, the two forms under Names and the CI job, and in the CI
+    // reference the jobs and the hook.
+    const counted = (text: string): number => text.match(/npx --no-install @spec-family\/spec-guard\b/g)?.length ?? 0;
+    expect(counted(readme)).toBeGreaterThanOrEqual(4);
+    expect(counted(read('docs/reference/ci.md'))).toBeGreaterThanOrEqual(4);
   });
 
   it("give a runner the package's full name, never the command's alone", () => {
@@ -300,7 +305,7 @@ describe('the commands this repository writes', () => {
   });
 
   it('register the MCP server by the full name, which a client starts with no terminal and wherever it stands', () => {
-    const entry = /"mcpServers": \{\s*"spec-guard": (\{[\s\S]*?\})\s*\}/.exec(readme)?.[1] ?? '{}';
+    const entry = /"mcpServers": \{\s*"spec-guard": (\{[\s\S]*?\})\s*\}/.exec(read('docs/reference/query-and-mcp.md'))?.[1] ?? '{}';
     const { command, args } = JSON.parse(entry) as { command?: string; args?: string[] };
     expect(command).toBe('npx');
     // Without `--no-install` a tree with no install would fetch on every start.

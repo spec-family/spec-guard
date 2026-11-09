@@ -38,6 +38,7 @@
     "src/vendor/spec-core/LICENSE",
     "CHANGELOG.md",
     "/README.md",
+    "docs/reference",
     "LICENSE"
   ],
   "publishConfig": {

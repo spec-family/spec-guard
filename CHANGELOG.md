@@ -10,6 +10,24 @@ what to do when upgrading; the family's policy, including how a flag or field
 is deprecated before it goes, is spec-core's
 [ADR-0009](https://github.com/spec-family/spec-core/blob/main/docs/adr/0009-versions-before-1-0.md).
 
+## Unreleased
+
+### Documentation
+
+- **The README is a front page, and the full reference ships in
+  `docs/reference/`.** The README keeps what spec-guard is, a quick start
+  with the output a run prints, the directives and the commands at a glance,
+  the least configuration, a CI job, and the mutation figures. Every command,
+  directive, attribute, regular-expression rule, option, configuration key and
+  output format, and the reasoning beside each, moved to nineteen pages under
+  `docs/reference/`, word for word but for the links and a sentence that
+  named the README. The package ships them, and the README links each one
+  relatively. The CLI page's options table gains rows for `--help` and
+  `--version`. Nothing spec-guard checks or reports changed. Upgrading:
+  nothing to do; a link to a heading of the README that moved now lands at
+  the top of the README, and the heading is on the page of the reference
+  that the README links for it.
+
 ## 0.33.0
 
 spec-guard says it holds code to what any Markdown document says about

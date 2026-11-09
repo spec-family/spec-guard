@@ -1,7 +1,8 @@
 /**
- * The Unicode each engine reads, measured: the limit the README and ADR-0007
- * state, held to the Node that runs the suite and to the ripgrep
- * `@vscode/ripgrep` pins (ADR-0007, amended 2026-11-08).
+ * The Unicode each engine reads, measured: the limit the reference
+ * (docs/reference/regex.md) and ADR-0007 state, held to the Node that runs
+ * the suite and to the ripgrep `@vscode/ripgrep` pins (ADR-0007, amended
+ * 2026-11-08).
  *
  * A class reads Unicode's properties as its engine has them, and Node 24
  * reads Unicode 17.0 where ripgrep 15 reads 16.0: the scanner takes code
@@ -9,8 +10,8 @@
  * of the CI matrix measures its own difference here, through every code
  * point, and holds it to the figure this file has for its version of
  * Unicode, so that a Node or a ripgrep that reads another version fails
- * here, saying what moved and what to update, rather than leaving the README
- * a number behind.
+ * here, saying what moved and what to update, rather than leaving the
+ * reference a number behind.
  */
 
 import { spawnSync } from 'node:child_process';
@@ -46,7 +47,7 @@ const EXPECTED: Readonly<Record<string, readonly [number, number]>> = {
 const rg = pinnedRipgrep();
 
 describe.skipIf(rg === null)('the Unicode the two engines read', () => {
-  it('differs by the figure the README and ADR-0007 state, for the Unicode this Node reads', () => {
+  it('differs by the figure the reference and ADR-0007 state, for the Unicode this Node reads', () => {
     const ripgrep = rg as string;
     const assigned = new RegExp(String.raw`^\P{Cn}$`, 'v');
     // One code point a line, with its number, for every code point but the
@@ -76,15 +77,15 @@ describe.skipIf(rg === null)('the Unicode the two engines read', () => {
     const moved = [
       `Node ${process.version} reads Unicode ${unicode}, and ${version} from @vscode/ripgrep leaves ${nodeOnly} code points unassigned that it assigns, and assigns ${ripgrepOnly} that it leaves unassigned;`,
       expected === undefined ? `this file has no figure for Unicode ${unicode}.` : `this file holds ${expected[0]} and ${expected[1]} for Unicode ${unicode}.`,
-      'Update the figure in README.md (the paragraph on the Unicode the classes read), the one in ADR-0007 (amended 2026-11-08), and EXPECTED here.',
+      'Update the figure in docs/reference/regex.md (The Unicode each engine reads), the one in ADR-0007 (amended 2026-11-08), and EXPECTED here.',
     ].join(' ');
     expect([nodeOnly, ripgrepOnly], moved).toEqual(expected);
   });
 
-  it('is the figure the README and ADR-0007 give, for the version that differs', () => {
+  it('is the figure the reference and ADR-0007 give, for the version that differs', () => {
     const [figure] = EXPECTED['17.0']!;
     const written = `${Math.floor(figure / 1000)},${String(figure % 1000).padStart(3, '0')} code points`;
-    expect(read('README.md')).toContain(written);
+    expect(read('docs/reference/regex.md')).toContain(written);
     expect(read('docs/adr/0007-search-scope.md')).toContain(written);
   });
 });

@@ -1,8 +1,9 @@
 # Contributing
 
-What spec-guard does is in the [README](README.md), and why in the ADRs in
-[`docs/adr`](docs/adr). This file is what a contributor needs besides: how to
-build and test it, how its tests are measured, and how a release is made.
+What spec-guard does is in the [README](README.md) and the reference in
+[`docs/reference`](docs/reference), and why in the ADRs in
+[`docs/adr`](docs/adr). This file is what a contributor needs besides: how
+to build and test it, how its tests are measured, and how a release is made.
 [CLAUDE.md](CLAUDE.md) holds the same working agreements, written for a coding
 agent.
 
@@ -48,8 +49,8 @@ spec-core, then copy it again with spec-core's `scripts/vendor.mjs --into`
 - **New behaviour needs a test that fails without it**, and a new heuristic a
   test for the case that must *not* match.
 - **Assert decisions, not shapes.** A test states behaviour a caller can
-  observe - from the README, an ADR or a documented message - rather than
-  restating the implementation.
+  observe - from the README, the reference, an ADR or a documented message -
+  rather than restating the implementation.
 - **A genuinely equivalent mutant gets no test**, and a comment beside the code
   saying why.
 - **A test that writes to disk makes its tree with `makeTempRepo`** in

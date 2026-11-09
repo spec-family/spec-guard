@@ -235,7 +235,7 @@ describe('findRipgrep', () => {
 
   it.runIf(rgPath)('reads a SPEC_GUARD_RG that is set to nothing as unset: the rg on PATH', async () => {
     // What `SPEC_GUARD_RG: ${{ vars.RG }}` leaves in a workflow whose variable
-    // is not defined. The README says so beside the variable.
+    // is not defined. docs/reference/ci.md says so beside the variable.
     process.env.SPEC_GUARD_RG = '';
     resetRipgrepProbe();
     expect(await withPath(path.dirname(rgPath as string), findRipgrep)).toBe('rg');
