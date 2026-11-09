@@ -22,8 +22,9 @@ is deprecated before it goes, is spec-core's
   output format, and the reasoning beside each, moved to nineteen pages under
   `docs/reference/`, word for word but for the links and a sentence that
   named the README. The package ships them, and the README links each one
-  relatively. The CLI page's options table gains rows for `--help` and
-  `--version`. Nothing spec-guard checks or reports changed. Upgrading:
+  relatively, beside `docs/reference/README.md`, an index with a line for
+  each page, which GitHub shows when the folder is opened. The CLI page's
+  options table gains rows for `--help` and `--version`. Nothing spec-guard checks or reports changed. Upgrading:
   nothing to do; a link to a heading of the README that moved now lands at
   the top of the README, and the heading is on the page of the reference
   that the README links for it.

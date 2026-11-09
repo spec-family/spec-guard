@@ -249,8 +249,8 @@ its line of a pull request or a merge request.
 
 ## Reference
 
-The full reference is in `docs/reference/`, which the package ships beside
-this README:
+The full reference is in [`docs/reference/`](docs/reference/README.md), a
+topic to a page, which the package ships beside this README:
 
 - **The rules.** [Directives](docs/reference/directives.md), how one is
   written and read, and the text rules;
