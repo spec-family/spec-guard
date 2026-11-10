@@ -211,6 +211,15 @@ npmjs.com, for the repository `spec-family/spec-guard`, the workflow
 repository, and the commands under *A person publishes* above name the new
 package, as the summary a staged release ends with does.
 
+*Amended 2026-11-10.* A release makes its GitHub release, as spec-graph's
+does: a last job, `github-release`, runs on a tag once the version is
+staged, and makes the release of the tag with the changelog's section as
+its notes and the tarball `verify` packed as its asset, the one artifact
+npm was handed. A dry run makes none, and a stage that fails leaves none
+behind it. The job alone may write to the repository, and only to make the
+release. 0.30.0 to 0.33.1, the versions of `@spec-family/spec-guard` before
+it, were given theirs by hand from the same sections, with no asset.
+
 ## Consequences
 
 - The README says what spec-guard does and ships in the package; how it is
@@ -220,8 +229,9 @@ package, as the summary a staged release ends with does.
 - Every version from 0.12.0 carries a provenance attestation naming the
   repository, the commit and the run that built it; the versions before it do
   not, and never will.
-- `release.yml` makes no GitHub release, where spec-graph's makes one. Until
-  2026-10-07 it did not check that the tagged commit is on main either.
+- Every version from 0.30.0 has a GitHub release; `release.yml` makes it from
+  0.33.2 on (amended 2026-11-10), and until 2026-10-07 it did not check that
+  the tagged commit is on main.
 
 ## Alternatives considered
 

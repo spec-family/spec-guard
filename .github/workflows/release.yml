@@ -349,3 +349,45 @@ jobs:
             echo 'Or the **Staged Packages** tab on npmjs.com. `npm stage reject`'
             echo 'discards it, and the tag can then be deleted and remade.'
           } >> "$GITHUB_STEP_SUMMARY"
+
+  # The release on GitHub, once npm has the staged version: the changelog's
+  # section as the notes and the tarball npm was handed as the asset, one
+  # artifact described once in both places, as spec-graph's release does. It
+  # runs on a tag alone, after the stage, so a dry run makes none and a
+  # failed stage leaves no release behind it (ADR-0019, amended 2026-11-10).
+  github-release:
+    name: GitHub release
+    needs: [verify, publish]
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write # gh release create
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: CHANGELOG.md
+          sparse-checkout-cone-mode: false
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: npm-package
+          path: npm-package
+
+      - name: Create the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          awk -v head="## $version" '$0 == head { on = 1; next } on && /^## / { exit } on' CHANGELOG.md > release-notes.md
+          if [ ! -s release-notes.md ]; then
+            echo "::error::CHANGELOG.md has no text under '## $version'"
+            exit 1
+          fi
+          tarball="$(echo ./npm-package/*.tgz)"
+          gh release create "$GITHUB_REF_NAME" "$tarball" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "spec-guard $version" \
+            --notes-file release-notes.md \
+            --verify-tag
