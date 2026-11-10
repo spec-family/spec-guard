@@ -32,9 +32,9 @@ is deprecated before it goes, is spec-core's
   Upgrading: nothing to do.
 - **A release makes its GitHub release.** The release workflow's last job
   makes the release of the tag, with this file's section as the notes and the
-  package's tarball as the asset, once npm has the staged version; 0.30.0 to
-  0.33.1 were given theirs by hand (ADR-0019, amended 2026-11-10). Nothing in
-  the package changes.
+  package's tarball as the asset, once npm has the staged version, from the
+  next release on; the versions before it have none (ADR-0019, amended
+  2026-11-10). Nothing in the package changes.
 
 ## 0.33.1
 

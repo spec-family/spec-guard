@@ -217,8 +217,8 @@ staged, and makes the release of the tag with the changelog's section as
 its notes and the tarball `verify` packed as its asset, the one artifact
 npm was handed. A dry run makes none, and a stage that fails leaves none
 behind it. The job alone may write to the repository, and only to make the
-release. 0.30.0 to 0.33.1, the versions of `@spec-family/spec-guard` before
-it, were given theirs by hand from the same sections, with no asset.
+release. The versions before it, 0.30.0 to 0.33.1, have none: their tags
+and the registry carry them, and this repository's changelog their notes.
 
 ## Consequences
 
@@ -229,8 +229,8 @@ it, were given theirs by hand from the same sections, with no asset.
 - Every version from 0.12.0 carries a provenance attestation naming the
   repository, the commit and the run that built it; the versions before it do
   not, and never will.
-- Every version from 0.30.0 has a GitHub release; `release.yml` makes it from
-  0.33.2 on (amended 2026-11-10), and until 2026-10-07 it did not check that
+- `release.yml` makes a GitHub release from 0.33.2 on (amended 2026-11-10);
+  the versions before it have none. Until 2026-10-07 it did not check that
   the tagged commit is on main.
 
 ## Alternatives considered
