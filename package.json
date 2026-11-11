@@ -1,6 +1,7 @@
 {
   "name": "@spec-family/spec-guard",
   "version": "0.33.1",
+  "mcpName": "io.github.spec-family/spec-guard",
   "description": "Hold your code to what your Markdown says about it: the claims specs, ADRs, READMEs and agent instructions make about your codebase, as assertions that run in CI.",
   "keywords": [
     "adr",
