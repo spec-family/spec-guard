@@ -554,7 +554,7 @@ describe('spec-guard claims', () => {
     const root = await project(HELD);
     const refused = [
       '--allow-missing-targets', '--no-allow-missing-targets', '--allow-empty-scope', '--no-allow-empty-scope', '--watch', '--fail-fast',
-      '--engine=js', '--print-baseline', '--ignore-status', '--no-ignore-status', '--include-specs', '--no-include-specs', '--max-snippets=1', '--concurrency=1', '--allow-empty',
+      '--engine=js', '--print-baseline', '--include-specs', '--no-include-specs', '--max-snippets=1', '--concurrency=1', '--allow-empty',
     ];
     for (const option of refused) {
       const { io, err } = createIO();

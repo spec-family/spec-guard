@@ -26,13 +26,17 @@ export interface SpecDocument {
   relativeFile: string;
   /** Its first level-one heading, when it has one. */
   title?: string;
-  /** The lifecycle status it declares, when it declares one. */
+  /**
+   * The lifecycle status it declares, when it declares one. Absent from a
+   * document a list in `ignoreStatus` matches, whose status is not read.
+   */
   status?: SpecStatus;
   /**
    * Whether the document is in force by its own account: it declares no status,
-   * or a status that does not withhold it. `--ignore-status` is the caller's
-   * business and is deliberately not folded in here - a query that lists a
-   * draft's rules still has to say the draft is a draft.
+   * or a status that does not withhold it, or its status is not read.
+   * `--ignore-status` is the caller's business and is deliberately not folded
+   * in here - a query that lists a draft's rules still has to say the draft is
+   * a draft.
    */
   inForce: boolean;
   /** Syntactically valid directives, in source order. */
@@ -74,10 +78,42 @@ export function specPath(root: string, file: string): string {
   return toPosix(path.relative(root, file)) || toPosix(file);
 }
 
-/** Expands the patterns and reads every document they match. */
-export async function readSpecs(patterns: readonly string[], root: string, io: Io = nodeIo, memo: Memo = NO_MEMO): Promise<SpecSet> {
+/**
+ * The configuration's `ignoreStatus`: `true` runs the rules of every document,
+ * whatever its status, as `--ignore-status` does, and a list of spec patterns
+ * names the documents whose status is not read at all.
+ */
+export type IgnoreStatus = boolean | readonly string[];
+
+/**
+ * Expands the patterns and reads every document they match.
+ *
+ * A document a list in `ignoreStatus` matches is read with no status: it is
+ * in force, and a status it writes is neither reported nor warned about. That
+ * is for a document whose status means nothing about whether it is in force,
+ * such as a Spec Kit specification, which is written `Draft` and stays so
+ * (ADR-0010, amended 2026-11-11). Its patterns are read as `patterns` are, so
+ * a directory names its Markdown files. `true` reads every status, as
+ * `false` and nothing do: what a status withholds is the caller's to run.
+ */
+export async function readSpecs(
+  patterns: readonly string[],
+  root: string,
+  io: Io = nodeIo,
+  memo: Memo = NO_MEMO,
+  ignoreStatus?: IgnoreStatus,
+): Promise<SpecSet> {
   const { files, unmatched } = await expandSpecs(patterns, root, undefined, io);
-  return { ...parseSpecs(root, files, await readSources(files, io), memo), unmatched };
+  return { ...parseSpecs(root, files, await readSources(files, io), memo, await statusless(ignoreStatus, root, io)), unmatched };
+}
+
+/** The warnings that are about a document's status alone, and go unsaid where its status is not read. */
+const STATUS_WARNINGS: ReadonlySet<SpecWarning['kind']> = new Set<SpecWarning['kind']>(['unreadable-status', 'unclosed-front-matter']);
+
+/** The files whose status is not read: those a list matches, absolute, as the specs are. */
+async function statusless(ignoreStatus: IgnoreStatus | undefined, root: string, io: Io): Promise<ReadonlySet<string>> {
+  if (typeof ignoreStatus !== 'object') return new Set();
+  return new Set((await expandSpecs(ignoreStatus, root, undefined, io)).files);
 }
 
 /**
@@ -97,7 +133,7 @@ export async function readSpecs(patterns: readonly string[], root: string, io: I
  */
 export interface DocumentMemo {
   /** `readSpecs`, with every document parsed before from the same bytes and paths served from memory. */
-  read(patterns: readonly string[], root: string, io?: Io): Promise<SpecSet>;
+  read(patterns: readonly string[], root: string, io?: Io, ignoreStatus?: IgnoreStatus): Promise<SpecSet>;
   /** Documents held: the readable ones of the spec set read last. */
   readonly size: number;
 }
@@ -105,9 +141,9 @@ export interface DocumentMemo {
 export function createDocumentMemo(): DocumentMemo {
   const memo = createMemo();
   return {
-    async read(patterns, root, io = nodeIo) {
+    async read(patterns, root, io = nodeIo, ignoreStatus) {
       const { files, unmatched } = await expandSpecs(patterns, root, undefined, io);
-      const specs = { ...parseSpecs(root, files, await readSources(files, io), memo), unmatched };
+      const specs = { ...parseSpecs(root, files, await readSources(files, io), memo, await statusless(ignoreStatus, root, io)), unmatched };
       // What bounds it. A sweep drops every entry this read did not ask for, so
       // what is held afterwards is one parse of each document the current spec
       // set names: a document that left the set, or whose bytes changed, is
@@ -142,8 +178,13 @@ async function readSources(files: readonly string[], io: Io): Promise<Array<Buff
   return sources;
 }
 
-/** What each document declares, in file order, parsed through `memo`. */
-function parseSpecs(root: string, files: string[], sources: ReadonlyArray<Buffer | Error>, memo: Memo): SpecSet {
+/**
+ * What each document declares, in file order, parsed through `memo`; one in
+ * `statusless` with no status. Its status is dropped after the parse rather
+ * than kept from it, so the memo holds one parse of each document whatever
+ * the configuration says of it.
+ */
+function parseSpecs(root: string, files: string[], sources: ReadonlyArray<Buffer | Error>, memo: Memo, statusless: ReadonlySet<string>): SpecSet {
   const documents: SpecDocument[] = [];
   const errors: DirectiveError[] = [];
   const warnings: SpecWarning[] = [];
@@ -162,15 +203,19 @@ function parseSpecs(root: string, files: string[], sources: ReadonlyArray<Buffer
     }
 
     const parsed = memo.remember(source, [file, relativeFile], () => parseDocument(source.toString('utf8'), { file, relativeFile }));
+    const status = statusless.has(file) ? undefined : parsed.status;
     errors.push(...parsed.errors);
-    warnings.push(...(parsed.warnings ?? []));
+    // A status that is not read cannot be one that could not be read, and
+    // front matter is read for nothing but the status. A block never closed
+    // hides directives, and is said whatever the status.
+    warnings.push(...(parsed.warnings ?? []).filter((warning) => !(STATUS_WARNINGS.has(warning.kind) && statusless.has(file))));
     masked.push(...(parsed.masked ?? []));
     documents.push({
       file,
       relativeFile,
       ...(parsed.title === undefined ? {} : { title: parsed.title }),
-      ...(parsed.status === undefined ? {} : { status: parsed.status }),
-      inForce: parsed.status?.active ?? true,
+      ...(status === undefined ? {} : { status }),
+      inForce: status?.active ?? true,
       directives: parsed.directives,
     });
   });

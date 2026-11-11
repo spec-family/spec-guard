@@ -627,7 +627,7 @@ export async function proveSpecGuard(options: ProveOptions): Promise<ProveReport
   const startedAt = performance.now();
   const root = path.resolve(options.root ?? process.cwd());
   const io = readOnce(options.io ?? nodeIo);
-  const plan = planRun(await readSpecs(options.patterns, root, io), root, options);
+  const plan = planRun(await readSpecs(options.patterns, root, io, undefined, options.ignoreStatus), root, options);
   const context: Context = { root, io, options };
 
   const results: ProveResult[] = [];

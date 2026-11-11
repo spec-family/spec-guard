@@ -33,7 +33,12 @@ export interface ProjectConfig {
   strict?: boolean;
   allowMissingTargets?: boolean;
   allowEmptyScope?: boolean;
-  ignoreStatus?: boolean;
+  /**
+   * `true` runs the rules of every document whatever its status, as
+   * `--ignore-status` does; a list of spec patterns reads the documents it
+   * matches with no status, in force (ADR-0010, amended 2026-11-11).
+   */
+  ignoreStatus?: boolean | string[];
   includeSpecs?: boolean;
   defaultSkips?: boolean;
   /** A file's comment syntax, by extension or by file name: `{ ".dsl": "c-like" }` (ADR-0006). */
@@ -151,6 +156,18 @@ function checkValue(key: ConfigKey, value: unknown): string | null {
       // A list copied from .gitignore is the usual source: its "!" lines would
       // otherwise be dropped, and the exclusion left wider than it reads.
       const error = excludeListError(value as string[]);
+      return error === null ? null : `has an ${error}`;
+    }
+    case 'ignoreStatus': {
+      if (typeof value === 'boolean') return null;
+      // An empty list says nothing, and is refused as a key written for
+      // nothing would be: `false` is the way to say no document.
+      if (!(Array.isArray(value) && value.length > 0 && value.every((entry) => typeof entry === 'string' && entry.trim() !== ''))) {
+        return `must be true, false or a non-empty list of spec globs whose documents' status is not read, got ${describe(value)}`;
+      }
+      // Read as `specs` is, and refused as it is: a glob read either way it
+      // could be read would leave a different set of documents in force.
+      const error = patternListError(value as string[], specPatternError);
       return error === null ? null : `has an ${error}`;
     }
     case 'engine':

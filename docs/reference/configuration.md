@@ -28,7 +28,8 @@ same options, at the top level, in `.spec-guard.json`:
 | `specs` | patterns, `--spec` | a non-empty array of globs |
 | `exclude` | `--exclude` | an array of paths, gitignore-style, left out of every assertion that takes `exclude`; no `!`, `..`, drive path or root |
 | `engine` | `--engine` | `"auto"`, `"rg"` or `"js"` |
-| `strict`, `allowMissingTargets`, `allowEmptyScope`, `ignoreStatus`, `includeSpecs`, `defaultSkips` | the flag of that name | `true` or `false` |
+| `strict`, `allowMissingTargets`, `allowEmptyScope`, `includeSpecs`, `defaultSkips` | the flag of that name | `true` or `false` |
+| `ignoreStatus` | `--ignore-status`, `--no-ignore-status` | `true` or `false`, or a non-empty array of spec globs whose documents are read with no status, in force ([document status](document-status.md#documents-whose-status-means-nothing)) |
 | `comments` | none | an object from an extension (`".dsl"`) or a file name (`"LICENSE-MIT"`) to a comment profile ([comments](attributes.md#comments---the-note-about-a-deletion-is-not-the-deletion)) |
 | `maxSnippets` | `--max-snippets` | an integer, 0 or more |
 | `concurrency` | `--concurrency` | an integer, 1 or more |

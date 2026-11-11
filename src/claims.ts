@@ -20,7 +20,7 @@ import { escapeRegExp } from './engine.js';
 import { nodeIo, readText, type Io } from './io.js';
 import { proveSpecGuard } from './prove.js';
 import { elapsed } from './runner.js';
-import { readSpecs, specPath } from './specs.js';
+import { readSpecs, specPath, type IgnoreStatus } from './specs.js';
 import type { ConfigUse, Directive, ProveResult } from './types.js';
 import { claimsIn, type Claim, type ListItem, type MarkdownScan } from './parser.js';
 import { patternListError, specPatternError } from './glob.js';
@@ -144,6 +144,13 @@ export interface ClaimsOptions {
   readonly root: string;
   readonly config: ClaimsConfig;
   readonly exclude?: readonly string[];
+  /**
+   * The configuration's `ignoreStatus`: `true` proves the directives under a
+   * claim whatever its document's status, and a list those of the documents
+   * it matches, which are read with no status. A directive whose document is
+   * not in force is no evidence otherwise.
+   */
+  readonly ignoreStatus?: IgnoreStatus;
   readonly defaultSkips?: boolean;
   readonly comments?: Readonly<Record<string, string>>;
   readonly io?: Io;
@@ -236,6 +243,8 @@ export async function findClaimsReport(options: ClaimsOptions): Promise<ClaimsRe
   const vocabulary = Object.keys(config.labels);
   const where = (location: { readonly relativeFile: string; readonly line: number; readonly column: number }): string =>
     `${location.relativeFile}:${location.line}:${location.column}`;
+  // Read for the claims and the directives under them, which a status does
+  // not change: whether a directive is evidence is the proof's to say.
   const set = await readSpecs(config.files, root, io);
   if (set.files.length === 0) {
     throw new ClaimsError(`"claims.files" matched no file (${config.files.join(', ')}), so no claim can be read`);
@@ -288,7 +297,15 @@ export async function findClaimsReport(options: ClaimsOptions): Promise<ClaimsRe
   // prove: a proof is a run per rule, and a check with none runs none.
   let proved: Promise<Map<string, ProveResult>> | undefined;
   const proofs = (): Promise<Map<string, ProveResult>> =>
-    (proved ??= proveSpecGuard({ patterns: config.files, root, io, exclude: options.exclude, defaultSkips: options.defaultSkips, comments: options.comments }).then(
+    (proved ??= proveSpecGuard({
+      patterns: config.files,
+      root,
+      io,
+      exclude: options.exclude,
+      ignoreStatus: options.ignoreStatus,
+      defaultSkips: options.defaultSkips,
+      comments: options.comments,
+    }).then(
       (report) => new Map(report.results.map((proof) => [where(proof.location), proof])),
     ));
 

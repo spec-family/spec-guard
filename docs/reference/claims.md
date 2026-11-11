@@ -45,6 +45,14 @@ x 1 claim finding
   string is no evidence of a test, and the finding says why a directive was
   not evidence: none named a test, its document is not in force, or prove
   could not show it failing.
+- **`"ignoreStatus"`** in the configuration, which `claims` reads, decides
+  what in force means here as it does for a run: `true`, or
+  `--ignore-status`, proves the directives under every claim whatever its
+  document's status, and a list of spec patterns reads the documents it
+  matches with no status, so they are in force - for Spec Kit's
+  specifications, which are all `Draft`
+  ([document status](document-status.md#documents-whose-status-means-nothing)).
+  `--no-ignore-status` reads every status.
 - **`"criterion"`** asks for that text in the claim's own words.
 - **One label per claim**: an item whose own words hold two is
   `mixed-labels`.

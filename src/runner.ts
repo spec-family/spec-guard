@@ -54,7 +54,7 @@ import {
 } from "./imports.js";
 import { BUILT_IN_ONLY, commentTable, type CommentTable } from "./comments.js";
 import { checkLayers, type LayerInput } from "./layers.js";
-import { readSpecs, specPath, unmatchedSpecs, type DocumentMemo, type SpecSet } from "./specs.js";
+import { readSpecs, specPath, unmatchedSpecs, type DocumentMemo, type IgnoreStatus, type SpecSet } from "./specs.js";
 import {
   createScope,
   DEFAULT_SCOPE,
@@ -149,13 +149,18 @@ export interface RunOptions {
    */
   exclude?: readonly string[];
   /**
-   * Execute every directive, whatever lifecycle status its document declares.
+   * `true`: execute every directive, whatever lifecycle status its document
+   * declares. A list of spec patterns: read the documents it matches with no
+   * status, so they are in force and their directives run.
    *
-   * The way to ask "would this draft pass if we accepted it today", and the
-   * escape hatch for a team whose `Proposed` means something else. Off by
-   * default, because the point of reading the status is to honour it.
+   * `true` is the way to ask "would this draft pass if we accepted it today",
+   * and the escape hatch for a team whose `Proposed` means something else. A
+   * list is for documents whose status says nothing about whether they are in
+   * force, such as Spec Kit's specifications, all `Draft` (ADR-0010, amended
+   * 2026-11-11). Off by default, because the point of reading the status is to
+   * honour it.
    */
-  ignoreStatus?: boolean;
+  ignoreStatus?: IgnoreStatus;
   /**
    * Which resolved assertions to execute. Every one, when unset.
    *
@@ -1777,7 +1782,8 @@ export function planRun(
   const inactiveSpecs: InactiveSpec[] = [];
 
   for (const document of specs.documents) {
-    if (!document.inForce && !(options.ignoreStatus ?? false)) {
+    // A list is no `true`: the documents it names were read in force.
+    if (!document.inForce && options.ignoreStatus !== true) {
       // A document is only ever out of force because of a status it declares.
       const status = document.status as SpecStatus;
       // Recorded even when it held no directives. "docs/adr/0011.md is a
@@ -1930,7 +1936,8 @@ export async function runSpecGuard(options: RunOptions): Promise<RunResult> {
   const startedAt = performance.now();
   const root = path.resolve(options.root ?? process.cwd());
   const io = options.io ?? nodeIo;
-  const specs = await (options.documents?.read(options.patterns, root, io) ?? readSpecs(options.patterns, root, io));
+  const specs = await (options.documents?.read(options.patterns, root, io, options.ignoreStatus) ??
+    readSpecs(options.patterns, root, io, undefined, options.ignoreStatus));
   const plan = planRun(specs, root, options);
   const assertions = plan.assertions;
 

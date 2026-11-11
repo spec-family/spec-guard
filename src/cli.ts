@@ -51,6 +51,7 @@ import {
   unreadFamilyClause,
 } from './reporter.js';
 import { DEFAULT_CONCURRENCY, DEFAULT_MAX_SNIPPETS, runSpecGuard, splitList, type RunOptions } from './runner.js';
+import type { IgnoreStatus } from './specs.js';
 import { createSession, runWatch } from './watch.js';
 import type { EnginePreference } from './engine.js';
 import type { CiteFamily, ConfigUse } from './types.js';
@@ -137,7 +138,8 @@ export interface CliOptions {
   comments?: Record<string, string>;
   /** Paths no assertion looks at, beside each directive's own exclude. */
   exclude: string[];
-  ignoreStatus: boolean;
+  /** `--ignore-status` either way, or the configuration's `ignoreStatus`, a list of spec patterns among its values. */
+  ignoreStatus: IgnoreStatus;
   strictTargets: boolean;
   allowEmptyScope: boolean;
   printBaseline: boolean;
@@ -291,6 +293,9 @@ Directives
   An assertion whose scope holds no files fails; add allow-empty="true" to allow it.
   A document whose status is draft, proposed, rejected, deprecated, superseded
   or archived is reported and not executed; --ignore-status runs it anyway.
+  "ignoreStatus": ["specs/**/*.md"] in the configuration reads the documents it
+  matches with no status, so they are in force: for Spec Kit's specifications,
+  which are all Draft.
   The status is read in English, whatever language the document is written in:
   status: superseded.
 
@@ -422,8 +427,10 @@ const NOT_FOR: Record<Exclude<Command, 'check'>, ReadonlySet<string>> = {
     '--allow-empty',
   ]),
   // Claims are read from the documents the configuration names, and their
-  // evidence proved as `prove` proves a rule: a document's status decides
-  // whether its rule is evidence, so it is not ignored, and no spec is named.
+  // evidence proved as `prove` proves a rule, so no spec is named. A
+  // document's status decides whether its rule is evidence, unless
+  // `ignoreStatus` says otherwise, which the command line can override as it
+  // can for every other command (ADR-0010, amended 2026-11-11).
   claims: new Set([
     '--spec',
     '--allow-missing-targets',
@@ -434,8 +441,6 @@ const NOT_FOR: Record<Exclude<Command, 'check'>, ReadonlySet<string>> = {
     '--fail-fast',
     '--engine',
     '--print-baseline',
-    '--ignore-status',
-    '--no-ignore-status',
     '--include-specs',
     '--no-include-specs',
     '--max-snippets',
@@ -806,7 +811,7 @@ const CITES_KEYS: ReadonlySet<ConfigKey> = new Set<ConfigKey>(['specs', 'exclude
  * decides whether a count under a claim finds its test. A missing target or an
  * empty scope fails a count of at least one either way, so neither is read.
  */
-const CLAIMS_KEYS: ReadonlySet<ConfigKey> = new Set<ConfigKey>(['exclude', 'defaultSkips', 'comments', 'claims']);
+const CLAIMS_KEYS: ReadonlySet<ConfigKey> = new Set<ConfigKey>(['exclude', 'ignoreStatus', 'defaultSkips', 'comments', 'claims']);
 
 /** The configurable options a proof reads: what decides whether a rule passes, and not how a run is scheduled. */
 const PROVE_KEYS: ReadonlySet<ConfigKey> = new Set<ConfigKey>([
@@ -1059,7 +1064,8 @@ async function runQuery(options: CliOptions, io: CliIO, use: ConfigUse | undefin
         patterns: options.patterns,
         root: options.root,
         paths: options.paths,
-        includeInactive: options.ignoreStatus,
+        includeInactive: options.ignoreStatus === true,
+        ignoreStatus: options.ignoreStatus,
         includeSpecs: options.includeSpecs,
         defaultSkips: options.defaultSkips,
         exclude: options.exclude,
@@ -1206,7 +1212,8 @@ async function runImpact(options: CliOptions, io: CliIO, use: ConfigUse | undefi
       paths: options.paths,
       // Absent and undefined are one answer to impactOf: every dependent.
       depth: options.depth,
-      includeInactive: options.ignoreStatus,
+      includeInactive: options.ignoreStatus === true,
+      ignoreStatus: options.ignoreStatus,
       includeSpecs: options.includeSpecs,
       defaultSkips: options.defaultSkips,
       exclude: options.exclude,
@@ -1313,6 +1320,7 @@ async function runClaims(options: CliOptions, io: CliIO, use: ConfigUse | undefi
         root: options.root,
         config: options.claims,
         exclude: options.exclude,
+        ignoreStatus: options.ignoreStatus,
         defaultSkips: options.defaultSkips,
         comments: options.comments,
       })),

@@ -94,6 +94,31 @@ found on the day it is written rather than on the day it is accepted.
 `--ignore-status` runs everything, which is how you ask whether a draft would
 pass if you accepted it today.
 
+## Documents whose status means nothing
+
+Some documents write a status that says nothing about whether they are in
+force. Spec Kit writes every specification `**Status**: Draft` and never
+changes it, so its rules never ran, and a claim's test under it was no
+evidence. `"ignoreStatus"` in the [configuration](configuration.md) takes a
+list of spec patterns for them, written as `specs` is - a file, a directory
+for the Markdown files under it, or a glob:
+
+```json
+{
+  "specs": ["specs/**/*.md", "docs/**/*.md"],
+  "ignoreStatus": ["specs/**/*.md"]
+}
+```
+
+The status of a document the list matches is not read. It is in force, and
+the status it writes is neither reported nor warned about: its rules run,
+`query`, `impact` and the MCP server list them as rules in force with no
+status, `prove` proves them, and `claims` counts the directives under its
+claims. Every other document's status is read as above, so a draft decision
+under `docs/` stays a draft. `"ignoreStatus": true` is `--ignore-status`
+for every run, and `--no-ignore-status` reads every status, whichever form
+the configuration holds. spec-graph reads the same key with the same meaning.
+
 A run in which nothing is in force executes no assertion, and says so rather
 than that every assertion holds: `no assertion was executed, so nothing was
 verified`. Under `--strict`, or `"strict": true`, that run fails, exit 1, as

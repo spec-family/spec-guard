@@ -601,3 +601,45 @@ On the 166 Markdown files of the five spec-* repositories every status and
 every warning is read as before.
 
 <!-- @assert-count target="src/parser.ts" symbol="const view = scan.masks.structure;" expected="1" reason="the label is read with comments masked" -->
+
+## Amended 2026-11-11: documents whose status is not read
+
+Spec Kit writes every specification `**Status**: Draft` and never changes
+it: the word marks a template's field, not a decision still open. spec-guard
+read it as this ADR says to, so a Spec Kit repository's rules never ran ("1
+not in force"), and `claims` reported every `Implemented` requirement as
+`unevidenced-claim` although the directive under it counted the test. The
+way out was `--ignore-status`, for every document, which also runs the
+rules of a decision under `docs/adr/` that really is a draft. The maintainer
+decided on 2026-11-11 (round 28, D1) that the configuration names such
+documents, and that spec-graph reads the same key with the same meaning
+(spec-core's ADR-0005, where a status is read).
+
+<!-- @assert-count target="src/specs.ts" symbol="const status = statusless.has(file) ? undefined : parsed.status;" expected="1" reason="a document a list in ignoreStatus matches is read with no status" -->
+
+- **`"ignoreStatus"` takes a list of spec patterns** beside `true` and
+  `false`: a non-empty array, each pattern written and read as `specs` is,
+  so a directory names its Markdown files and a pattern spec-guard cannot
+  read is refused, exit 2, before anything runs. An empty list is refused
+  as a key written for nothing.
+- **The status of a document the list matches is not read.** It declares no
+  status, so it is in force; the status it writes is neither reported nor
+  warned about, and neither is front matter never closed, which is read for
+  the status alone. A block never closed is still said: it hides directives.
+  Its rules run, `query`, `impact` and the MCP server list them in force
+  with no status, `prove` proves them, and `claims` counts the directives
+  under its claims. Every other document is read as before.
+- **`true` is as it was**: `--ignore-status` for every run, which still names
+  a draft's status where a query lists its rules. `--no-ignore-status` reads
+  every status, whichever form the configuration holds, and `--ignore-status`
+  runs every rule.
+- **`claims` reads the key**, and takes both flags, which it refused: a
+  document's status still decides whether a directive under a claim is
+  evidence, and the configuration is where a project says what its statuses
+  mean ([ADR-0020](0020-a-claim-is-held-to-its-evidence.md), amended the same
+  day). `cites` does not read it: the status of a cited document is what it
+  checks.
+
+This is no new way for a document to go dark. The list puts documents in
+force, never out of it, and a pattern that matches a document nobody meant
+runs that document's rules, which a reader sees in the report.

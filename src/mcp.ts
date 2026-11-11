@@ -207,8 +207,10 @@ export interface McpServerOptions {
   /** Reported as the server's version. */
   version: string;
   /**
-   * Run settings, as the CLI flags set them. `ignoreStatus` also makes
-   * `get_architectural_rules` list rules from documents not in force by default.
+   * Run settings, as the CLI flags set them. `ignoreStatus: true` also makes
+   * `get_architectural_rules` and `get_dependents` list rules from documents
+   * not in force by default; a list of patterns reads the documents it matches
+   * in force, for every tool and resource.
    */
   run?: Omit<RunOptions, 'patterns' | 'root' | 'select'>;
   /**
@@ -275,6 +277,7 @@ export function createMcpHandler(options: McpServerOptions): (message: unknown) 
     includeSpecs: run?.includeSpecs,
     defaultSkips: run?.defaultSkips,
     exclude: run?.exclude,
+    ignoreStatus: run?.ignoreStatus,
   });
 
   const noSpecs = (patterns: readonly string[]): ToolOutcome =>
@@ -303,7 +306,8 @@ export function createMcpHandler(options: McpServerOptions): (message: unknown) 
     if (unknown) return unknown;
     if (typeof args['path'] !== 'string') return toolError('"path" is required and must be a string.');
     const settings = await current();
-    const includeInactive = args['include_inactive'] ?? settings.run?.ignoreStatus ?? false;
+    // A list is no `true`: the documents it names are read in force already.
+    const includeInactive = args['include_inactive'] ?? settings.run?.ignoreStatus === true;
     if (typeof includeInactive !== 'boolean') return toolError('"include_inactive" must be true or false.');
 
     const startedAt = performance.now();
@@ -405,7 +409,8 @@ export function createMcpHandler(options: McpServerOptions): (message: unknown) 
       return toolError('"depth" must be a whole number of 1 or more: a depth of 0 would follow no import.');
     }
     const settings = await current();
-    const includeInactive = args['include_inactive'] ?? settings.run?.ignoreStatus ?? false;
+    // A list is no `true`: the documents it names are read in force already.
+    const includeInactive = args['include_inactive'] ?? settings.run?.ignoreStatus === true;
     if (typeof includeInactive !== 'boolean') return toolError('"include_inactive" must be true or false.');
 
     const report = {

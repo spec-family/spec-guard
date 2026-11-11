@@ -10,6 +10,37 @@ what to do when upgrading; the family's policy, including how a flag or field
 is deprecated before it goes, is spec-core's
 [ADR-0009](https://github.com/spec-family/spec-core/blob/main/docs/adr/0009-versions-before-1-0.md).
 
+## Unreleased
+
+### Added
+
+- **`"ignoreStatus"` takes a list of spec patterns, whose documents are read
+  with no status.** Spec Kit writes every specification `**Status**: Draft`
+  and never changes it, so a Spec Kit repository's rules never ran ("1 not in
+  force") and `claims` reported each `Implemented` requirement as
+  `unevidenced-claim` with its test counted right under it.
+  `"ignoreStatus": ["specs/**/*.md"]` reads the documents it matches, written
+  as `specs` is, with no status: they are in force, their rules run, `query`,
+  `impact` and the MCP server list them, `prove` proves them and `claims`
+  counts the directives under their claims. Every other document's status is
+  read as before, and `true` and `false` mean what they did; `cites` does
+  not read the key. spec-graph reads the same key with the same meaning
+  ([ADR-0010](https://github.com/spec-family/spec-guard/blob/main/docs/adr/0010-spec-status.md#amended-2026-11-11-documents-whose-status-is-not-read)
+  and
+  [ADR-0020](https://github.com/spec-family/spec-guard/blob/main/docs/adr/0020-a-claim-is-held-to-its-evidence.md#amended-2026-11-11-what-in-force-means-is-the-configurations),
+  amended 2026-11-11).
+
+### Changed
+
+- **`claims` reads `"ignoreStatus"`, and takes `--ignore-status` and
+  `--no-ignore-status`**, which it refused. A directive under a claim is
+  evidence only in a document in force, and the configuration is where a
+  project says which are: `true` proves the directives under every claim,
+  and a list those of the documents it matches. Upgrading: a configuration
+  with `"ignoreStatus": true` now has `claims` count a directive in a
+  document not in force as evidence, as a run runs it; `--no-ignore-status`
+  on the `claims` line keeps the answer it gave.
+
 ## 0.33.2
 
 The MCP server is listed in the official MCP Registry from this release on,

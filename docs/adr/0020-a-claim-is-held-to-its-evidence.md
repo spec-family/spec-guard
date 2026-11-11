@@ -138,3 +138,22 @@ not change for it.
   own, "it is Implemented in round 3", and a finding would fail a run on
   prose nobody meant as a claim. The note lets a reader see what the check
   does not hold, and decide.
+
+## Amended 2026-11-11: what in force means is the configuration's
+
+A directive under a claim is evidence only in a document in force, and
+Spec Kit writes every specification `Draft`: each `Implemented` requirement
+was `unevidenced-claim` with its test counted right under it. `claims` now
+reads `"ignoreStatus"` as a run does
+([ADR-0010](0010-spec-status.md#amended-2026-11-11-documents-whose-status-is-not-read),
+amended the same day), and takes `--ignore-status` and `--no-ignore-status`,
+which it refused, so the command line overrides the configuration here as
+everywhere else.
+
+- **`true`**, or `--ignore-status`, proves the directives under every claim
+  whatever its document's status.
+- **A list of spec patterns** reads the documents it matches with no
+  status, so they are in force and the directives under their claims are
+  proved.
+- **Nothing**, `false` or `--no-ignore-status`: a directive in a document
+  not in force is no evidence, and the finding says so, as before.
