@@ -396,6 +396,43 @@ describe('a label and a comment', () => {
   });
 });
 
+describe('a section, a table and a comment', () => {
+  // The section's line and the table's cell were read with comments kept, so a
+  // template's hint before the value left it unreadable, and a reader who saw
+  // "Superseded" saw a document still in force. ADR-0010, amended 2026-11-11,
+  // as the label is read and as spec-graph reads all three.
+  const context = { file: '/r/docs/a.md', relativeFile: 'docs/a.md' };
+  const warningOf = (source: string) => parseDocument(source, context).warnings?.map(({ location, message }) => [location.line, message]);
+
+  it('reads the line under a section past a comment kept above it or on it', async () => {
+    const source = `# ADR-1\n\n## Status\n\n<!-- one of: draft, accepted, superseded -->\nSuperseded by ADR-0002\n\n${VIOLATION}`;
+    expect(parseStatus(source)).toMatchObject({ value: 'superseded', label: 'Superseded by ADR-0002', source: 'heading' });
+    expect(warningOf(source)).toBeUndefined();
+    // Withheld, where the comment made a status that could not be read.
+    expect((await run(await repo({ 'docs/a.md': source, ...CODE }))).summary).toMatchObject({ total: 0, inactive: 1 });
+    expect(parseStatus('# ADR-1\n\n## Status\n\nAccepted <!-- was proposed -->\n')).toMatchObject({ value: 'accepted', label: 'Accepted' });
+    expect(parseStatus('# ADR-1\n\n## Status\n\n<!--\nSuperseded\n-->\nAccepted\n')).toMatchObject({ value: 'accepted' });
+  });
+
+  it('reads a section holding nothing but a comment as empty, which keeps its document in force', () => {
+    expect(parseStatus('# ADR-1\n\n## Status\n\n<!-- Superseded -->\n\n## Context\n')).toBeUndefined();
+    expect(warningOf('# ADR-1\n\n## Status\n\n<!-- Superseded -->\n\n## Context\n')).toEqual([
+      [
+        3,
+        'the status under the heading "Status" cannot be read (it is empty), so its status is unrecognised and the document stays in force; a status written elsewhere in the document is not read in its place',
+      ],
+    ]);
+  });
+
+  it('reads the right cell of a table past a comment, and one that holds only a comment as empty', () => {
+    expect(parseStatus('# ADR-1\n\n| Status | <!-- draft or accepted --> Proposed |\n| --- | --- |\n')).toMatchObject({ value: 'proposed', label: 'Proposed', source: 'table' });
+    expect(parseStatus('# ADR-1\n\n| Status | <!-- Superseded --> |\n| --- | --- |\n')).toBeUndefined();
+    expect(warningOf('# ADR-1\n\n| Status | <!-- Superseded --> |\n| --- | --- |\n')).toEqual([
+      [3, 'the status in the table cannot be read (it is empty), so its status is unrecognised and the document stays in force; a status written elsewhere in the document is not read in its place'],
+    ]);
+  });
+});
+
 describe('the headings a status is read by', () => {
   it('ignores a `## Status` kept in a comment, which is a template not yet filled in', () => {
     const template = '# ADR-1\n\n<!--\n## Status\n\nDraft\n-->\n\n## Context\n';

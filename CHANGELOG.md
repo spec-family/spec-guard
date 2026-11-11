@@ -33,6 +33,17 @@ is deprecated before it goes, is spec-core's
 
 ### Changed
 
+- **A `## Status` section and a status table are read with comments masked**,
+  as the label is since 0.33.0 and as spec-graph reads all three. A
+  template's hint in a comment above or beside the value made a status that
+  could not be read: `## Status` over `<!-- one of: draft, accepted -->` and
+  `Superseded by ADR-0002` kept its document in force, which its reader saw
+  superseded. A section or a cell that holds only a comment is empty, and
+  keeps its document in force as before. Upgrading: a document whose
+  status a comment hid is now read by the status around it, and withheld
+  where that says so; the five spec-* repositories read every status as
+  before
+  ([ADR-0010](https://github.com/spec-family/spec-guard/blob/main/docs/adr/0010-spec-status.md#amended-2026-11-11-the-section-and-the-table-are-read-with-comments-masked)).
 - **`claims` reads `"ignoreStatus"`, and takes `--ignore-status` and
   `--no-ignore-status`**, which it refused. A directive under a claim is
   evidence only in a document in force, and the configuration is where a
