@@ -66,12 +66,12 @@ function files(directory = ''): string[] {
 }
 
 describe('the repository package.json names', () => {
-  it('is this one, which npm publishes from with provenance, and so are its issues and its page', () => {
+  it('is this one, which npm publishes from with provenance, and so are its issues; its page is the family's site', () => {
     const manifest = JSON.parse(read('package.json')) as { name: string; repository: unknown; bugs: unknown; homepage: string };
     expect(manifest.name).toBe('@spec-family/spec-guard');
     expect(manifest.repository).toEqual({ type: 'git', url: 'git+https://github.com/spec-family/spec-guard.git' });
     expect(manifest.bugs).toEqual({ url: 'https://github.com/spec-family/spec-guard/issues' });
-    expect(manifest.homepage).toBe('https://github.com/spec-family/spec-guard#readme');
+    expect(manifest.homepage).toBe('https://spec-family.github.io');
   });
 });
 

@@ -10,7 +10,14 @@ what to do when upgrading; the family's policy, including how a flag or field
 is deprecated before it goes, is spec-core's
 [ADR-0009](https://github.com/spec-family/spec-core/blob/main/docs/adr/0009-versions-before-1-0.md).
 
-## Unreleased
+## 0.34.0
+
+`"ignoreStatus"` takes a list of spec patterns, whose documents are read
+with no status, with the meaning spec-graph gives the same key; a
+`## Status` section and a status table are read with comments masked; and
+`claims` counts no status line as prose. The copy of spec-core is at
+92e46d4, and the package's homepage on npm is the family's site,
+https://spec-family.github.io. No exit code and no JSON field changes.
 
 ### Added
 

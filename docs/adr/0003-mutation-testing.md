@@ -1558,6 +1558,19 @@ ran high where they were least measured: `runner.ts` and `text.ts` took 7m35s
 against 15.2 minutes, and `cli.ts` alone 8m18s against 15.1, so the next
 split starts from this run's logs rather than 398fe94's.
 
+### 0.34.0: the shards moved, and the equivalent flips back
+
+CI's full sweep of 4566965 (run 43065997393) came out at **99.26% over
+15,761 mutants with 115 survivors and 1 without coverage**, 236 of them
+detected by timeout; the shards took from 10m29s to 19m36s on the table
+the amendment of 2026-11-11 moved, where 0.33.2's took up to 22m02s.
+Against 0.33.2's sweep of 8d3a2ea (run 42967382109) no survivor is new
+and one is gone: `target === '.'` made `true` in `src/impact.ts`, the
+equivalent its comment names, which this sweep detected again. The 84
+mutants more are those of `ignoreStatus`'s list, of the status section
+and table read with comments masked and of `claims`' status line, and
+every one of them is detected.
+
 ### 0.33.2: the first on vitest 5, and the equivalent that flips
 
 CI's full sweep of 8d3a2ea (run 42967382109) came out at **99.25% over

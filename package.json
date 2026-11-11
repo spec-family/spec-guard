@@ -1,6 +1,6 @@
 {
   "name": "@spec-family/spec-guard",
-  "version": "0.33.2",
+  "version": "0.34.0",
   "mcpName": "io.github.spec-family/spec-guard",
   "description": "Hold your code to what your Markdown says about it: the claims specs, ADRs, READMEs and agent instructions make about your codebase, as assertions that run in CI.",
   "keywords": [
@@ -72,7 +72,7 @@
   "bugs": {
     "url": "https://github.com/spec-family/spec-guard/issues"
   },
-  "homepage": "https://github.com/spec-family/spec-guard#readme",
+  "homepage": "https://spec-family.github.io",
   "specGuard": {
     "specs": [
       "docs/**/*.md",
