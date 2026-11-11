@@ -30,28 +30,33 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 // replaces, and a separately pinned copy could drift from it.
 import { calculateMutationTestMetrics } from 'mutation-testing-metrics';
 
-// Minutes each file took in two of main's full sweeps on vitest 5, of b659668
-// and 3e616be, read off the shards' logs with scripts/mutation-timeline.mjs
-// (runs 42750234431 and 42971082810):
+// Minutes each file took in three full sweeps on vitest 5, read off the
+// shards' logs with scripts/mutation-timeline.mjs: main's of b659668 and
+// 3e616be (runs 42750234431 and 42971082810), and one of the same source
+// with an earlier table of this file (run 43044744456):
 //
-//   polyglot 15.9 12.2   glob 11.5 12.2   comments 10.1 8.0   runner 10.0 10.2
-//   cli 9.9 14.8   imports 9.8 9.6   engine 9.3 8.6   reporter 7.2 5.1
-//   cites 6.1 4.7   graph 5.4 5.3   watch 3.9 3.4   parser 3.7 3.3
-//   config 1.5 1.1   text 1.4 1.6   mcp 1.4 1.4   specs 1.3 1.1
-//   structure 1.1 1.1   scope 0.6 0.6   the twelve files of the last 8.3 10.6
+//   polyglot 15.9 12.2 8.4    glob 11.5 12.2 9.7    comments 10.1 8.0 6.6
+//   runner 10.0 10.2 13.2     cli 9.9 14.8 11.5     imports 9.8 9.6 9.9
+//   engine 9.3 8.6 11.2       reporter 7.2 5.1 7.2  cites 6.1 4.7 6.6
+//   graph 5.4 5.3 4.2         watch 3.9 3.4 3.5     parser 3.7 3.3 5.5
+//   config 1.5 1.1 1.5        text 1.4 1.6 1.5      mcp 1.4 1.4 1.2
+//   specs 1.3 1.1 1.3         structure 1.1 1.1 0.9 scope 0.6 0.6 0.4
+//   the twelve files of the last 8.3 10.6 10.4
 //
-// About 118 and 115 minutes in all. glob.ts's timeouts disagree with its
-// report's (16 in the report, 2 counted in its stretch), as they did in
-// 0.12.0's sweep, so its minutes are the least certain; every shard's total
-// is read off its own log and is not in doubt. Runners differ by a fifth or
-// more, and cli.ts by half between these two sweeps: its static mutants are
+// About 115 to 118 minutes in all each time, and a file by as much as half
+// from one sweep to the next: polyglot.ts took 15.9 minutes, then 12.2, then
+// 8.4. Runners differ by a fifth or more, and cli.ts's static mutants are
 // killed only by the long command test files, which a mutant runs last.
+// glob.ts's timeouts disagree with its report's (16 in the report, 2 counted
+// in its stretch), as they did in 0.12.0's sweep, so its minutes are the
+// least certain; every shard's total is read off its own log.
 //
 // The table these replace put polyglot.ts, comments.ts and config.ts in one
-// shard, which took 27.5 and 21.3 of these minutes and 22m02s to 28m44s as a
-// job over main's five sweeps on vitest 5, against the job's 30. The eight
-// below take 11.1 to 16.5 minutes in either sweep. polyglot.ts takes 15.9
-// alone and a file cannot be split, so no split of eight does much better.
+// shard, which took 22m02s to 28m44s as a job over main's five sweeps on
+// vitest 5, against the job's 30. The one below was searched for on the three
+// sweeps at once: no shard takes more than 17.1 of these minutes in any of
+// them, and the last, where a new file lands, 10.3 to 12.6. A file cannot be
+// split, so no split of eight does much better.
 //
 // The last shard mutates everything else the base configuration mutates, so
 // a file added later is still mutated without anyone remembering to list it
@@ -60,14 +65,14 @@ import { calculateMutationTestMetrics } from 'mutation-testing-metrics';
 // minutes, re-measure and move files or add a shard (and add it to the
 // workflow's matrix, which the merge checks). ADR-0003, amended 2026-11-11.
 export const ASSIGNED = [
-  ['src/runner.ts', 'src/cites.ts'], // 16.1 14.9
-  ['src/imports.ts', 'src/parser.ts', 'src/text.ts', 'src/structure.ts'], // 16.0 15.6
-  ['src/glob.ts', 'src/watch.ts'], // 15.4 15.6
-  ['src/cli.ts', 'src/mcp.ts'], // 11.3 16.2
-  ['src/engine.ts', 'src/reporter.ts'], // 16.5 13.7
-  ['src/polyglot.ts'], // 15.9 12.2
-  ['src/comments.ts', 'src/graph.ts', 'src/scope.ts'], // 16.1 13.9
-]; // and the rest, config.ts and specs.ts among them: 11.1 12.8
+  ['src/polyglot.ts', 'src/structure.ts'], // 17.0 13.3 9.3
+  ['src/comments.ts', 'src/cites.ts'], // 16.2 12.7 13.2
+  ['src/engine.ts', 'src/graph.ts', 'src/text.ts'], // 16.1 15.5 16.9
+  ['src/runner.ts', 'src/watch.ts'], // 13.9 13.6 16.7
+  ['src/glob.ts', 'src/parser.ts'], // 15.2 15.5 15.2
+  ['src/cli.ts', 'src/config.ts', 'src/specs.ts'], // 12.7 17.0 14.3
+  ['src/imports.ts', 'src/reporter.ts'], // 17.0 14.7 17.1
+]; // and the rest, mcp.ts and scope.ts among them: 10.3 12.6 12.0
 
 export const SHARD_COUNT = ASSIGNED.length + 1;
 
