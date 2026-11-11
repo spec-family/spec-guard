@@ -178,7 +178,8 @@ spec-guard impact <paths...>           # the files that depend on each path, and
 
 - [**`query`** and **`mcp`**](docs/reference/query-and-mcp.md) answer which
   rules govern a path before anyone writes to it, from the specs alone, and
-  serve that answer to an agent over the Model Context Protocol.
+  serve that answer to an agent over the Model Context Protocol. The server
+  is listed in the official MCP Registry as `io.github.spec-family/spec-guard`.
 - [**`prove`**](docs/reference/prove.md) shows each rule a violation of
   itself, in memory, and fails a rule that still passes.
 - [**`cites`**](docs/reference/cites.md) holds each decision a code comment

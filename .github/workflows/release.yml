@@ -115,7 +115,10 @@ jobs:
       # finding out afterwards costs a withdrawn release. The same step enforces
       # the first line of this file: a dispatch that is neither a dry run nor on
       # a tag would be a release from a branch, which is not a thing here.
-      - name: The tag, package.json and CHANGELOG.md must agree
+      # server.json is what mcp-registry.yml lists from this tag once npm
+      # serves the version, so it names the version twice, as package.json
+      # does once.
+      - name: The tag, package.json, server.json and CHANGELOG.md must agree
         env:
           DRY_RUN: ${{ inputs.dry_run }}
         run: |
@@ -132,6 +135,13 @@ jobs:
             echo "::error::tag $GITHUB_REF_NAME does not match package.json version $version"
             exit 1
           fi
+          for field in version 'packages[0].version'; do
+            listed="$(node -p "require('./server.json').$field")"
+            if [ "$listed" != "$version" ]; then
+              echo "::error::server.json names $listed as $field, where package.json names $version"
+              exit 1
+            fi
+          done
           if ! grep -qx "## $version" CHANGELOG.md; then
             echo "::error::CHANGELOG.md has no '## $version' section"
             exit 1

@@ -203,7 +203,10 @@ documentation (spec-core's
    and back to the start of this step.
 3. **Commit `release: <x.y.z>` on main**:
    `npm version <x.y.z> --no-git-tag-version` for `package.json` and
-   `package-lock.json`; `## Unreleased` renamed `## <x.y.z>`; the sweep's
+   `package-lock.json`; the same version in `server.json`, twice, as
+   `version` and as the package's `version`, which `npm version` does not
+   touch and `tests/mcp-registry.test.ts` and the release both hold to
+   `package.json`'s; `## Unreleased` renamed `## <x.y.z>`; the sweep's
    figures in the README's line under "spec-guard checks itself" and in a new
    `### <x.y.z>: ...` section of ADR-0003, above the last release's. The commit
    message gives the sweep - its commit, score, mutants and survivors - and
@@ -217,11 +220,19 @@ documentation (spec-core's
 
 5. **CI stages it**, as below.
 6. **The maintainer approves it** with a second factor.
+7. **The maintainer lists it in the MCP Registry**, once npm serves it:
+
+   ```bash
+   gh workflow run mcp-registry.yml --ref main -f version=<x.y.z>
+   ```
+
+   or `Actions -> MCP Registry -> Run workflow` with the version, as below.
 
 [`release.yml`](.github/workflows/release.yml) then:
 
 1. refuses the release unless the tagged commit is on main, and the tag,
-   `package.json` and a `## <version>` heading in `CHANGELOG.md` all agree;
+   `package.json`, both versions in `server.json` and a `## <version>`
+   heading in `CHANGELOG.md` all agree;
 2. type checks, builds, runs the suite and executes this repository's own ADRs.
    A tag push does not run CI, so the release job runs those steps itself;
 3. `npm pack`s the tarball, prints its file list and its SHA-256, and hands that
@@ -249,6 +260,18 @@ npm stage approve <stage-id>   # asks for a second factor
 `npm stage reject <stage-id>` discards it instead, and the tag can be deleted
 and remade. Approving needs 2FA and therefore a person: CI can build a release,
 but it cannot decide to publish one.
+
+The MCP server is listed in the official MCP Registry as
+`io.github.spec-family/spec-guard`, by
+[`mcp-registry.yml`](.github/workflows/mcp-registry.yml). The registry reads
+the package from npm, so the listing waits for the approval, which GitHub
+never hears of: the maintainer dispatches the workflow from `main` with the
+version. It checks out that version's tag; stops unless `server.json`,
+`package.json` and npm all name the version, and npm serves it with
+`server.json`'s name as its `mcpName`; downloads `mcp-publisher` at one
+version and checks its SHA-256; logs in with the run's GitHub OIDC token,
+which needs no secret; and publishes `server.json`. A run before the
+approval stops at npm, and says so.
 
 Two repository settings hold the other end of this. The `npm` environment
 accepts deployments only from `main` and from `v*` tags, so no branch can reach

@@ -12,6 +12,19 @@ is deprecated before it goes, is spec-core's
 
 ## Unreleased
 
+### Added
+
+- **The MCP server is listed in the official MCP Registry**, as
+  `io.github.spec-family/spec-guard`, from this release on. `package.json`
+  names the server as its `mcpName`, which the registry reads from npm to
+  tell the package is this repository's, and `server.json` lists the package
+  at its version, started with `mcp` in the directory the client starts
+  servers in. The maintainer lists each release once npm serves it, with a
+  workflow dispatched by hand, and a release refuses a tag whose
+  `server.json` names another version
+  ([ADR-0019](https://github.com/spec-family/spec-guard/blob/main/docs/adr/0019-releases-are-staged-by-ci.md),
+  amended 2026-11-11). Nothing spec-guard checks or reports changes.
+
 ### Changed
 
 - **The suite runs on vitest 5, and the mutation sweep keeps its own record

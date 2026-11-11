@@ -79,6 +79,15 @@ gives `npx` the package's [full name](../../README.md#names) behind
 `--no-install`: in a tree without the install the server fails to start, and
 nothing is fetched.
 
+From 0.33.2 the server is listed in the
+[official MCP Registry](https://registry.modelcontextprotocol.io/v0.1/servers?search=io.github.spec-family/spec-guard)
+as `io.github.spec-family/spec-guard`, for a client that installs servers
+from it. That entry names the package on npm at its release and starts it
+with `mcp` alone, in the directory the client starts servers in, where its
+specs come from the project's configuration or `docs/**/*.md`; the client
+fetches that version itself, where the entry above runs the project's
+install.
+
 The root defaults to the directory the client starts the server in; pass
 `--root` if yours starts servers somewhere else. On Windows, `npx` is a `.cmd`
 script that a client spawning without a shell cannot launch; point `command` at
