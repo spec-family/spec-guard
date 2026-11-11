@@ -41,6 +41,12 @@ is deprecated before it goes, is spec-core's
   with `"ignoreStatus": true` now has `claims` count a directive in a
   document not in force as evidence, as a run runs it; `--no-ignore-status`
   on the `claims` line keeps the answer it gave.
+- **spec-core at 92e46d4.** The copy of spec-core's `markdown` and `text`
+  modules moves from 404152c, copied with spec-core's `scripts/vendor.mjs`:
+  its #63's equivalent rewrites, which end a walk with `Math.min` and mark
+  the mutants no input tells apart, and two modules spec-guard does not
+  read, `annotations.ts` and `registers.ts`. Nothing a run decides changes.
+  Upgrading: nothing to do.
 
 ## 0.33.2
 
