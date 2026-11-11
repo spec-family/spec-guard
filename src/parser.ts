@@ -571,6 +571,12 @@ const NOT_READ_BELOW = '; a status written elsewhere in the document is not read
  * the label is not read in its place. It used to be: `## Status` over
  * `2024-05-01: accepted` handed over to a `Status: draft` line in the preamble,
  * and a status that cannot be read withheld a document by accident.
+ *
+ * Its lines are read with code and comments masked, as the label's are and
+ * as spec-graph reads all three: a template's hint in a comment above the
+ * value made a status that could not be read, under which a reader saw
+ * "Superseded", and a section that holds only a comment is empty (ADR-0010,
+ * amended 2026-11-11).
  */
 function fromHeading(scan: MarkdownScan): StatusReading | undefined {
   const at = scan.headings.findIndex((candidate) => candidate.text.toLowerCase() === 'status');
@@ -578,7 +584,7 @@ function fromHeading(scan: MarkdownScan): StatusReading | undefined {
   const heading = scan.headings[at] as Heading;
   const next = scan.headings[at + 1];
   const subject = `the status under the heading "${heading.text}"`;
-  const view = scan.masks.directives;
+  const view = scan.masks.structure;
   for (const line of scan.lines.slice(heading.endLine, next === undefined ? undefined : next.line - 1)) {
     const candidate = view.slice(line.start, line.end).trim();
     if (candidate.length > 0) return decided(toStatus(candidate, 'heading'), line.line, candidate, subject, NOT_READ_BELOW);
@@ -607,12 +613,12 @@ function preambleEnd(scan: MarkdownScan): number {
  * whose status column is theirs; neither is read, whatever it holds. The left
  * cell is compared whole, without the emphasis that wraps it and in any case,
  * so `**Status**` names the status and `Status of the migration` does not; the
- * right cell is read with code masked, as a section's line is. The first row
- * that names it decides, readable or not, as a section does.
+ * right cell is read with code and comments masked, as a section's line is.
+ * The first row that names it decides, readable or not, as a section does.
  */
 function fromTable(scan: MarkdownScan): StatusReading | undefined {
   const end = preambleEnd(scan);
-  const view = scan.masks.directives;
+  const view = scan.masks.structure;
   // `<` and `<=` read alike: the scanner makes no row of a heading's line, so
   // no table starts on the one that ends the preamble.
   for (const table of scan.tables.filter((candidate) => candidate.line < end && candidate.headers.length === 2)) {
@@ -664,9 +670,10 @@ function fromLabel(scan: MarkdownScan): StatusReading | undefined {
  * licence to read the prose instead. Then the section, the table and the
  * label, the first of them that is there deciding, readable or not.
  *
- * The section, the table and the label are read with code masked, so a
- * document that documents this syntax inside a fence - this project's README
- * does - is not read as declaring a status.
+ * The section, the table and the label are read with code and comments
+ * masked, so a document that documents this syntax inside a fence - this
+ * project's README does - is not read as declaring a status, and a
+ * template's hint in a comment is no part of one.
  */
 export function parseStatus(source: string): SpecStatus | undefined {
   return statusOf(scanMarkdown(source)).status;

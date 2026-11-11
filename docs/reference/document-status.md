@@ -47,6 +47,10 @@ label, and the first of them that is there decides:
 - **A section's value** is its first line of prose before the next heading.
   Headings are read as CommonMark reads them, so an underlined `Status` is the
   section and a `## Status` kept in a comment is not.
+- **Comments are not read**, in the section, the table or the label, as a
+  reader of the rendered document sees none: `<!-- one of: draft, accepted -->`
+  above or beside the value is no part of it, and a section or a cell that
+  holds only a comment is empty.
 - **The table and the label** are only read above the first section heading.
   A table is read when it has exactly two columns and one of its rows, the
   header row or another, names the status in its left cell - `Status` or

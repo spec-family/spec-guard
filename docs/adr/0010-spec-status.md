@@ -600,7 +600,9 @@ read, which keeps the document in force and says so, and withdraws nothing.
 On the 166 Markdown files of the five spec-* repositories every status and
 every warning is read as before.
 
-<!-- @assert-count target="src/parser.ts" symbol="const view = scan.masks.structure;" expected="1" reason="the label is read with comments masked" -->
+The directive that held this amendment counted one reader with comments
+masked; the amendment of 2026-11-11 that masks them in the section and
+the table counts all three.
 
 ## Amended 2026-11-11: documents whose status is not read
 
@@ -647,3 +649,28 @@ documents, and that spec-graph reads the same key with the same meaning
 This is no new way for a document to go dark. The list puts documents in
 force, never out of it, and a pattern that matches a document nobody meant
 runs that document's rules, which a reader sees in the report.
+
+## Amended 2026-11-11: the section and the table are read with comments masked
+
+The amendment of 2026-11-08 masked comments in the label and left the
+section's line and the table's cell as they were, read with comments kept.
+So `## Status` over `<!-- one of: draft, accepted, superseded -->` and then
+`Superseded by ADR-0002` was a status that could not be read: the document
+stayed in force, and its reader saw it superseded. `| Status | <!-- draft or
+accepted --> Proposed |` began with no word the same way. spec-graph reads
+all three with comments masked, and the family reads a status one way
+(round 28).
+
+<!-- @assert-count target="src/parser.ts" symbol="const view = scan.masks.structure;" expected="3" reason="the section, the table and the label are read with comments masked" -->
+<!-- @assert-count target="src/parser.ts" symbol="scan.masks.directives" expected="1" reason="directives are the one thing read with comments kept: no status is" -->
+
+- **The section's line and the table's cell are read with comments masked**,
+  as the label is. A comment above the value or beside it is no part of it.
+- **A section or a cell that holds only a comment is empty**: a status that
+  cannot be read, which keeps the document in force and says so, on the
+  heading's line for a section, as it was said on the comment's.
+
+A document whose status a comment hid is read by what it says around the
+comment, which can withhold it: that is the status its reader sees. On the
+230 Markdown files of the five spec-* repositories every status and every
+warning is read as before.
