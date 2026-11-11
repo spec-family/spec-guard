@@ -30,50 +30,44 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 // replaces, and a separately pinned copy could drift from it.
 import { calculateMutationTestMetrics } from 'mutation-testing-metrics';
 
-// Minutes each file took in main's full sweep of 398fe94, the merge of
-// 0.12.0's code, read off the shards' logs with scripts/mutation-timeline.mjs.
-// That sweep's last shard was cancelled at the 30-minute limit with 137 static
-// mutants untested. Its files' counts come from the pull request's report of
-// the same tree, and the 137 are put at the pace of the 122 static mutants
-// before them:
+// Minutes each file took in two of main's full sweeps on vitest 5, of b659668
+// and 3e616be, read off the shards' logs with scripts/mutation-timeline.mjs
+// (runs 42750234431 and 42971082810):
 //
-//   cli 15.1   runner 14.7   glob 10.7   imports 10.4   parser 8.1
-//   comments 7.3   engine 7.3   reporter 6.6   polyglot 4.7   graph 4.7
-//   cites 3.9   watch 3.2   config 2.9   specs 1.7   prove 1.7   scope 1.6
-//   impact 1.5   mcp 1.2   structure 1.0   the other eight files 3.4
+//   polyglot 15.9 12.2   glob 11.5 12.2   comments 10.1 8.0   runner 10.0 10.2
+//   cli 9.9 14.8   imports 9.8 9.6   engine 9.3 8.6   reporter 7.2 5.1
+//   cites 6.1 4.7   graph 5.4 5.3   watch 3.9 3.4   parser 3.7 3.3
+//   config 1.5 1.1   text 1.4 1.6   mcp 1.4 1.4   specs 1.3 1.1
+//   structure 1.1 1.1   scope 0.6 0.6   the twelve files of the last 8.3 10.6
 //
-// About 111 minutes in all, against 52 in 0.11.0's sweep. They are not scaled
-// to a common runner, as earlier tables were: a shard's initial test run now
-// takes as long as the files it instruments make it, so it no longer measures
-// the runner. The runners this sweep had were at the slow end of those the
-// same shards had on eight runs, so these are slow-runner minutes. Runners
-// differ by a fifth or more, so none of this is good to better than a minute
-// or so.
+// About 118 and 115 minutes in all. glob.ts's timeouts disagree with its
+// report's (16 in the report, 2 counted in its stretch), as they did in
+// 0.12.0's sweep, so its minutes are the least certain; every shard's total
+// is read off its own log and is not in doubt. Runners differ by a fifth or
+// more, and cli.ts by half between these two sweeps: its static mutants are
+// killed only by the long command test files, which a mutant runs last.
 //
-// cli.ts and runner.ts take about 15 minutes each and a file cannot be split,
-// so the sweep cannot finish much sooner than that; seven listed shards bring
-// the rest up to them. The last mutates everything else the base configuration
-// mutates, so a file added later is still mutated without anyone remembering
-// to list it here. The price is that new files all land in one shard, so it
-// holds only small files and keeps room for them. When a shard's sweep passes
-// 20 minutes, re-measure and move files or add a shard (and add it to the
-// workflow's matrix, which the merge checks).
+// The table these replace put polyglot.ts, comments.ts and config.ts in one
+// shard, which took 27.5 and 21.3 of these minutes and 22m02s to 28m44s as a
+// job over main's five sweeps on vitest 5, against the job's 30. The eight
+// below take 11.1 to 16.5 minutes in either sweep. polyglot.ts takes 15.9
+// alone and a file cannot be split, so no split of eight does much better.
 //
-// The minutes beside each shard are 398fe94's. Since a mutant's quickest test
-// files run first (vitest.mutation.config.ts) the eight have taken, in two
-// sweeps of d498e24's source, 11m10s and 6m56s, 12m05s and 10m03s, 8m14s and
-// 11m42s, 6m20s and 5m28s, 7m14s and 7m49s, 8m17s and 11m07s, 9m54s and
-// 13m15s, and 3m55s and 4m28s, on runners that differ by as much as the
-// shards do. The table is as it was: ADR-0003, amended 2026-10-11.
+// The last shard mutates everything else the base configuration mutates, so
+// a file added later is still mutated without anyone remembering to list it
+// here. The price is that new files all land in one shard, so it holds only
+// small files and keeps room for them. When a shard's sweep passes 20
+// minutes, re-measure and move files or add a shard (and add it to the
+// workflow's matrix, which the merge checks). ADR-0003, amended 2026-11-11.
 export const ASSIGNED = [
-  ['src/runner.ts', 'src/text.ts'], // 15.2
-  ['src/imports.ts', 'src/graph.ts'], // 15.1
-  ['src/glob.ts', 'src/scope.ts', 'src/mcp.ts', 'src/structure.ts'], // 14.5
-  ['src/cli.ts'], // 15.1
-  ['src/parser.ts', 'src/engine.ts'], // 15.3
-  ['src/comments.ts', 'src/polyglot.ts', 'src/config.ts'], // 14.8
-  ['src/reporter.ts', 'src/cites.ts', 'src/watch.ts', 'src/specs.ts'], // 15.3
-]; // and the rest: 6.1
+  ['src/runner.ts', 'src/cites.ts'], // 16.1 14.9
+  ['src/imports.ts', 'src/parser.ts', 'src/text.ts', 'src/structure.ts'], // 16.0 15.6
+  ['src/glob.ts', 'src/watch.ts'], // 15.4 15.6
+  ['src/cli.ts', 'src/mcp.ts'], // 11.3 16.2
+  ['src/engine.ts', 'src/reporter.ts'], // 16.5 13.7
+  ['src/polyglot.ts'], // 15.9 12.2
+  ['src/comments.ts', 'src/graph.ts', 'src/scope.ts'], // 16.1 13.9
+]; // and the rest, config.ts and specs.ts among them: 11.1 12.8
 
 export const SHARD_COUNT = ASSIGNED.length + 1;
 

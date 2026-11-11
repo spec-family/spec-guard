@@ -2939,3 +2939,39 @@ last four sweeps on vitest 4, of ad69852, 31ce51f, ae0b850 and 28a061c (runs
   range, as each run costs less on vitest 5. Shard 6, which holds 917 static
   mutants, took 27m41s; on main it has taken 20m37s to 28m37s over six
   sweeps, against the job's 30 minutes.
+
+## Amended 2026-11-11: the shards moved on vitest 5's minutes
+
+On vitest 5 the shard of `src/polyglot.ts`, `src/comments.ts` and
+`src/config.ts` was the long one in every full sweep on main: 23m47s,
+28m44s, 28m12s, 22m02s and 22m24s as a job over the sweeps of e6f38b3,
+b659668, 1bbc3a2, 8d3a2ea and 3e616be, against the job's 30 minutes, while
+the last shard took 6m48s to 11m46s. `scripts/mutation-timeline.mjs` read
+the minutes of each file off the shards' logs of b659668 and 3e616be (runs
+42750234431 and 42971082810); its check on timeouts agrees within two for
+every file but `src/glob.ts`, 16 in the report and 2 counted, as in
+0.12.0's sweep, and three files off by three.
+
+| Shard | Before | Minutes | After | Minutes |
+| --- | --- | --- | --- | --- |
+| 1 | runner, text | 11.5, 11.8 | runner, cites | 16.1, 14.9 |
+| 2 | imports, graph | 15.2, 14.9 | imports, parser, text, structure | 16.0, 15.6 |
+| 3 | glob, scope, mcp, structure | 14.7, 15.3 | glob, watch | 15.4, 15.6 |
+| 4 | cli | 9.9, 14.8 | cli, mcp | 11.3, 16.2 |
+| 5 | parser, engine | 13.0, 11.9 | engine, reporter | 16.5, 13.7 |
+| 6 | comments, polyglot, config | 27.5, 21.3 | polyglot | 15.9, 12.2 |
+| 7 | reporter, cites, watch, specs | 18.5, 14.3 | comments, graph, scope | 16.1, 13.9 |
+| 8 | the rest | 8.3, 10.6 | the rest, config and specs among them | 11.1, 12.8 |
+
+The minutes are those of the files in each sweep, from the first progress
+line, so a job takes a minute or two more. The new table was searched for
+on both sweeps at once, the slowest shard of either as low as it goes with
+the last kept near 13 minutes for the files that land there unlisted:
+16.5 at most, where `src/polyglot.ts` alone takes 15.9 and cannot be split.
+Eight shards stay: a ninth would cost every sweep a runner's set-up and a
+dry run, for a slowest shard no lower than `src/polyglot.ts`.
+
+`src/cli.ts` took 9.9 minutes in one sweep and 14.8 in the other. Its
+static mutants are killed only by the long command test files, which a
+static mutant runs last on vitest 5, so its minutes move with the runner's
+pace over those files more than any other's.
