@@ -149,7 +149,8 @@ describe('parseConfig', () => {
   });
 
   it('refuses a boolean written as anything but true or false', () => {
-    for (const key of ['strict', 'allowMissingTargets', 'allowEmptyScope', 'ignoreStatus', 'includeSpecs', 'defaultSkips']) {
+    // ignoreStatus takes a list as well: tests/ignore-status.test.ts.
+    for (const key of ['strict', 'allowMissingTargets', 'allowEmptyScope', 'includeSpecs', 'defaultSkips']) {
       expect(refusal(manifest({ [key]: 'yes' }))).toBe(`package.json: "specGuard.${key}" must be true or false, got "yes".`);
       expect(refusal(manifest({ [key]: 1 }))).toBe(`package.json: "specGuard.${key}" must be true or false, got 1.`);
     }
@@ -585,8 +586,9 @@ describe('applyConfig', () => {
 
   it('applies claims to spec-guard claims alone, with what decides whether a rule under a claim passes and can fail', () => {
     const options = parseArgs(['claims'], cwd);
-    expect(applyConfig(options, everything)).toEqual({ file: 'package.json', applied: ['exclude', 'defaultSkips', 'comments', 'claims'], overridden: [] });
+    expect(applyConfig(options, everything)).toEqual({ file: 'package.json', applied: ['exclude', 'ignoreStatus', 'defaultSkips', 'comments', 'claims'], overridden: [] });
     expect(options.claims).toEqual(everything.claims);
+    expect(options.ignoreStatus).toBe(true);
     for (const argv of [[], ['query', 'src'], ['prove'], ['cites'], ['mcp'], ['--watch']]) {
       expect(applyConfig(parseArgs(argv, cwd), { claims: everything.claims }), argv.join(' ')).toBeUndefined();
     }

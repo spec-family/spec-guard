@@ -211,7 +211,7 @@ export function createSession(options: SessionOptions): Session {
       const reads = new Set<FactKey>();
       const door = facts.view(reads);
       const settings = await options.settings(door);
-      const plan = planRun(await readSpecs(settings.patterns, root, door, memo), root, settings.run, leaveOut);
+      const plan = planRun(await readSpecs(settings.patterns, root, door, memo, settings.run.ignoreStatus), root, settings.run, leaveOut);
       planned = reads;
 
       const before = executed;

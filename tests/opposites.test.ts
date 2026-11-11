@@ -53,7 +53,7 @@ const PAIRS: Array<[on: string, off: string, commands: string[][]]> = [
   ['--allow-missing-targets', '--no-allow-missing-targets', [...RUN, ['mcp']]],
   ['--allow-empty-scope', '--no-allow-empty-scope', [...RUN, ['mcp']]],
   ['--default-skips', '--no-default-skips', [...RUN, ['cites'], ...ASKS, ['mcp']]],
-  ['--ignore-status', '--no-ignore-status', [...RUN, ...ASKS, ['mcp']]],
+  ['--ignore-status', '--no-ignore-status', [...RUN, ...ASKS, ['mcp'], ['claims']]],
   ['--include-specs', '--no-include-specs', [...RUN, ...ASKS, ['mcp']]],
   ['--color', '--no-color', [...RUN, ['cites']]],
   ['--ascii', '--no-ascii', [...RUN, ['cites']]],

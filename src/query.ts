@@ -17,7 +17,7 @@ import { formatOptionLines } from './reporter.js';
 import { checkProjectExcludes, elapsed, resolveDirective, specExclusions } from './runner.js';
 import { createScope } from './scope.js';
 import { governs, leftOutByOwnExclude, viewRule, within, type DocumentView, type QueryPath, type RuleView } from './rules.js';
-import { readSpecs, specPath, unmatchedSpecs, type DocumentMemo, type SpecDocument } from './specs.js';
+import { readSpecs, specPath, unmatchedSpecs, type DocumentMemo, type IgnoreStatus, type SpecDocument } from './specs.js';
 import type { Assertion, ConfigUse, DirectiveError } from './types.js';
 
 export interface RuleSetOptions {
@@ -31,6 +31,12 @@ export interface RuleSetOptions {
   defaultSkips?: boolean;
   /** The project's exclusions, which govern what each rule covers as they do in a run. */
   exclude?: readonly string[];
+  /**
+   * The configuration's `ignoreStatus`. A list names the documents read with
+   * no status, which are in force; `true` reads every status, and listing the
+   * rules of documents not in force is `includeInactive`'s to ask.
+   */
+  ignoreStatus?: IgnoreStatus;
   /**
    * The door the specs are found and read through, as a run's `io` is
    * (ADR-0014). The filesystem when none is given.
@@ -77,7 +83,8 @@ export function viewDocument(document: SpecDocument): DocumentView {
  */
 export async function loadRuleSet(options: RuleSetOptions): Promise<RuleSet> {
   const exclude = checkProjectExcludes(options.exclude);
-  const specs = await (options.documents?.read(options.patterns, options.root, options.io) ?? readSpecs(options.patterns, options.root, options.io));
+  const specs = await (options.documents?.read(options.patterns, options.root, options.io, options.ignoreStatus) ??
+    readSpecs(options.patterns, options.root, options.io, undefined, options.ignoreStatus));
   const context = {
     root: options.root,
     excludeFiles: specExclusions(specs.files, options.includeSpecs ?? false),
