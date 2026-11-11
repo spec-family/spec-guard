@@ -89,9 +89,11 @@ describe("the order a mutant's test files run in", () => {
   });
   afterEach(() => removeTempRepo(work));
 
-  // The order's own record, told of a file's end as vitest tells a reporter.
-  const ended = (file: string, state: TestModuleState) => {
-    lastRun.onTestModuleEnd({ moduleId: `${work}/${file}`, state: () => state } as unknown as TestModule);
+  // The order's own record, told of a file's end as vitest tells a reporter,
+  // and how long the file took in that run: by default as long as the cache
+  // has it taking.
+  const ended = (file: string, state: TestModuleState, duration = TIMED[file]?.duration ?? 0) => {
+    lastRun.onTestModuleEnd({ moduleId: `${work}/${file}`, state: () => state, diagnostic: () => ({ duration }) } as unknown as TestModule);
   };
   // A run of every file the worker has timed, in which those named failed and
   // the rest passed.
@@ -136,6 +138,19 @@ describe("the order a mutant's test files run in", () => {
     // A run of one file, which fails; the other has not run since it failed.
     ended('tests/scope.test.ts', 'failed');
     expect(await ours(TIMED)).toEqual(['scope', 'watch-equivalence', 'text', 'glob-core', 'specs', 'cli']);
+  });
+
+  it('ranks a file by the time it took when the worker last ran it, narrowed or not, and one it has not run by the cache\'s', async () => {
+    // A run narrowed to one quick test of the longest file: it took 3 ms
+    // there, and runs first, where the cache's 6,900 ran it last.
+    ended('tests/watch-equivalence.test.ts', 'passed', 3);
+    expect(await ours(TIMED)).toEqual(['watch-equivalence', 'text', 'scope', 'glob-core', 'specs', 'cli']);
+    // A file skipped by a run keeps its time from the run that last ran it.
+    ended('tests/watch-equivalence.test.ts', 'skipped', 9_000);
+    expect(await ours(TIMED)).toEqual(['watch-equivalence', 'text', 'scope', 'glob-core', 'specs', 'cli']);
+    // And a run of all of it takes it back past the others.
+    ended('tests/watch-equivalence.test.ts', 'passed', 7_000);
+    expect(await ours(TIMED)).toEqual(['text', 'scope', 'glob-core', 'watch-equivalence', 'specs', 'cli']);
   });
 
   it("takes no failure from vitest's cache, which keeps one from a narrowed run until a run of the whole file passes", async () => {
@@ -237,10 +252,9 @@ describe("the order a mutant's test files run in", () => {
     const runs = await asStrykerRuns(['holds$', 'short holds$|long breaks$', 'holds$', 'short holds$|long quick$', 'holds$']);
     // The smaller first, as neither has a time; then the quicker; then the
     // one that failed in the run before; then, as it passed there, the
-    // quicker again; and after a run of its one quick test, still `short`, by
-    // the cache's time, the whole file's: a record of each run's time, which
-    // would run `long` first there, swept no better in spec-core (its
-    // ADR-0007, 2026-11-09). A record emptied at the start of each run, as an
+    // quicker again; and after a run of its one quick test, `long`, by the
+    // time it took in that run, where the cache's, the whole file's, would
+    // run `short` first. A record emptied at the start of each run, as an
     // `onInit` of the reporter would empty it, runs the quicker first in the
     // third.
     expect(runs.map(({ order }) => order)).toEqual([
@@ -248,7 +262,7 @@ describe("the order a mutant's test files run in", () => {
       ['short', 'long'],
       ['long', 'short'],
       ['short', 'long'],
-      ['short', 'long'],
+      ['long', 'short'],
     ]);
     // Why the order keeps a record: from the second run on vitest's cache has
     // `long` failed, and by it the fourth run would run `long` first. Where it
