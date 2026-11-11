@@ -53,6 +53,19 @@ is deprecated before it goes, is spec-core's
   document not in force as evidence, as a run runs it; `--no-ignore-status`
   on the `claims` line keeps the answer it gave.
 
+### Fixed
+
+- **`claims` counts no status line as a label in prose.** `**Status**:
+  Implemented` in a document's preamble, a `| Status | Implemented |` row
+  or the line under `## Status` is the document's status, and the note of
+  labels in prose no longer lists it; the same words on any other line still
+  count
+  ([ADR-0020](https://github.com/spec-family/spec-guard/blob/main/docs/adr/0020-a-claim-is-held-to-its-evidence.md#amended-2026-11-11-a-status-line-is-no-prose-and-the-hint-names-the-prefix)).
+- **The hint of `unevidenced-claim` names the first of `testPrefixes`.** It
+  said `symbol="fn test_..."` whatever the configuration held; with
+  `"testPrefixes": ["test('"]` it now says `symbol="test('..."`, a quote or a
+  backslash in the prefix escaped so the directive can be copied as shown.
+
 ## 0.33.2
 
 The MCP server is listed in the official MCP Registry from this release on,

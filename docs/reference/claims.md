@@ -62,7 +62,13 @@ x 1 claim finding
   a sentence, a heading, a table cell or a code span that opens no item, is
   no claim, and no check holds it. The report closes with how many there
   are, `--verbose` says where, and JSON lists them as `prose`; they change
-  no exit code.
+  no exit code. The line the document's status is written on,
+  `**Status**: Implemented`, a `| Status | Implemented |` row or the line
+  under `## Status`, is the document's status and no prose
+  ([document status](document-status.md)).
+- **The hint of `unevidenced-claim`** shows the directive to write with the
+  first of `testPrefixes`, quoted so that it can be copied as shown:
+  `["it(\""]` is shown as `symbol="it(\"..."`.
 - `--format json`, `sarif`, `github` and `gitlab`, as `cites`. No `claims`
   in the configuration, or `files` that match nothing, is exit 2.
 

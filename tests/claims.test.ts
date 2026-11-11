@@ -7,6 +7,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { claimsConfigError, ClaimsError, findClaimsReport, whyNot, type ClaimsConfig } from '../src/claims.js';
+import { parseAttributes } from '../src/parser.js';
 import type { ProveResult } from '../src/types.js';
 import { nodeIo } from '../src/io.js';
 import { makeTempRepo, removeTempRepo } from './helpers.js';
@@ -93,6 +94,20 @@ describe('a claim whose label asks for a test', () => {
     const report = await findClaimsReport({ root, config: { ...CONFIG, testPrefixes: ['fn test_', '#[test]'] } });
     expect(report.findings.map((f) => [f.line, f.message])).toEqual([[1, '`Implemented` needs a test, and no directive under the claim names one (fn test_, #[test])']]);
     expect(report.claims[1]?.evidence).toEqual(['spec/a.md:4']);
+  });
+
+  it('asks in its hint for a directive written with the first prefix the configuration names, one that can be copied as it is shown', async () => {
+    const root = await repo({ 'spec/a.md': '- `Implemented`: nothing under it.\n' });
+    const hint = async (testPrefixes: string[]): Promise<string> => (await findClaimsReport({ root, config: { ...CONFIG, testPrefixes } })).findings[0]!.hint;
+    expect(await hint(["test('", 'fn test_'])).toBe(
+      'write a directive under the claim that counts the test, as <!-- @assert-count target="..." symbol="test(\'..." min="1" -->, or lower the label',
+    );
+    // The directive shown, read as the parser reads one, names the prefix as
+    // the configuration writes it: a quote and a backslash are escaped.
+    const symbol = async (testPrefixes: string[]): Promise<string | undefined> =>
+      parseAttributes(/<!-- @assert-count (.*) -->/.exec(await hint(testPrefixes))![1]!)['symbol'];
+    expect(await symbol(['it("'])).toBe('it("...');
+    expect(await symbol(['a\\\\b("'])).toBe('a\\\\b("...');
   });
 
   it('counts no count without a symbol, such as an import count', async () => {
@@ -334,6 +349,21 @@ describe('a label in prose', () => {
   it('reads a span after a list as no item\'s, where the claim before it has ended', async () => {
     const root = await repo({ 'spec/a.md': '- `Specified`: one.\n\nThe `Target` here is prose.\n' });
     expect(where(await findClaimsReport({ root, config: CONFIG }))).toEqual([['spec/a.md', 3, 5, 'Target']]);
+  });
+
+  it('is no status the document writes in its body, where its status is read, and is one written as a status anywhere else', async () => {
+    const root = await repo({
+      'spec/label.md': '# A\n\n**Status**: Implemented\n\nThe rest is Implemented.\n',
+      'spec/section.md': '# B\n\n## Status\n\nImplemented (Target next).\n\n## Next\n\nStatus: Implemented\n',
+      'spec/table.md': '# C\n\n| Status | Implemented |\n| --- | --- |\n\n## Rest\n\n| Status | Target |\n| --- | --- |\n',
+      // A status that cannot be read is still the line the status is written on.
+      'spec/unread.md': '# D\n\n**Status**: 2026-11 Implemented\n',
+    });
+    expect(where(await findClaimsReport({ root, config: CONFIG }))).toEqual([
+      ['spec/label.md', 5, 13, 'Implemented'],
+      ['spec/section.md', 9, 9, 'Implemented'],
+      ['spec/table.md', 8, 12, 'Target'],
+    ]);
   });
 
   it('is none in a document that writes each label only to open a claim', async () => {
