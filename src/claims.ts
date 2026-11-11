@@ -223,6 +223,15 @@ function namesTest(directive: Directive, prefixes: readonly string[]): boolean {
   return symbol !== undefined && least >= 1 && prefixes.some((prefix) => symbol.startsWith(prefix));
 }
 
+/**
+ * A value as a directive's double-quoted attribute holds it: a quote or a
+ * backslash escaped, as the parser reads them back, so a hint shown for
+ * `it("` is a directive that can be copied.
+ */
+function attributeText(value: string): string {
+  return value.replace(/["\\]/g, '\\$&');
+}
+
 /** What the report says of a directive that counts a test and is no evidence, by what `prove` found of it. */
 export function whyNot(proof: ProveResult | undefined): string {
   if (proof === undefined) return 'its document is not in force, so the rule is not run';
@@ -256,10 +265,13 @@ export async function findClaimsReport(options: ClaimsOptions): Promise<ClaimsRe
   const prose: ProseLabel[] = [];
   for (const document of set.documents) {
     const source = await readText(io, document.file);
-    const { claims, scan } = claimsIn(source, vocabulary);
+    const { claims, scan, statusLine } = claimsIn(source, vocabulary);
     for (const { offset, label } of proseLabels(scan, claims, vocabulary)) {
       const { line, column } = scan.index.positionAt(offset);
-      prose.push({ file: document.relativeFile, line, column, label });
+      // The document's status, written as a label, in a table or under
+      // `## Status`, is no sentence: a status read in front matter is masked
+      // with it, and one in the body is passed over here.
+      if (line !== statusLine) prose.push({ file: document.relativeFile, line, column, label });
     }
     // The innermost claim around a directive is the one it is written under,
     // and the last of those around it to open. A directive opens at its `<!--`,
@@ -326,7 +338,7 @@ export async function findClaimsReport(options: ClaimsOptions): Promise<ClaimsRe
           first === undefined
             ? `\`${entry.label}\` needs a test, and no directive under the claim names one (${config.testPrefixes!.join(', ')})`
             : `\`${entry.label}\` needs a test, and the directive naming one at line ${first.location.line} is no evidence: ${whyNot(proofOf(first))}`,
-        hint: 'write a directive under the claim that counts the test, as <!-- @assert-count target="..." symbol="fn test_..." min="1" -->, or lower the label',
+        hint: `write a directive under the claim that counts the test, as <!-- @assert-count target="..." symbol="${attributeText(config.testPrefixes![0]!)}..." min="1" -->, or lower the label`,
       });
     }
     if (rule.criterion !== undefined && !text.includes(rule.criterion)) {

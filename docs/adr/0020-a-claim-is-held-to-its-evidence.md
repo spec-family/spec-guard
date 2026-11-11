@@ -157,3 +157,21 @@ everywhere else.
   proved.
 - **Nothing**, `false` or `--no-ignore-status`: a directive in a document
   not in force is no evidence, and the finding says so, as before.
+
+## Amended 2026-11-11: a status line is no prose, and the hint names the prefix
+
+Two things the report said were not so, found in round 28.
+
+- **The line a document's status is written on is not prose.**
+  `**Status**: Implemented` in the preamble was a note's label in prose, though
+  it is the document's status, read as [ADR-0010](0010-spec-status.md) reads
+  one. The line the status is read from in the body - the label's, the
+  table row's, or the first line under `## Status`, readable or not - is
+  passed over, as front matter, where a status is also read, always was.
+  The same words on any other line, a `Status:` line past the preamble
+  among them, are prose as before.
+- **The hint of `unevidenced-claim` names the configured prefix.** It said
+  `symbol="fn test_..."` whatever `testPrefixes` held, and a project whose
+  tests are `test('...')` was told to write a directive that counts none. It
+  shows the first of `testPrefixes`, with a quote and a backslash escaped as
+  the parser reads them back, so the directive can be copied as shown.

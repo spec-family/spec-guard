@@ -249,6 +249,8 @@ function unreadable(text: string): string {
 interface StatusReading {
   status?: SpecStatus;
   problem?: { line: number; message: string };
+  /** The line of the body the status is written on, readable or not: a section's, a table row's or a label's. */
+  line?: number;
 }
 
 /**
@@ -257,8 +259,9 @@ interface StatusReading {
  * which keeps the document in force. `subject` names where it was written.
  */
 function decided(status: SpecStatus | undefined, line: number, text: string, subject: string, below: string): StatusReading {
-  if (status !== undefined) return { status };
+  if (status !== undefined) return { status, line };
   return {
+    line,
     problem: {
       line,
       message: `${subject} cannot be read (${unreadable(text)}), so its status is unrecognised and the document stays in force${below}`,
@@ -949,9 +952,15 @@ export type { Claim, ListItem, MarkdownScan };
 /**
  * The claims of a document, read as every document is read here, and the scan
  * they were read from, for what `spec-guard claims` asks of each item: where a
- * directive lies, and what the item says in its own words (ADR-0020).
+ * directive lies, and what the item says in its own words (ADR-0020). With
+ * them the line of the body its status is written on, which is structure, not
+ * prose: `**Status**: Implemented` is the document's status, and no label in a
+ * sentence.
  */
-export function claimsIn(source: string, vocabulary: readonly string[]): { readonly claims: Claim[]; readonly scan: MarkdownScan } {
+export function claimsIn(
+  source: string,
+  vocabulary: readonly string[],
+): { readonly claims: Claim[]; readonly scan: MarkdownScan; readonly statusLine: number | undefined } {
   const scan = scanMarkdown(source);
-  return { claims: findClaims(scan, vocabulary), scan };
+  return { claims: findClaims(scan, vocabulary), scan, statusLine: statusOf(scan).line };
 }
