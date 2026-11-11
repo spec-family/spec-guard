@@ -1558,6 +1558,20 @@ ran high where they were least measured: `runner.ts` and `text.ts` took 7m35s
 against 15.2 minutes, and `cli.ts` alone 8m18s against 15.1, so the next
 split starts from this run's logs rather than 398fe94's.
 
+### 0.33.2: the first on vitest 5, and the equivalent that flips
+
+CI's full sweep of 8d3a2ea (run 42967382109) came out at **99.25% over
+15,677 mutants with 116 survivors and 1 without coverage**, 237 of them
+detected by timeout; the shards took from 6m48s to 22m02s. It is the first
+release swept on vitest 5, with the order's own record of the file that
+failed last (amended 2026-11-09). Against 0.33.1's sweep of 31ce51f (run
+42575665016) no mutant is new or gone and one survivor is more:
+`target === '.'` made `true` in `src/impact.ts`, the equivalent its comment
+names, which 0.33.1's sweep detected and this one did not, as it has gone
+both ways since 0.18.1. No survivor ran no test. The release changed the
+release and registry workflows, `server.json` and the documents; no line of
+`src/` moved.
+
 ### 0.33.1: the same survivors
 
 CI's full sweep of 31ce51f (run 42575665016) came out at **99.26% over

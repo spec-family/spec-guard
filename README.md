@@ -295,8 +295,8 @@ build fails if they stop being true. CI proves every one of those rules can
 fail, and `spec-guard cites` holds every ADR a comment in the code cites to
 existing and being in force.
 
-Line coverage is 100%, CI's full mutation sweep kills 99.26% of 15,677 mutants
-(0.33.1), and every survivor a release adds is replayed before it ships
+Line coverage is 100%, CI's full mutation sweep kills 99.25% of 15,677 mutants
+(0.33.2), and every survivor a release adds is replayed before it ships
 ([ADR-0003](https://github.com/spec-family/spec-guard/blob/main/docs/adr/0003-mutation-testing.md));
 [CONTRIBUTING.md](https://github.com/spec-family/spec-guard/blob/main/CONTRIBUTING.md)
 has how to build, test and release, and

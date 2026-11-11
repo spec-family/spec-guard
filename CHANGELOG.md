@@ -10,7 +10,11 @@ what to do when upgrading; the family's policy, including how a flag or field
 is deprecated before it goes, is spec-core's
 [ADR-0009](https://github.com/spec-family/spec-core/blob/main/docs/adr/0009-versions-before-1-0.md).
 
-## Unreleased
+## 0.33.2
+
+The MCP server is listed in the official MCP Registry from this release on,
+and a release makes its GitHub release. The suite runs on vitest 5. Nothing
+spec-guard checks or reports changed.
 
 ### Added
 
