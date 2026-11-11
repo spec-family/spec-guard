@@ -83,6 +83,9 @@ jobs:
     # number (30, then 45, then a coin flip at 45) is why it is not raised.
     # With a mutant's quickest test files first the eight took 4 to 13 minutes
     # (runs 38111345528 and 38115759932; ADR-0003, amended 2026-10-11).
+    # On vitest 5 the shard of polyglot.ts, comments.ts and config.ts took up
+    # to 28m44s, and the files were moved between the eight on the minutes
+    # each took (ADR-0003, amended 2026-11-11).
     timeout-minutes: 30
 
     strategy:

@@ -2939,3 +2939,43 @@ last four sweeps on vitest 4, of ad69852, 31ce51f, ae0b850 and 28a061c (runs
   range, as each run costs less on vitest 5. Shard 6, which holds 917 static
   mutants, took 27m41s; on main it has taken 20m37s to 28m37s over six
   sweeps, against the job's 30 minutes.
+
+## Amended 2026-11-11: the shards moved on vitest 5's minutes
+
+On vitest 5 the shard of `src/polyglot.ts`, `src/comments.ts` and
+`src/config.ts` was the long one in every full sweep on main: 23m47s,
+28m44s, 28m12s, 22m02s and 22m24s as a job over the sweeps of e6f38b3,
+b659668, 1bbc3a2, 8d3a2ea and 3e616be, against the job's 30 minutes, while
+the last shard took 6m48s to 11m46s. `scripts/mutation-timeline.mjs` read
+the minutes of each file off the shards' logs of b659668 and 3e616be (runs
+42750234431 and 42971082810); its check on timeouts agrees within two for
+every file but `src/glob.ts`, 16 in the report and 2 counted, as in
+0.12.0's sweep, and three files off by three.
+
+A first table, searched for on those two sweeps, was swept on the pull
+request's branch (run 43044744456): its eight took 9m17s to 20m50s as jobs,
+the slowest 19.7 minutes of files, where the two sweeps had it at 16.1.
+Files moved by a third and more from one sweep to the next:
+`src/polyglot.ts` took 15.9, 12.2 and 8.4 minutes, `src/runner.ts` 10.0,
+10.2 and 13.2. The table kept was searched for on all three sweeps at once,
+the slowest shard of any of them as low as it goes with the last kept near
+13 minutes for the files that land there unlisted:
+
+| Shard | Before | Minutes | After | Minutes |
+| --- | --- | --- | --- | --- |
+| 1 | runner, text | 11.5, 11.8 | polyglot, structure | 17.0, 13.3, 9.3 |
+| 2 | imports, graph | 15.2, 14.9 | comments, cites | 16.2, 12.7, 13.2 |
+| 3 | glob, scope, mcp, structure | 14.7, 15.3 | engine, graph, text | 16.1, 15.5, 16.9 |
+| 4 | cli | 9.9, 14.8 | runner, watch | 13.9, 13.6, 16.7 |
+| 5 | parser, engine | 13.0, 11.9 | glob, parser | 15.2, 15.5, 15.2 |
+| 6 | comments, polyglot, config | 27.5, 21.3 | cli, config, specs | 12.7, 17.0, 14.3 |
+| 7 | reporter, cites, watch, specs | 18.5, 14.3 | imports, reporter | 17.0, 14.7, 17.1 |
+| 8 | the rest | 8.3, 10.6 | the rest, mcp and scope among them | 10.3, 12.6, 12.0 |
+
+The minutes are those of the files in each sweep, from the first progress
+line, so a job takes a minute or two more. 17.1 is the slowest shard of any
+of the three sweeps, where the first table's was 19.8 and main's 27.5.
+Eight shards stay: a ninth would cost every sweep a runner's set-up and a
+dry run, for a slowest shard held up by one file all the same. The next
+sweeps on main measure the table, and the rule above holds: past 20
+minutes, move files again.
