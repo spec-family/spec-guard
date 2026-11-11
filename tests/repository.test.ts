@@ -66,7 +66,7 @@ function files(directory = ''): string[] {
 }
 
 describe('the repository package.json names', () => {
-  it('is this one, which npm publishes from with provenance, and so are its issues; its page is the family's site', () => {
+  it('is this one, which npm publishes from with provenance, and so are its issues; its page is the site of the family', () => {
     const manifest = JSON.parse(read('package.json')) as { name: string; repository: unknown; bugs: unknown; homepage: string };
     expect(manifest.name).toBe('@spec-family/spec-guard');
     expect(manifest.repository).toEqual({ type: 'git', url: 'git+https://github.com/spec-family/spec-guard.git' });
