@@ -168,7 +168,18 @@ function checkValue(key: ConfigKey, value: unknown): string | null {
       // Read as `specs` is, and refused as it is: a glob read either way it
       // could be read would leave a different set of documents in force.
       const error = patternListError(value as string[], specPatternError);
-      return error === null ? null : `has an ${error}`;
+      if (error !== null) return `has an ${error}`;
+      // Two that `specs` takes are refused here, so that every list
+      // spec-graph's `ignoreStatus` takes means the same in both tools and
+      // the rest are refused by both (spec-core's ADR-0005): the root, which
+      // names every document, and a pattern that starts with "!", which would
+      // be a path that matches nothing.
+      const root = (value as string[]).find((entry) => ROOT_PATTERNS.has(entry));
+      if (root !== undefined) {
+        return `has "${root}" in it, which names every document: a list names the documents whose status is not read, and true runs the rules of every document`;
+      }
+      const negated = (value as string[]).find((entry) => entry.startsWith('!'));
+      return negated === undefined ? null : `has "${negated}" in it, and a list takes nothing back: name only the documents whose status is not read`;
     }
     case 'engine':
       return typeof value === 'string' ? null : `must be a string, got ${describe(value)}`;
@@ -186,6 +197,9 @@ function checkValue(key: ConfigKey, value: unknown): string | null {
       return typeof value === 'boolean' ? null : `must be true or false, got ${describe(value)}`;
   }
 }
+
+/** What names the root as a spec pattern: every Markdown file under it. */
+const ROOT_PATTERNS: ReadonlySet<string> = new Set(['.', './']);
 
 /** The keys a `cites` entry takes, and no others. */
 const CITE_KEYS: readonly string[] = ['id', 'files'];

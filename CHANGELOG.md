@@ -20,7 +20,8 @@ is deprecated before it goes, is spec-core's
   force") and `claims` reported each `Implemented` requirement as
   `unevidenced-claim` with its test counted right under it.
   `"ignoreStatus": ["specs/**/*.md"]` reads the documents it matches, written
-  as `specs` is, with no status: they are in force, their rules run, `query`,
+  as `specs` is but for the root and a pattern that starts with `!`, which
+  are refused, with no status: they are in force, their rules run, `query`,
   `impact` and the MCP server list them, `prove` proves them and `claims`
   counts the directives under their claims. Every other document's status is
   read as before, and `true` and `false` mean what they did; `cites` does

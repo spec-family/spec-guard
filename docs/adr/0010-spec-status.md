@@ -621,7 +621,11 @@ documents, and that spec-graph reads the same key with the same meaning
   `false`: a non-empty array, each pattern written and read as `specs` is,
   so a directory names its Markdown files and a pattern spec-guard cannot
   read is refused, exit 2, before anything runs. An empty list is refused
-  as a key written for nothing.
+  as a key written for nothing, and so are two patterns `specs` takes: the
+  root, `"."` or `"./"`, which names every document, and one that
+  starts with `!`, which would be a path that matches nothing. spec-graph
+  refuses both in its own `ignoreStatus`, so every list either tool takes
+  means the same in both (the maintainer's decision of the same day).
 - **The status of a document the list matches is not read.** It declares no
   status, so it is in force; the status it writes is neither reported nor
   warned about, and neither is front matter never closed, which is read for

@@ -101,7 +101,11 @@ force. Spec Kit writes every specification `**Status**: Draft` and never
 changes it, so its rules never ran, and a claim's test under it was no
 evidence. `"ignoreStatus"` in the [configuration](configuration.md) takes a
 list of spec patterns for them, written as `specs` is - a file, a directory
-for the Markdown files under it, or a glob:
+for the Markdown files under it, or a glob - but for two that are refused,
+exit 2: the root, `"."` or `"./"`, which names every document, and a
+pattern that starts with `!`, since a list takes nothing back. spec-graph
+refuses both in its own `ignoreStatus`, so a list either tool takes means
+the same in both:
 
 ```json
 {

@@ -271,6 +271,19 @@ describe('the command line and the configuration', () => {
     expect(said('specs')).toBe(`${shape} "specs".`);
     expect(said(1)).toBe(`${shape} 1.`);
     expect(said(['specs/**.md'])).toMatch(/^package\.json: "specGuard\.ignoreStatus" has an invalid spec pattern "specs\/\*\*\.md": /);
+    // The root and a pattern that starts with "!" are spec patterns, and are
+    // refused here as spec-graph refuses them in its own ignoreStatus, so a
+    // list either tool takes means the same in both.
+    for (const root of ['.', './']) {
+      expect(said(['specs', root])).toBe(
+        `package.json: "specGuard.ignoreStatus" has "${root}" in it, which names every document: a list names the documents whose status is not read, and true runs the rules of every document.`,
+      );
+    }
+    expect(said(['specs', '!specs/001-refunds/plan.md'])).toBe(
+      'package.json: "specGuard.ignoreStatus" has "!specs/001-refunds/plan.md" in it, and a list takes nothing back: name only the documents whose status is not read.',
+    );
+    // Neither is refused where it is no whole pattern of its own.
+    expect(said(['./specs', 'specs/!draft.md', '.specs'])).toBe('accepted');
 
     const tree = await project({ ignoreStatus: [] });
     const refused = createIO(tree);
