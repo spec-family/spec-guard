@@ -121,8 +121,8 @@ async function holdsLanguage(io: Io, root: string, prefix: string, language: Mod
     const found = listed.flat();
     if (found.some(({ entry }) => entry.isFile() && extensions.includes(path.extname(entry.name).toLowerCase()))) return true;
     // A file kept here as a folder is listed next time, and its listing,
-    // which fails, holds nothing: `true` for `isDirectory()` is an
-    // equivalent mutant.
+    // which fails, holds nothing: `true` for `isDirectory()`, or no filter at
+    // all, is an equivalent mutant.
     level = found.filter(({ entry }) => entry.isDirectory()).map(({ directory, entry }) => path.join(directory, entry.name));
   }
   return false;
@@ -144,7 +144,7 @@ function isAbsolute(reference: ModuleReference, language: ModuleLanguage): boole
  * most likely written for; else the first.
  */
 function closest<T extends { module: string }>(pattern: string, imports: readonly [T, ...T[]]): T {
-  const names = literalTail(pattern, 1).at(-1)?.split('.') ?? [];
+  const names = literalTail(pattern, 1).slice(-1).flatMap((segment) => segment.split('.'));
   return imports.find(({ module }) => module.split('/').some((part) => names.includes(part))) ?? imports[0];
 }
 

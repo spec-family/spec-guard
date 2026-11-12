@@ -179,6 +179,15 @@ describe('a pattern on a path, held to files that import by module name', () => 
     expect(result!.blindSpots).toBeUndefined();
   });
 
+  it('is not said when an import of the language names the folder itself', async () => {
+    const [result] = await results(['<!-- @assert-import-absence module="app/infra/**" target="app/domain" -->'], {
+      'app/infra/db.py': 'x = 1\n',
+      'app/domain/order.py': 'import os\nimport app\n',
+    });
+
+    expect(result!.blindSpots).toBeUndefined();
+  });
+
   it('is not said when an import of the language does start at the folder', async () => {
     const [result] = await results(['<!-- @assert-import-absence module="app/infra/**" target="app/domain" -->'], {
       'app/infra/db.py': 'x = 1\n',
@@ -277,13 +286,16 @@ describe('a pattern on a path, held to files that import by module name', () => 
       'internal/infra/db.go': 'package infra\n',
       'internal/domain/order.go': 'package domain\nimport "github.com/acme/shop/internal/infra"\n',
     };
-    const [rooted, trailing] = await results(
-      ['<!-- @assert-import-absence module="./internal/infra/**" target="internal/domain" -->', '<!-- @assert-import-absence module="internal/infra/" target="internal/domain" -->'],
+    const [rooted, slashed, trailing] = await results(
+      [
+        '<!-- @assert-import-absence module="./internal/infra/**" target="internal/domain" -->',
+        '<!-- @assert-import-absence module="/internal/infra/**" target="internal/domain" -->',
+        '<!-- @assert-import-absence module="internal/infra/" target="internal/domain" -->',
+      ],
       files,
     );
 
-    expect(rooted!.blindSpots?.[0]?.hint).toContain('as "**/internal/infra", or write');
-    expect(trailing!.blindSpots?.[0]?.hint).toContain('as "**/internal/infra", or write');
+    for (const result of [rooted, slashed, trailing]) expect(result!.blindSpots?.[0]?.hint).toContain('as "**/internal/infra", or write');
   });
 
   it('is said for Rust, with the module from crate::', async () => {
@@ -297,11 +309,16 @@ describe('a pattern on a path, held to files that import by module name', () => 
   });
 
   it('writes the Rust module from src, wherever the pattern starts, and none where src ends it', async () => {
-    const files = { 'rs/src/infra.rs': 'pub mod db;\n', 'rs/src/domain/mod.rs': 'use crate::myself::db;\n' };
-    const [dotted, bare] = await results(
-      ['<!-- @assert-import-absence module="./rs/src/infra/**" target="rs/src/domain" -->', '<!-- @assert-import-absence module="rs/src/**" target="rs/src/domain" -->'],
+    const files = { 'rs/src/infra.rs': 'pub mod db;\n', 'rs/src/infra/db.rs': 'pub fn x() {}\n', 'rs/src/domain/mod.rs': 'use crate::myself::db;\n' };
+    const [dotted, bare, nested] = await results(
+      [
+        '<!-- @assert-import-absence module="./rs/src/infra/**" target="rs/src/domain" -->',
+        '<!-- @assert-import-absence module="rs/src/**" target="rs/src/domain" -->',
+        '<!-- @assert-import-absence module="rs/src/infra/db" target="rs/src/domain" -->',
+      ],
       files,
     );
+    expect(nested!.blindSpots?.[0]?.hint).toBe('Rust names a crate\'s own modules from crate::: write "crate::infra::db"');
 
     // `myself::` holds `self::`, which only a path that starts with it makes relative.
     expect(dotted!.blindSpots?.[0]?.hint).toBe('Rust names a crate\'s own modules from crate::: write "crate::infra"');
