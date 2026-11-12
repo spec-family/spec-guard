@@ -624,10 +624,43 @@ export function unreadFamilyClause(patterns: readonly string[] | undefined, refu
  */
 export const RUN_FORMAT_VERSION = 1;
 
+/**
+ * The family's envelope, first in every JSON document a command writes for a
+ * script (spec-core's ADR-0005, amended 2026-11-12): the tool, its release,
+ * the command and the document's version. `schemaVersion` is
+ * `formatVersion`'s value, written beside it while the format is frozen and
+ * in its place after. The release is the caller's to give, as SARIF's is,
+ * since nothing here reads the package's manifest.
+ */
+export function envelope(command: string, schemaVersion: number, options: { version?: string } = {}): Record<'tool' | 'toolVersion' | 'command', string> & { schemaVersion: number } {
+  return { tool: 'spec-guard', toolVersion: options.version ?? '0.0.0', command, schemaVersion };
+}
+
+/** What to do about a failing assertion, in its annotation and in JSON. */
+const FAILED_HINT = 'fix the code, or the rule if the decision it records has changed';
+/** What to do about a directive that could not be read. */
+const INVALID_HINT = 'fix the directive: nothing it states is checked until it can be read';
+
+/**
+ * A directive that could not be read, for a script: where, what, and as
+ * written, with the family's `rule`, `severity` and `hint` beside them.
+ */
+function errorJson(error: DirectiveError) {
+  return {
+    spec: { file: error.location.relativeFile, line: error.location.line, column: error.location.column },
+    message: error.message,
+    raw: error.raw,
+    rule: 'invalid-directive',
+    severity: 'error',
+    hint: INVALID_HINT,
+  };
+}
+
 /** Machine-readable output for CI consumers. */
-export function formatJson(report: RunResult): string {
+export function formatJson(report: RunResult, options: { version?: string } = {}): string {
   return JSON.stringify(
     {
+      ...envelope('check', RUN_FORMAT_VERSION, options),
       formatVersion: RUN_FORMAT_VERSION,
       ok: report.ok,
       // Present only when it is why `ok` is false, as `config` is present
@@ -675,16 +708,11 @@ export function formatJson(report: RunResult): string {
         skipped: result.scope.skipped,
         engine: result.engine,
         durationMs: Math.round(result.durationMs * 1000) / 1000,
+        // A failed assertion is a finding, and says what one says in the
+        // family's words; a passed one is no finding, and says none of them.
+        ...(result.ok ? {} : { rule: result.kind, severity: 'error', hint: FAILED_HINT }),
       })),
-      errors: report.errors.map((error) => ({
-        spec: {
-          file: error.location.relativeFile,
-          line: error.location.line,
-          column: error.location.column,
-        },
-        message: error.message,
-        raw: error.raw,
-      })),
+      errors: report.errors.map(errorJson),
       warnings: report.warnings,
       specWarnings: specWarningsJson(report.specWarnings),
       maskedDirectives: maskedJson(report.maskedDirectives),
@@ -1032,10 +1060,15 @@ export function formatProve(report: ProveReport, options: ReporterOptions): stri
  */
 export const PROVE_FORMAT_VERSION = 1;
 
+/** What to do about a rule that survived `prove`, and about one no violation could be made for. */
+const SURVIVED_HINT = 'narrow the rule until a violation fails it: a target that reaches the code, a glob that names its files, a bound that can be crossed';
+const UNPROVABLE_HINT = "check that the rule's target and glob reach the files it is about";
+
 /** What `spec-guard prove` found, for a script. */
-export function formatProveJson(report: ProveReport): string {
+export function formatProveJson(report: ProveReport, options: { version?: string } = {}): string {
   return JSON.stringify(
     {
+      ...envelope('prove', PROVE_FORMAT_VERSION, options),
       formatVersion: PROVE_FORMAT_VERSION,
       ok: report.ok,
       ...(report.nothingVerified === true ? { nothingVerified: true } : {}),
@@ -1053,12 +1086,14 @@ export function formatProveJson(report: ProveReport): string {
         unprovable: result.unprovable,
         probes: result.probes,
         durationMs: Math.round(result.durationMs * 1000) / 1000,
+        // As its annotation says it: a rule seen to fail is no finding.
+        ...(result.outcome === 'survived'
+          ? { rule: 'rule-cannot-fail', severity: 'error', hint: SURVIVED_HINT }
+          : result.outcome === 'unprovable'
+            ? { rule: 'rule-unprovable', severity: 'note', hint: UNPROVABLE_HINT }
+            : {}),
       })),
-      errors: report.errors.map((error) => ({
-        spec: { file: error.location.relativeFile, line: error.location.line, column: error.location.column },
-        message: error.message,
-        raw: error.raw,
-      })),
+      errors: report.errors.map(errorJson),
       specWarnings: specWarningsJson(report.specWarnings),
       maskedDirectives: maskedJson(report.maskedDirectives),
       inactiveSpecs: report.inactiveSpecs,
@@ -1347,7 +1382,7 @@ function errorAnnotations(errors: readonly DirectiveError[]): Annotation[] {
     file: error.location.relativeFile,
     line: error.location.line,
     message: error.message,
-    hint: 'fix the directive: nothing it states is checked until it can be read',
+    hint: INVALID_HINT,
   }));
 }
 
@@ -1375,7 +1410,7 @@ export function runAnnotations(report: RunResult): Annotation[] {
         file: match?.file ?? result.location.relativeFile,
         line: match?.line ?? result.location.line,
         message: `${result.description}: ${result.message} (${result.location.relativeFile}:${result.location.line})`,
-        hint: 'fix the code, or the rule if the decision it records has changed',
+        hint: FAILED_HINT,
       };
     });
   return [
@@ -1414,9 +1449,7 @@ export function proveAnnotations(report: ProveReport): Annotation[] {
         file: result.location.relativeFile,
         line: result.location.line,
         message: `${result.description}: ${detail}`,
-        hint: survived
-          ? 'narrow the rule until a violation fails it: a target that reaches the code, a glob that names its files, a bound that can be crossed'
-          : "check that the rule's target and glob reach the files it is about",
+        hint: survived ? SURVIVED_HINT : UNPROVABLE_HINT,
       };
     });
   return [
@@ -1529,9 +1562,10 @@ export function formatCites(report: CitesReport, options: ReporterOptions): stri
 export const CITES_FORMAT_VERSION = 1;
 
 /** What `spec-guard cites` found, for a script. */
-export function formatCitesJson(report: CitesReport): string {
+export function formatCitesJson(report: CitesReport, options: { version?: string } = {}): string {
   return JSON.stringify(
     {
+      ...envelope('cites', CITES_FORMAT_VERSION, options),
       formatVersion: CITES_FORMAT_VERSION,
       ok: report.ok,
       ...(report.nothingRead === undefined ? {} : { nothingRead: true }),
@@ -1796,14 +1830,16 @@ export function formatClaims(report: ClaimsReport, options: ReporterOptions): st
 export const CLAIMS_FORMAT_VERSION = 1;
 
 /** What `spec-guard claims` found, for a script. */
-export function formatClaimsJson(report: ClaimsReport): string {
+export function formatClaimsJson(report: ClaimsReport, options: { version?: string } = {}): string {
   return JSON.stringify(
     {
+      ...envelope('claims', CLAIMS_FORMAT_VERSION, options),
       formatVersion: CLAIMS_FORMAT_VERSION,
       ok: report.ok,
       totals: report.totals,
       claims: report.claims,
-      findings: report.findings,
+      // Every finding fails the check, which is the family's `error`.
+      findings: report.findings.map((finding) => ({ ...finding, severity: 'error' })),
       prose: report.prose,
       files: report.files,
       unmatched: report.unmatched,

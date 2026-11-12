@@ -425,7 +425,7 @@ export function createMcpHandler(options: McpServerOptions): (message: unknown) 
     };
     // With no spec at all the report says so itself, as it always has.
     const unmatched = report.specFiles.length === 0 ? undefined : report.unmatchedSpecs;
-    return { text: noted(formatImpact(report), unmatched), structured: { ...impactDocument(report) } };
+    return { text: noted(formatImpact(report), unmatched), structured: { ...impactDocument(report, { version: options.version }) } };
   }
 
   function rulesResource(ruleSet: RuleSet): JsonObject {

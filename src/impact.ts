@@ -25,7 +25,7 @@ import { nodeIo, type Io } from './io.js';
 import { languageFor, normalizeModule, type ModuleLanguage } from './polyglot.js';
 import { loadRuleSet, resolveQueryPath, type RuleSetOptions } from './query.js';
 import { governs, viewRule, within, type DocumentView, type QueryPath, type RuleView } from './rules.js';
-import { formatOptionLines } from './reporter.js';
+import { envelope, formatOptionLines } from './reporter.js';
 import { createScope } from './scope.js';
 import type { Assertion, ConfigUse } from './types.js';
 import { displayWidth } from './vendor/spec-core/text/index.js';
@@ -535,11 +535,11 @@ export const IMPACT_FORMAT_VERSION = 1;
  * answers with as its structured content: one object, so the two cannot
  * drift apart.
  */
-export function impactDocument(report: ImpactReport): { formatVersion: number } & ImpactReport {
-  return { formatVersion: IMPACT_FORMAT_VERSION, ...report, durationMs: Math.round(report.durationMs * 1000) / 1000 };
+export function impactDocument(report: ImpactReport, options: { version?: string } = {}): ReturnType<typeof envelope> & { formatVersion: number } & ImpactReport {
+  return { ...envelope('impact', IMPACT_FORMAT_VERSION, options), formatVersion: IMPACT_FORMAT_VERSION, ...report, durationMs: Math.round(report.durationMs * 1000) / 1000 };
 }
 
 /** The JSON form of an impact report. */
-export function formatImpactJson(report: ImpactReport): string {
-  return JSON.stringify(impactDocument(report), null, 2);
+export function formatImpactJson(report: ImpactReport, options: { version?: string } = {}): string {
+  return JSON.stringify(impactDocument(report, options), null, 2);
 }

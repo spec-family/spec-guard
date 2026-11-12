@@ -13,7 +13,7 @@ import path from 'node:path';
 import { comparePaths } from './engine.js';
 import { createExcludeMatcher, toPosix } from './glob.js';
 import { nodeIo, spelling, type Io } from './io.js';
-import { formatOptionLines } from './reporter.js';
+import { envelope, formatOptionLines } from './reporter.js';
 import { checkProjectExcludes, elapsed, resolveDirective, specExclusions } from './runner.js';
 import { createScope } from './scope.js';
 import { governs, leftOutByOwnExclude, viewRule, within, type DocumentView, type QueryPath, type RuleView } from './rules.js';
@@ -376,8 +376,12 @@ export function formatQuery(report: QueryReport): string {
 export const QUERY_FORMAT_VERSION = 1;
 
 /** The JSON form of a query, stable enough for a script to depend on. */
-export function formatQueryJson(report: QueryReport): string {
-  return JSON.stringify({ formatVersion: QUERY_FORMAT_VERSION, ...report, durationMs: Math.round(report.durationMs * 1000) / 1000 }, null, 2);
+export function formatQueryJson(report: QueryReport, options: { version?: string } = {}): string {
+  return JSON.stringify(
+    { ...envelope('query', QUERY_FORMAT_VERSION, options), formatVersion: QUERY_FORMAT_VERSION, ...report, durationMs: Math.round(report.durationMs * 1000) / 1000 },
+    null,
+    2,
+  );
 }
 
 /** Whether a location lies in any of the queried paths. */
