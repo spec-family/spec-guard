@@ -52,9 +52,18 @@ project's does not.
 
 The arithmetic that decides whether a rule governs a path is tested against the
 walk a real run makes, file for file, under both engines and on randomly
-generated trees. [ADR-0012](https://github.com/spec-family/spec-guard/blob/main/docs/adr/0012-query-and-mcp.md) lists the three
-things it cannot see: file content (binary, oversized, unreadable), symbolic
-links, and letter case on case-insensitive filesystems.
+generated trees. [ADR-0012](https://github.com/spec-family/spec-guard/blob/main/docs/adr/0012-query-and-mcp.md) lists the two
+things it cannot see: file content (binary, oversized, unreadable) and
+symbolic links.
+
+**A path is spelled as the disk spells it.** On a filesystem that ignores
+case, as Windows' and macOS's do, `query SRC/LOANS.JS` asks about
+`src/loans.js`, the file it opens, and the answer, `impact` and the MCP
+server's tools name it so; a file still to make under `SRC/` is
+`src/new.ts`. On a filesystem that tells case apart a path is taken as
+written. A rule whose `target` or `file` is found only because the
+filesystem ignores case is said beside the rule, since on Linux it names
+nothing ([ADR-0012](https://github.com/spec-family/spec-guard/blob/main/docs/adr/0012-query-and-mcp.md#amended-2026-11-12-a-path-in-another-case)).
 
 ## The MCP server
 

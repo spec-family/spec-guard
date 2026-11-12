@@ -12,7 +12,7 @@ import path from 'node:path';
 
 import { comparePaths } from './engine.js';
 import { createExcludeMatcher, toPosix } from './glob.js';
-import { nodeIo, type Io } from './io.js';
+import { nodeIo, spelling, type Io } from './io.js';
 import { formatOptionLines } from './reporter.js';
 import { checkProjectExcludes, elapsed, resolveDirective, specExclusions } from './runner.js';
 import { createScope } from './scope.js';
@@ -136,12 +136,17 @@ export async function resolveQueryPath(input: string, root: string, io: Io = nod
   if (input.trim().length === 0) throw new QueryPathError('A path to query must not be empty.');
   // Separators normalised before resolving, so the path, the absolute path and
   // whether it exists all describe the same file on every platform.
-  const absolutePath = path.resolve(root, toPosix(input));
-  const relative = path.relative(root, absolutePath);
-  const posix = toPosix(relative);
-  if (posix === '..' || posix.startsWith('../') || path.isAbsolute(relative)) {
+  const resolved = path.resolve(root, toPosix(input));
+  const relative = path.relative(root, resolved);
+  const written = toPosix(relative);
+  if (written === '..' || written.startsWith('../') || path.isAbsolute(relative)) {
     throw new QueryPathError(`"${input}" is outside the root ${toPosix(root)}.`);
   }
+  // As the disk spells it, where the filesystem ignores case: rules are
+  // written against that spelling, and `SRC/LOANS.JS` on Windows found no
+  // rule for the file it opens (round 29).
+  const posix = written === '' ? '' : await spelling(io, root, written);
+  const absolutePath = posix === written ? resolved : path.resolve(root, posix);
   const stats = await io.stat(absolutePath);
   const shape = stats ? (stats.isDirectory() ? 'directory' : 'file') : /[\\/]$/.test(input) ? 'directory' : 'file';
   return { path: posix || '.', shape, absolutePath, exists: stats !== null };

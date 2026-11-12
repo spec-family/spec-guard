@@ -52,6 +52,13 @@ is deprecated before it goes, is spec-core's
   ([ADR-0007](https://github.com/spec-family/spec-guard/blob/main/docs/adr/0007-search-scope.md#amended-2026-11-12-a-file-over-the-size-limit-is-named),
   amended 2026-11-12).
 
+- **A rule's `target` or `file` found only because the filesystem ignores
+  case is said.** `target="SRC/APP.JS"` passed on Windows and named nothing
+  in CI on Linux. The rule now carries a warning that names the disk's
+  spelling; it fails nothing
+  ([ADR-0012](https://github.com/spec-family/spec-guard/blob/main/docs/adr/0012-query-and-mcp.md#amended-2026-11-12-a-path-in-another-case),
+  amended 2026-11-12).
+
 ### Changed
 
 - **A worker of the mutation sweep that Stryker starts after a timeout
@@ -66,6 +73,14 @@ is deprecated before it goes, is spec-core's
   1,077,674 in the sweep of the change, with the score and the survivors
   unchanged. Development tooling only: nothing spec-guard checks or reports
   changed. Upgrading: nothing to do.
+
+### Fixed
+
+- **A path in another case is spelled as the disk spells it on Windows and
+  macOS.** `query SRC/LOANS.JS` said no rule governs the file it opens,
+  `impact` said it was not JavaScript, and the MCP server answered as
+  `query` did. Each now reads the path in the case the disk has, and names
+  it so; on a filesystem that tells case apart a path is taken as written.
 
 ## 0.34.0
 
