@@ -155,8 +155,9 @@ about the tree:
 | [`@assert-present`](docs/reference/directives.md#assert-present---this-file-exists) | these paths exist |
 
 The import rules read the dependency rather than the text, in JavaScript and
-TypeScript, Python, Go, Rust and C#, and say what they could not resolve
-rather than counting it clean. A match inside a comment does not count unless
+TypeScript, Python, Go, Rust and C#, and say what they could not resolve -
+a dynamic import, a path alias, a pattern on a path held to imports by
+module name - rather than counting it clean. A match inside a comment does not count unless
 a rule asks for it, a rule that inspects no file fails, and a `baseline`
 adopts a rule the code already breaks without hiding what is added
 ([attributes](docs/reference/attributes.md)). A draft, a proposal or a

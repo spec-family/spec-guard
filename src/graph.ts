@@ -91,7 +91,7 @@ function isRelative(specifier: string): boolean {
  * followed is missing rather than absent. This is the only inference in the
  * resolver, and it is made from npm's naming rules, not from anyone's config.
  */
-function cannotBePackage(specifier: string): boolean {
+export function cannotBePackage(specifier: string): boolean {
   return /^(?:#|@\/|~\/|\/)/.test(specifier);
 }
 

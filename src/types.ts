@@ -324,6 +324,21 @@ export interface Assertion {
   allowEmpty: boolean;
 }
 
+/**
+ * Something an import or layer rule could not have seen, though it may pass
+ * (`blind.ts`): a path alias, or a path pattern held to files that import by
+ * module name.
+ */
+export interface BlindSpot {
+  rule: 'unresolved-alias' | 'module-path-pattern';
+  /** What the rule did not see, as a sentence. */
+  message: string;
+  /** What to write instead. */
+  hint: string;
+  /** Where, as `file:line specifier`, at most as many as the run shows. */
+  at: string[];
+}
+
 export interface AssertionResult {
   ok: boolean;
   kind: DirectiveKind;
@@ -377,6 +392,12 @@ export interface AssertionResult {
    * way `matches` is.
    */
   fileMatches: Array<{ file: string; count: number }>;
+  /**
+   * What an import or layer rule could not have seen, though it may pass: a
+   * path alias it does not resolve, a path pattern held to files that import
+   * by module name. Warnings, which fail nothing yet. Absent when there is none.
+   */
+  blindSpots?: BlindSpot[];
   engine?: EngineName;
   durationMs: number;
 }

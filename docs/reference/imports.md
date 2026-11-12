@@ -59,7 +59,8 @@ Relative specifiers are resolved by path arithmetic, so `module="src/db"`
 matches `../db/client.js` seen from `src/ui/`, and Python's `from ..core import
 x` resolves against the importing file the same way. There is deliberately no
 filesystem resolution: tsconfig `paths` aliases and package `exports` maps are
-not followed, so an alias is written out as itself (`module="@app/db"`).
+not followed, so an alias is written out as itself (`module="@app/db"`), and
+an alias no pattern names is said beside the rule (below).
 
 **It tells you what it could not see.** Roughly 1% of module references in real
 code are dynamic, and about 0.09% of files defeat the tokenizer outright. Both
@@ -94,6 +95,34 @@ stops it being mistaken for a complete answer.
   `--strict` such a file fails an import or layer rule, as a reference it
   could not resolve does: leave it out with `exclude`. A cycle rule claims
   nothing of a file outside its graph, and says it without failing.
+- **An import it could not follow by path is said too, and fails nothing
+  yet.** A path alias, `@/db/client` under tsconfig `paths`, reaches no
+  pattern written as a path, so an import or layer rule names each alias
+  that matched none of its patterns or layers, with its file and line. So
+  does a pattern written as a path into the tree, `module="src/shop/infra/**"`,
+  held to files whose language names a module otherwise: a Python package
+  from its import root, which a src layout's `src/` is not part of, a Go
+  package by its module path, a Rust module from `crate::`, a C# namespace.
+  Each is a warning on the directive in every format and a `blindSpots`
+  entry on the result in JSON (`rule`, `message`, `hint`, `at`), and fails
+  no rule, `--strict` included, while the family's format freeze lasts; the
+  release after it fails `--strict` on both. A pattern written right is left
+  alone: a Python folder holding `__init__.py`, a pattern that starts with
+  `**/`, one that matched an import of the language, one whose path holds no
+  code in that language.
+
+  ```text
+  ⚠ docs/adr.md:4  1 import is written as a path alias, which spec-guard does not resolve, and it reaches no pattern of this rule, so where it leads was not checked (name the alias as it is written as well, as "@/db/**" does, or import by a relative path)
+  ⚠ docs/adr.md:4    src/domain/order.ts:1 @/db/client
+  ```
+
+  | Language | A path pattern that misses | What to write |
+  | --- | --- | --- |
+  | TypeScript alias | `module="src/db/**"` over `@/db/client` | `module="src/db/**, @/db/**"`; a layer `**/db/**` |
+  | Python, src layout | `module="src/shop/infra/**"` over `shop.infra.db` | `module="shop.infra"` |
+  | Go | `module="internal/infra/**"` over `github.com/acme/shop/internal/infra` | `module="**/internal/infra"` |
+  | Rust | `module="src/infra/**"` over `crate::infra::db` | `module="crate::infra"` |
+  | C# | `module="src/Shop.Infra/**"` over `using Shop.Infra;` | `module="Shop.Infra"` |
 - **A file that can hold no import is in neither count**: JSON in any of its
   spellings (`.json`, `.jsonc`, `.json5`, `.jsonl`, `.ndjson`), `.csv`, `.tsv`,
   `.txt`, `.svg`, and anything binary, a NUL in its bytes, as an image or a
