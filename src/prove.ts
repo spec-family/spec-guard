@@ -594,6 +594,8 @@ async function probe(assertion: Assertion, claim: ProveClaim, now: AssertionResu
 
 async function proveAssertion(assertion: Assertion, shared: Context): Promise<ProveResult> {
   const startedAt = performance.now();
+  // A memo left out answers the same, slower: `{}` for it is an equivalent
+  // mutant, which ADR-0016's measurement, not a test, holds.
   const context: Context = { ...shared, memo: createMemo() };
   const base = { kind: assertion.kind, location: assertion.location, description: assertion.description, reason: assertion.reason };
   const now = await execute(assertion, context.io, context);
@@ -654,7 +656,8 @@ export async function proveSpecGuard(options: ProveOptions): Promise<ProveReport
       results[at] = await proveAssertion(plan.assertions[at]!, context);
     }
   };
-  await Promise.all(Array.from({ length: Math.min(options.concurrency ?? DEFAULT_CONCURRENCY, plan.assertions.length) }, worker));
+  // A worker past the last rule finds none left, and ends.
+  await Promise.all(Array.from({ length: options.concurrency ?? DEFAULT_CONCURRENCY }, worker));
 
   const count = (outcome: ProveResult['outcome']): number => results.filter((result) => result.outcome === outcome).length;
   return {
