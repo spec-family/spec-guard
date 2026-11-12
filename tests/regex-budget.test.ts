@@ -46,6 +46,20 @@ describe('the budget', () => {
     expect(withinBudget(() => 'xx foo'.match(/foo/g)?.length, 1000)).toEqual({ done: true, value: 1 });
     expect(() => withinBudget(() => { throw new TypeError('inner'); }, 1000)).toThrow(TypeError);
   });
+
+  it('throws on what the work throws as it was thrown, an error or not', () => {
+    for (const thrown of [null, undefined, 'text', { code: 'ENOENT' }]) {
+      let caught: unknown = Symbol('nothing');
+      try {
+        withinBudget(() => {
+          throw thrown;
+        }, 1000);
+      } catch (error) {
+        caught = error;
+      }
+      expect(caught).toBe(thrown);
+    }
+  });
 });
 
 describe('a regex rule stopped on a file', () => {
@@ -74,6 +88,21 @@ describe('a regex rule stopped on a file', () => {
     expect(formatReport(plain, { color: false, verbose: false })).toContain(
       '1 file not searched to the end: the regular expression was still matching when its time ran out, as one that backtracks without end does: src/trap.txt',
     );
+  });
+
+  it('is counted and named three at a time, apart from what else was not read', async () => {
+    const report = await run(false);
+    const result = report.results[0]!;
+    const skipped = [
+      ...['src/1.txt', 'src/2.txt', 'src/3.txt', 'src/4.txt'].map((file) => ({ path: file, reason: 'timed-out' as const })),
+      { path: 'src/x.bin', reason: 'binary' as const, matches: 1 },
+      { path: 'src/big.txt', reason: 'too-large' as const },
+    ];
+    const lines = formatReport({ ...report, results: [{ ...result, scope: { ...result.scope, skipped } }] }, { color: false, verbose: false }).split('\n');
+
+    expect(lines.filter((line) => line.includes('not searched to the end')).map((line) => line.trim())).toEqual([
+      expect.stringMatching(/4 files not searched to the end: .*: src\/1\.txt, src\/2\.txt, src\/3\.txt$/),
+    ]);
   });
 });
 

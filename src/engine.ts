@@ -76,7 +76,7 @@ export function regexBudget(bytes: number): number {
 // One context and one script for every budgeted call: the work is handed
 // over through the context, and a new context each call would cost more than
 // the watchdog thread the timeout starts.
-const BUDGET_CONTEXT = vm.createContext({ work: undefined as (() => unknown) | undefined });
+const BUDGET_CONTEXT: { work?: () => unknown } = vm.createContext({});
 const BUDGET_SCRIPT = new vm.Script('work()');
 
 /**
@@ -93,7 +93,9 @@ const BUDGET_SCRIPT = new vm.Script('work()');
 export function withinBudget<T>(work: () => T, ms: number): { done: true; value: T } | { done: false } {
   BUDGET_CONTEXT.work = work;
   try {
-    return { done: true, value: BUDGET_SCRIPT.runInContext(BUDGET_CONTEXT, { timeout: ms }) as T };
+    // The script returns what `work` returned, which vm types as `any`.
+    const value: unknown = BUDGET_SCRIPT.runInContext(BUDGET_CONTEXT, { timeout: ms });
+    return { done: true, value: value as T };
   } catch (error) {
     if ((error as { code?: unknown } | null)?.code === 'ERR_SCRIPT_EXECUTION_TIMEOUT') return { done: false };
     throw error;
@@ -886,8 +888,9 @@ function scanFile(
   const timedOut = new Set<string>();
   // Only a regex rule is timed. A literal is escaped before it is built, and
   // matches in time proportional to the text, so a watchdog thread for each
-  // of its files would be cost and nothing else: `if (false)` here is an
-  // equivalent mutant, slower and with the same answers.
+  // of its files would be cost and nothing else: `if (false)` here, or the
+  // block below emptied, is an equivalent mutant, slower and with the same
+  // answers.
   const budget = regexBudget(buffer.length);
   for (const [pattern, regexp] of regexps) {
     if (!regex) {
