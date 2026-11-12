@@ -370,8 +370,9 @@ export function createMcpHandler(options: McpServerOptions): (message: unknown) 
       return toolError('"paths" must be a non-empty array of strings.');
     }
     if (many !== undefined && args['path'] !== undefined) return toolError('Give "path" or "paths", not both.');
-    if (many === undefined && typeof args['path'] !== 'string') return toolError('"path" is required and must be a string, or "paths" an array of them.');
-    const asked = many === undefined ? [args['path'] as string] : (many as string[]);
+    const single = args['path'];
+    if (many === undefined && typeof single !== 'string') return toolError('"path" is required and must be a string, or "paths" an array of them.');
+    const asked = many === undefined ? [single as string] : (many as string[]);
     const settings = await current();
     // A list is no `true`: the documents it names are read in force already.
     const includeInactive = args['include_inactive'] ?? settings.run?.ignoreStatus === true;
@@ -398,8 +399,9 @@ export function createMcpHandler(options: McpServerOptions): (message: unknown) 
     }
     // Unsaved files, read in memory in place of the disk, through the door
     // prove reads its violations through: nothing is written.
-    const unsaved = Object.entries((contents ?? {}) as Record<string, string>);
-    const written = await Promise.all(unsaved.map(async ([file, text]) => [(await resolveQueryPath(file, options.root)).path, text] as const));
+    const given = contents ?? {};
+    const unsaved = Object.entries(given as Record<string, string>);
+    const written = await Promise.all(unsaved.map(async ([file, text]): Promise<[string, string]> => [(await resolveQueryPath(file, options.root)).path, text]));
     const io: Io = written.length === 0 ? nodeIo : overlayIo(nodeIo, options.root, { write: new Map(written), remove: new Set() });
     const asked = rawPaths === undefined ? (written.length === 0 ? undefined : written.map(([file]) => file)) : (rawPaths as string[]);
     const paths: Array<QueryPath & { exists: boolean }> | undefined = asked === undefined ? undefined : await Promise.all(asked.map((entry) => resolveQueryPath(entry, options.root, io)));
