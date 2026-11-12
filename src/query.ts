@@ -145,7 +145,7 @@ export async function resolveQueryPath(input: string, root: string, io: Io = nod
   // As the disk spells it, where the filesystem ignores case: rules are
   // written against that spelling, and `SRC/LOANS.JS` on Windows found no
   // rule for the file it opens (round 29).
-  const posix = written === '' ? '' : await spelling(io, root, written);
+  const posix = await spelling(io, root, written);
   const absolutePath = posix === written ? resolved : path.resolve(root, posix);
   const stats = await io.stat(absolutePath);
   const shape = stats ? (stats.isDirectory() ? 'directory' : 'file') : /[\\/]$/.test(input) ? 'directory' : 'file';

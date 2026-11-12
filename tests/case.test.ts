@@ -138,6 +138,17 @@ describe('a target or a path a rule names in another case', () => {
     expect(report.results[0]!.warnings).toEqual([]);
   });
 
+  it('is not said of a target reached through a link, whose real path is elsewhere, nor where the real path cannot be read', async () => {
+    const base = ignoringCase({ ...TREE, 'lib/loans.js': 'export {};\n', 'docs/rules.md': '# Rules\n\n<!-- @assert-absence symbol="Legacy" target="SRC" -->\n' });
+    const linked: Io = { ...base, realpath: async (target) => (path.resolve(target).toLowerCase() === path.resolve(ROOT, 'src').toLowerCase() ? path.resolve(ROOT, 'lib') : base.realpath(target)) };
+    const unread: Io = { ...base, realpath: async (target) => (path.resolve(target) === path.resolve(ROOT) ? base.realpath(target) : Promise.reject(new Error('EACCES'))) };
+
+    for (const io of [linked, unread]) {
+      const report = await runSpecGuard({ patterns: ['docs/rules.md'], root: ROOT, io, engine: 'javascript' });
+      expect(report.results[0]!.warnings).toEqual([]);
+    }
+  });
+
   it('is not said of one spelled as the disk spells it', async () => {
     const report = await run('<!-- @assert-absence symbol="Legacy" target="src/loans.js" -->\n<!-- @assert-present file="./src/money.js" -->');
 

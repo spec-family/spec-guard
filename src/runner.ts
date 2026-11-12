@@ -992,7 +992,6 @@ async function partitionTargets(
  */
 async function miscasedTarget(target: string, options: { root: string; io: Io }): Promise<string | null> {
   const written = toPosix(path.relative(options.root, path.resolve(options.root, target)));
-  if (written === '' || written === '..' || written.startsWith('../')) return null;
   // The real path, which a filesystem that ignores case gives in the case its
   // entries have, read for the root and the target alike, so that a root
   // given in another case says nothing of the target. A real path and not
