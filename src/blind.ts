@@ -45,7 +45,7 @@ export function isAlias(file: string, specifier: string): boolean {
  */
 function aliasHint(specifier: string, reached: 'pattern' | 'layer'): string {
   const [prefix, folder] = specifier.split('/');
-  if (folder === undefined || folder === '') return 'import by a relative path, which the rule resolves';
+  if (!folder) return 'import by a relative path, which the rule resolves';
   return reached === 'pattern'
     ? `name the alias as it is written as well, as "${prefix}/${folder}/**" does, or import by a relative path`
     : `write the layer to match the alias as well, as "**/${folder}/**" does, or import by a relative path`;
@@ -103,47 +103,49 @@ const LOOK_FOLDERS = 64;
  * name that happens to hold a slash (`net/http`) or code in another language.
  */
 async function holdsLanguage(io: Io, root: string, prefix: string, language: ModuleLanguage): Promise<boolean> {
-  const extensions = [...POLYGLOT_EXTENSIONS].flatMap(([extension, of]) => (of === language ? [extension] : []));
+  const extensions = [...POLYGLOT_EXTENSIONS].filter(([, of]) => of === language).map(([extension]) => extension);
   const absolute = path.resolve(root, prefix);
   for (const extension of extensions) {
     if ((await io.stat(absolute + extension))?.isFile() === true) return true;
   }
   let level = [absolute];
-  for (let depth = 0; depth < LOOK_DEPTH && level.length > 0; depth++) {
-    const next: string[] = [];
-    for (const directory of level.slice(0, LOOK_FOLDERS)) {
-      const entries = await io.readDirectory(directory).catch(() => []);
-      for (const entry of entries) {
-        if (entry.isFile() && extensions.includes(path.extname(entry.name).toLowerCase())) return true;
-        if (entry.isDirectory()) next.push(path.join(directory, entry.name));
-      }
-    }
-    level = next;
+  for (let depth = 0; depth < LOOK_DEPTH; depth += 1) {
+    const listed = await Promise.all(
+      level.slice(0, LOOK_FOLDERS).map((directory) =>
+        io.readDirectory(directory).then(
+          (entries) => entries.map((entry) => ({ directory, entry })),
+          () => [],
+        ),
+      ),
+    );
+    const found = listed.flat();
+    if (found.some(({ entry }) => entry.isFile() && extensions.includes(path.extname(entry.name).toLowerCase()))) return true;
+    // A file kept here as a folder is listed next time, and its listing,
+    // which fails, holds nothing: `true` for `isDirectory()` is an
+    // equivalent mutant.
+    level = found.filter(({ entry }) => entry.isDirectory()).map(({ directory, entry }) => path.join(directory, entry.name));
   }
   return false;
 }
 
-/** Whether a reference names its module from somewhere, rather than from the importing file. */
+/**
+ * Whether a reference names its module from somewhere, rather than from the
+ * importing file: not a Python relative import, nor Rust's `self::` or
+ * `super::`. No Go import path or C# namespace starts with either.
+ */
 function isAbsolute(reference: ModuleReference, language: ModuleLanguage): boolean {
-  if (language === 'python') return !reference.specifier.startsWith('.');
-  if (language === 'rust') return !/^(?:self|super)::/.test(reference.specifier);
-  return true;
-}
-
-/** A path's or a module's names, lowercased: `shop`, `infra` of `Shop.Infra` and of `src/shop/infra/**`. */
-function words(name: string): Set<string> {
-  return new Set(name.toLowerCase().split(/[/.:]+/).filter((word) => word !== '' && !GLOB_SYNTAX.test(word)));
+  return language === 'python' ? !reference.specifier.startsWith('.') : !/^(?:self|super)::/.test(reference.specifier);
 }
 
 /**
- * The import to show beside a pattern: the one that shares the most names with
- * it, which is the dependency the pattern was most likely written for, the
- * first of them on a tie.
+ * The import to show beside a pattern: the first that names a module by the
+ * last name the pattern spells out, `infra` of `src/shop/infra/**`, `Shop` or
+ * `Infra` of `src/Shop.Infra/**`, which is the dependency the pattern was
+ * most likely written for; else the first.
  */
 function closest<T extends { module: string }>(pattern: string, imports: readonly [T, ...T[]]): T {
-  const written = words(pattern);
-  const shared = (entry: T): number => [...words(entry.module)].filter((word) => written.has(word)).length;
-  return imports.reduce((best, entry) => (shared(entry) > shared(best) ? entry : best));
+  const names = literalTail(pattern, 1).at(-1)?.split('.') ?? [];
+  return imports.find(({ module }) => module.split('/').some((part) => names.includes(part))) ?? imports[0];
 }
 
 function languageHint(language: ModuleLanguage, pattern: string, folder: string): string {
@@ -154,10 +156,9 @@ function languageHint(language: ModuleLanguage, pattern: string, folder: string)
   }
   if (language === 'go') return `a Go import names a package by its module path: start the pattern with **/, as "**/${literalTail(pattern, 0).join('/')}", or write the module path in full`;
   if (language === 'rust') {
-    const segments = pattern.replace(/^\.?\//, '').split('/');
-    const source = segments.indexOf('src');
-    const module = source === -1 ? [] : literalTail(pattern, source + 1);
-    return `Rust names a crate's own modules from crate::${module.length === 0 ? '' : `: write "crate::${module.join('::')}"`}`;
+    const literal = literalTail(pattern, 0);
+    const module = literal.slice(literal.indexOf('src') + 1);
+    return literal.includes('src') && module.length > 0 ? `Rust names a crate's own modules from crate::: write "crate::${module.join('::')}"` : "Rust names a crate's own modules from crate::";
   }
   return 'a C# using names a namespace, never a folder: write the namespace as a using names it';
 }
@@ -185,7 +186,6 @@ export async function modulePathBlindSpots(
   inputs: readonly ModulePathInput[],
   options: {
     languages: readonly ModuleLanguage[];
-    includeTypes: boolean;
     /** Every name a reference is matched under, as the rule matches it. */
     names: (file: string, reference: ModuleReference) => readonly string[];
     describe: (patterns: readonly string[]) => string;
@@ -196,9 +196,11 @@ export async function modulePathBlindSpots(
   const spots: BlindSpot[] = [];
   for (const language of options.languages) {
     const files = inputs.filter((input) => languageFor(input.file) === language);
+    // Every import, a type-only one too: each says how the language names a
+    // module, which is what is asked here.
     const absolute = files.flatMap(({ file, references }) =>
       references
-        .filter((reference) => (options.includeTypes || !reference.typeOnly) && isAbsolute(reference, language))
+        .filter((reference) => isAbsolute(reference, language))
         .map((reference) => ({ file, reference, module: normalizeModule(reference.specifier, file, language) })),
     );
     const [first, ...rest] = absolute;

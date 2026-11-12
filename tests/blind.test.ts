@@ -47,6 +47,9 @@ describe('a path alias', () => {
       },
     ]);
     expect(result!.warnings).toContain('  src/domain/order.ts:1 @/db/client');
+    expect(result!.warnings).toContain(
+      '1 import is written as a path alias, which spec-guard does not resolve, and it reaches no pattern of this rule, so where it leads was not checked (name the alias as it is written as well, as "@/db/**" does, or import by a relative path)',
+    );
   });
 
   it('is said beside a layer rule it passed', async () => {
@@ -56,6 +59,7 @@ describe('a path alias', () => {
     expect(result!.blindSpots?.map((spot) => [spot.rule, spot.at])).toEqual([['unresolved-alias', ['src/domain/order.ts:1 @/db/client']]]);
     expect(result!.blindSpots?.[0]?.message).toContain('reaches no layer of this rule');
     expect(result!.blindSpots?.[0]?.hint).toBe('write the layer to match the alias as well, as "**/db/**" does, or import by a relative path');
+    expect(result!.warnings).toContain('  src/domain/order.ts:1 @/db/client');
   });
 
   it('is not one when the rule names it as written: the dependency is then seen, and fails the rule', async () => {
@@ -91,14 +95,30 @@ describe('a path alias', () => {
     expect(result!.blindSpots).toBeUndefined();
   });
 
+  it('is said of a type import where the rule counts types, as it does by default', async () => {
+    const [result] = await results(['<!-- @assert-import-absence module="src/db/**" target="src/domain" -->'], {
+      'src/domain/order.ts': "import type { Client } from '@/db/client';\nexport type Order = Client;\n",
+    });
+
+    expect(result!.blindSpots?.[0]?.at).toEqual(['src/domain/order.ts:1 @/db/client']);
+  });
+
   it('is a name no package could have, and a package is not one', async () => {
     const [result] = await results(['<!-- @assert-import-absence module="src/db/**" target="src" -->'], {
       'src/a.ts': "import '@scope/pkg';\nimport 'lodash';\nimport '~/lib';\nimport '#internal/x';\n",
     });
 
     expect(result!.blindSpots?.[0]?.at).toEqual(['src/a.ts:3 ~/lib', 'src/a.ts:4 #internal/x']);
-    expect(result!.blindSpots?.[0]?.message).toMatch(/^2 imports are written as a path alias/);
+    expect(result!.blindSpots?.[0]?.message).toBe(
+      '2 imports are written as a path alias, which spec-guard does not resolve, and they reach no pattern of this rule, so where they lead was not checked',
+    );
     expect(result!.blindSpots?.[0]?.hint).toBe('name the alias as it is written as well, as "~/lib/**" does, or import by a relative path');
+  });
+
+  it('with nothing after its first slash has no folder to name either', async () => {
+    const [result] = await results(['<!-- @assert-import-absence module="src/db/**" target="src" -->'], { 'src/a.ts': "import '~/';\n" });
+
+    expect(result!.blindSpots?.[0]?.hint).toBe('import by a relative path, which the rule resolves');
   });
 
   it('of one segment has no folder to name, so the hint is the relative path', async () => {
@@ -162,7 +182,7 @@ describe('a pattern on a path, held to files that import by module name', () => 
   it('is not said when an import of the language does start at the folder', async () => {
     const [result] = await results(['<!-- @assert-import-absence module="app/infra/**" target="app/domain" -->'], {
       'app/infra/db.py': 'x = 1\n',
-      'app/domain/order.py': 'import app.domain.money\n',
+      'app/domain/order.py': 'import os\nimport app.domain.money\n',
     });
 
     expect(result!.blindSpots).toBeUndefined();
@@ -172,6 +192,7 @@ describe('a pattern on a path, held to files that import by module name', () => 
     const [result] = await results(['<!-- @assert-import-absence module="src/shop/infra" target="src/shop/domain" max="1" -->'], {
       'src/shop/infra/db.py': 'x = 1\n',
       'src/shop/domain/order.py': 'import os\nfrom ..infra import db\n',
+      'src/shop/domain/money.py': 'import decimal\n',
     });
 
     expect(result!.actual).toBe(1);
@@ -187,6 +208,48 @@ describe('a pattern on a path, held to files that import by module name', () => 
     expect(result!.blindSpots).toBeUndefined();
   });
 
+  it('reads a Python relative import as relative, wherever the file stands', async () => {
+    const [result] = await results(['<!-- @assert-import-absence module="lib/infra/**" target="app" -->'], {
+      'lib/infra/db.py': 'x = 1\n',
+      'app/views.py': 'from . import models\n',
+    });
+
+    expect(result!.blindSpots).toBeUndefined();
+  });
+
+  it('shows the import that names what the pattern does, and else the first', async () => {
+    const files = { 'src/shop/infra/db.py': 'x = 1\n' };
+    const [named] = await results(['<!-- @assert-import-absence module="src/shop/infra/**" target="app" -->'], { ...files, 'app/a.py': 'import os\nimport shop.infra.db\n' });
+    const [neither] = await results(['<!-- @assert-import-absence module="src/shop/infra/**" target="app" -->'], { ...files, 'app/a.py': 'import typing\nimport json\n' });
+
+    expect(named!.blindSpots?.[0]?.message).toContain('such as "shop.infra.db"');
+    expect(neither!.blindSpots?.[0]?.message).toContain('such as "typing"');
+  });
+
+  it('counts the files of the language alone, beside files in another', async () => {
+    const [result] = await results(['<!-- @assert-import-absence module="src/shop/infra/**" target="src/shop/domain" -->'], {
+      'src/shop/infra/db.py': 'x = 1\n',
+      'src/shop/domain/order.py': 'from shop.infra.db import x\n',
+      'src/shop/domain/view.ts': "import '../infra/x';\n",
+    });
+
+    expect(result!.blindSpots?.[0]?.message).toContain('the 1 Python file in scope imports');
+  });
+
+  it('does not look for code more than three folders below the path, nor past its first 64 folders', async () => {
+    const deep = await results(['<!-- @assert-import-absence module="internal/infra" target="cmd" -->'], {
+      'internal/infra/a/b/c/db.go': 'package c\n',
+      'cmd/main.go': 'package main\nimport "github.com/acme/shop/internal/infra/a/b/c"\n',
+    });
+    const wide: Record<string, string> = { 'cmd/main.go': 'package main\nimport "github.com/acme/shop/internal/infra/d64"\n' };
+    for (let at = 0; at < 64; at++) wide[`internal/infra/d${String(at).padStart(2, '0')}/readme.txt`] = 'x\n';
+    wide['internal/infra/d64/db.go'] = 'package d64\n';
+    const broad = await results(['<!-- @assert-import-absence module="internal/infra" target="cmd" -->'], wide);
+
+    expect(deep[0]!.blindSpots).toBeUndefined();
+    expect(broad[0]!.blindSpots).toBeUndefined();
+  });
+
   it('is said for Go, which names a package by its module path, and not for **/ or the standard library', async () => {
     const files = { 'internal/infra/db.go': 'package infra\n', 'internal/domain/order.go': 'package domain\nimport (\n  "fmt"\n  "github.com/acme/shop/internal/infra"\n)\n' };
     const [wrong, anywhere, standard] = await results(
@@ -198,6 +261,7 @@ describe('a pattern on a path, held to files that import by module name', () => 
       files,
     );
 
+    expect(wrong!.blindSpots?.[0]?.message).toContain('names Go code by its path from internal/, and the 1 Go file in scope imports');
     expect(wrong!.blindSpots?.[0]?.message).toContain('such as "github.com/acme/shop/internal/infra"');
     expect(wrong!.blindSpots?.[0]?.hint).toBe(
       'a Go import names a package by its module path: start the pattern with **/, as "**/internal/infra", or write the module path in full',
@@ -207,6 +271,21 @@ describe('a pattern on a path, held to files that import by module name', () => 
     expect(standard!.blindSpots).toBeUndefined();
   });
 
+  it('spells the Go pattern from its folder, a leading or trailing slash left out, and asks no __init__.py of Go', async () => {
+    const files = {
+      'internal/__init__.py': '',
+      'internal/infra/db.go': 'package infra\n',
+      'internal/domain/order.go': 'package domain\nimport "github.com/acme/shop/internal/infra"\n',
+    };
+    const [rooted, trailing] = await results(
+      ['<!-- @assert-import-absence module="./internal/infra/**" target="internal/domain" -->', '<!-- @assert-import-absence module="internal/infra/" target="internal/domain" -->'],
+      files,
+    );
+
+    expect(rooted!.blindSpots?.[0]?.hint).toContain('as "**/internal/infra", or write');
+    expect(trailing!.blindSpots?.[0]?.hint).toContain('as "**/internal/infra", or write');
+  });
+
   it('is said for Rust, with the module from crate::', async () => {
     const [result] = await results(['<!-- @assert-import-absence module="rs/src/infra/**" target="rs/src/domain" -->'], {
       'rs/src/infra.rs': 'pub mod db;\n',
@@ -214,6 +293,19 @@ describe('a pattern on a path, held to files that import by module name', () => 
     });
 
     expect(result!.blindSpots?.[0]?.hint).toBe('Rust names a crate\'s own modules from crate::: write "crate::infra"');
+    expect(result!.blindSpots?.[0]?.message).toContain('names Rust code by its path from rs/');
+  });
+
+  it('writes the Rust module from src, wherever the pattern starts, and none where src ends it', async () => {
+    const files = { 'rs/src/infra.rs': 'pub mod db;\n', 'rs/src/domain/mod.rs': 'use crate::myself::db;\n' };
+    const [dotted, bare] = await results(
+      ['<!-- @assert-import-absence module="./rs/src/infra/**" target="rs/src/domain" -->', '<!-- @assert-import-absence module="rs/src/**" target="rs/src/domain" -->'],
+      files,
+    );
+
+    // `myself::` holds `self::`, which only a path that starts with it makes relative.
+    expect(dotted!.blindSpots?.[0]?.hint).toBe('Rust names a crate\'s own modules from crate::: write "crate::infra"');
+    expect(bare!.blindSpots?.[0]?.hint).toBe("Rust names a crate's own modules from crate::");
   });
 
   it('is said for C# beside an import rule, where a using names a namespace', async () => {
@@ -222,6 +314,7 @@ describe('a pattern on a path, held to files that import by module name', () => 
       'src/Shop.Domain/Order.cs': 'using System;\nusing Shop.Infra;\nnamespace Shop.Domain { class Order {} }\n',
     });
 
+    expect(result!.blindSpots?.[0]?.message).toContain('names C# code by its path from src/');
     expect(result!.blindSpots?.[0]?.message).toContain('such as "Shop.Infra"');
     expect(result!.blindSpots?.[0]?.hint).toBe('a C# using names a namespace, never a folder: write the namespace as a using names it');
   });
@@ -314,6 +407,7 @@ describe('the folder a pattern starts at', () => {
     expect(leadingFolder('{src,lib}/x')).toBeNull();
     expect(leadingFolder('!src/x')).toBeNull();
     expect(leadingFolder('s?c/x')).toBeNull();
+    expect(leadingFolder('//x')).toBeNull();
   });
 });
 
@@ -343,6 +437,7 @@ describe('what a format says of a blind spot', () => {
       engine: 'javascript',
     });
     expect(JSON.parse(formatJson(clean)).results[0]).not.toHaveProperty('blindSpots');
+    expect(runAnnotations(clean)).toEqual([]);
   });
 
   it('is a warning notification in SARIF, not an alert', async () => {

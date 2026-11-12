@@ -1447,7 +1447,6 @@ async function executeImportAssertion(
     ...listed(aliasBlindSpot(aliases, "pattern", options.maxSnippets)),
     ...(await modulePathBlindSpots(query.modules, analysed, {
       languages: MODULE_LANGUAGES,
-      includeTypes: query.includeTypes,
       names: (file, reference) => moduleNames(reference.specifier, file, reference.namespace),
       io: options.io,
       root: options.root,
@@ -1667,7 +1666,6 @@ async function finishLayers(
     ...listed(aliasBlindSpot(report.aliases, "layer", options.maxSnippets)),
     ...(await modulePathBlindSpots(order, read.analysed, {
       languages: MODULE_LANGUAGES.filter((language) => language !== "csharp"),
-      includeTypes: query.includeTypes,
       names: (file, reference) => referenceForms(reference.specifier, file, reference.namespace),
       io: options.io,
       root: options.root,
