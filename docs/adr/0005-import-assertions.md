@@ -422,3 +422,24 @@ makes both fail `--strict`. Resolving an alias through tsconfig `paths`, and
 naming a module per language from `__init__.py` chains, `go.mod` and the
 crate, are the larger answer, and still not made: each is a resolution
 algorithm, and this one only says where the rule did not look.
+
+## Amended 2026-11-12: what only a type checker reads
+
+Q1 made `import type` the one erased import, and `types="ignore"` asks the
+question without it. Round 29's evaluation found two more that it still
+counted. A TypeScript import type, `type T = import('./a').X` or
+`typeof import('./a')`, was read as `import()`, a load, so a cycle the
+compiler erases stayed in the count under `types="ignore"`. And Python's
+`if TYPE_CHECKING:` block, whose imports a type checker reads and Python never
+runs, was counted as runtime: `types` did nothing in Python at all.
+
+In a TypeScript file, `import('x')` is now type-only where `typeof` stands
+before it, or where a member is read off it, `import('x').User`, which on the
+promise a load returns names nothing; `.then`, `.catch` and `.finally` are the
+promise's, and a load. In JavaScript `import()` stays a load: a type there is
+in a JSDoc comment, which is not read. In Python an import is type-only in the
+block of an `if TYPE_CHECKING:` or `if <module>.TYPE_CHECKING:` at the head of
+a line, and after its colon on the same line; a line no deeper than the `if`
+ends the block, an `else:` among them, and `if not TYPE_CHECKING:` opens none.
+The default counts them as before, since a type-only dependency is still a
+coupling.

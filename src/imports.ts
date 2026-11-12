@@ -382,6 +382,26 @@ export function tokenize(source: string): TokenizeResult {
 /** How far past `import`/`export` to look for `from`, before giving up. */
 const CLAUSE_LOOKAHEAD = 200;
 
+/** TypeScript's extensions, where `import('x')` may stand in a type. */
+const TYPESCRIPT = /\.(?:ts|mts|cts|tsx)$/;
+
+/** What is called on the promise `import('x')` is, which makes it a load. */
+const PROMISE_METHODS: ReadonlySet<string> = new Set(['then', 'catch', 'finally']);
+
+/**
+ * Whether `import('x')` at `index` is a type in TypeScript, erased as
+ * `import type` is: `typeof import('./a')`, or a member of it,
+ * `import('./a').User`, which on the promise a load returns names nothing.
+ * `.then`, `.catch` and `.finally` are the promise's, and a load.
+ */
+function importType(tokens: readonly Token[], index: number): boolean {
+  const before = tokens[index - 1];
+  if (before?.type === 'word' && before.value === 'typeof') return true;
+  const dot = tokens[index + 4];
+  const member = tokens[index + 5];
+  return tokens[index + 3]?.value === ')' && dot?.type === 'punct' && dot.value === '.' && member?.type === 'word' && !PROMISE_METHODS.has(member.value);
+}
+
 /**
  * Reads module references off a token stream.
  *
@@ -392,6 +412,7 @@ const CLAUSE_LOOKAHEAD = 200;
 export function extractReferences(tokens: readonly Token[], file: string): FileImports {
   const references: ModuleReference[] = [];
   const notes: AnalysisNote[] = [];
+  const typescript = TYPESCRIPT.test(file);
 
   const note = (kind: NoteKind, token: Token, detail: string): void => {
     notes.push({ kind, file, line: token.line, column: token.column, detail });
@@ -429,7 +450,7 @@ export function extractReferences(tokens: readonly Token[], file: string): FileI
         references.push({
           specifier: argument.value,
           kind: isImport ? 'dynamic-import' : 'require',
-          typeOnly: false,
+          typeOnly: isImport && typescript && importType(tokens, index),
           line: token.line,
           column: token.column,
         });

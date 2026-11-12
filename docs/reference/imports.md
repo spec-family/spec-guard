@@ -50,6 +50,7 @@ TypeScript it understands:
 | --- | --- |
 | `import { A } from 'x'`, `import 'x'`, `import * as ns from 'x'` | yes |
 | `import type { A } from 'x'` | yes, unless `types="ignore"` |
+| `import('x').A`, `typeof import('x')` in TypeScript | yes, unless `types="ignore"`: a type, which the compiler erases. `import('x').then(...)` is a load |
 | `export * from 'x'`, `export { A } from 'x'` | yes - a re-export is a dependency, and a barrel file is how layering rules usually get broken |
 | `require('x')` | yes, with a literal argument |
 | `import('x')` | yes, with a literal argument |
@@ -269,7 +270,10 @@ on a codebase that already has two, and fails on the third.
 
 `types="ignore"` asks the runtime question - erased imports create no load-order
 cycle - and the default asks the coupling one. This repository needs both: its
-`src/` has exactly one cycle, and it is type-only.
+`src/` has exactly one cycle, and it is type-only. An erased import is
+`import type`, a TypeScript import type (`type T = import('./a').X`,
+`typeof import('./a')`), and an import in Python's `if TYPE_CHECKING:` block,
+which only a type checker runs; an `else:` after it runs.
 
 `dynamic="ignore"` asks it about `import()` too. A plugin that `configuration.ts`
 loads with `import('./tier-boot.ts')` can import `configuration.ts` back without
