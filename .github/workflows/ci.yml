@@ -38,6 +38,12 @@ jobs:
         # that move one.
         os: [ubuntu-24.04, ubuntu-26.04, windows-2025-vs2026, macos-26]
         node: ['22', '24', '26']
+        # A pull request runs four of the twelve legs: the floor and the current
+        # release on the gates' image, and the floor on Windows and macOS. A push
+        # to main, a manual run and a release (which calls this workflow) run
+        # them all, so every leg still passes before a version is staged.
+        # spec-core's ADR-0008, amended 2026-11-12, says why.
+        exclude: ${{ fromJSON(github.event_name == 'pull_request' && '[{"os":"ubuntu-26.04"},{"node":"24"},{"os":"windows-2025-vs2026","node":"26"},{"os":"macos-26","node":"26"}]' || '[]') }}
 
     steps:
       # Pinned to a commit, with the tag beside it, because a tag can be moved
