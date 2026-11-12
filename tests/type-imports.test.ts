@@ -110,6 +110,29 @@ describe('an import in Python under if TYPE_CHECKING', () => {
     ]);
   });
 
+  it('opens on if alone, with blanks where Python takes them, and an import right after the colon', () => {
+    const source = [
+      'if TYPE_CHECKING:import app.tight',
+      'if\tTYPE_CHECKING :',
+      '    import app.spaced',
+      'if x:',
+      '    pass',
+      'elif TYPE_CHECKING:',
+      '    import app.elif_branch',
+      '',
+    ].join('\n');
+
+    expect(typeOnly(source, 'src/x.py')).toEqual([
+      ['app.tight', true],
+      ['app.spaced', true],
+      ['app.elif_branch', false],
+    ]);
+  });
+
+  it('reads import() with a second argument and a member after it as a load', () => {
+    expect(typeOnly("const a = import('./a', { with: { type: 'json' } });\n", 'src/x.ts')).toEqual([['./a', false]]);
+  });
+
   it('measures a tab as Python does, to the next multiple of eight', () => {
     expect(typeOnly('if TYPE_CHECKING:\n\timport app.db\n        import app.same\nimport os\n', 'src/x.py')).toEqual([
       ['app.db', true],

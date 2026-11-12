@@ -397,9 +397,9 @@ const PROMISE_METHODS: ReadonlySet<string> = new Set(['then', 'catch', 'finally'
 function importType(tokens: readonly Token[], index: number): boolean {
   const before = tokens[index - 1];
   if (before?.type === 'word' && before.value === 'typeof') return true;
-  const dot = tokens[index + 4];
-  const member = tokens[index + 5];
-  return tokens[index + 3]?.value === ')' && dot?.type === 'punct' && dot.value === '.' && member?.type === 'word' && !PROMISE_METHODS.has(member.value);
+  // `import('x').member`: the call closes at index + 3, and a second
+  // argument would put a token other than the dot after it.
+  return tokens[index + 4]?.value === '.' && !PROMISE_METHODS.has(String(tokens[index + 5]?.value));
 }
 
 /**
