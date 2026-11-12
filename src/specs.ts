@@ -18,6 +18,31 @@ import { createMemo, NO_MEMO, type Memo } from './memo.js';
 import { parseDocument } from './parser.js';
 import type { Directive, DirectiveError, MaskedDirective, SpecStatus, SpecWarning } from './types.js';
 
+/**
+ * A document's text, from its bytes.
+ *
+ * UTF-8, as before, unless a byte order mark says UTF-16: Windows PowerShell
+ * 5.1 writes UTF-16LE with one for `>` and `Out-File`, and read as UTF-8 such
+ * a spec held no directive and said nothing (round 29). A UTF-16 file with no
+ * mark cannot be told from UTF-8 by its bytes alone, but its NUL bytes can be
+ * seen, and UTF-8 text holds none: `nul` says so, for the run to warn.
+ */
+export function decodeDocument(bytes: Buffer): { text: string; nul: boolean } {
+  if (bytes[0] === 0xff && bytes[1] === 0xfe) return { text: bytes.subarray(2).toString('utf16le'), nul: false };
+  if (bytes[0] === 0xfe && bytes[1] === 0xff) {
+    // Swapped in a copy: `swap16` swaps in place, and the bytes are the
+    // memo's key. An odd last byte is no character, and is dropped.
+    const swapped = Buffer.from(bytes.subarray(2, 2 + ((bytes.length - 2) & ~1)));
+    return { text: swapped.swap16().toString('utf16le'), nul: false };
+  }
+  return { text: bytes.toString('utf8'), nul: bytes.includes(0) };
+}
+
+/** What the run says of a document with a NUL byte and no byte order mark. */
+const NUL_MESSAGE =
+  'holds NUL bytes, which UTF-8 text never does, so its directives may not have been read: a file Windows PowerShell 5.1 writes with > or Out-File is UTF-16';
+const NUL_HINT = 'save it as UTF-8, or as UTF-16 with a byte order mark, which is read';
+
 /** One spec document, as read. */
 export interface SpecDocument {
   /** Absolute path. */
@@ -202,7 +227,13 @@ function parseSpecs(root: string, files: string[], sources: ReadonlyArray<Buffer
       return;
     }
 
-    const parsed = memo.remember(source, [file, relativeFile], () => parseDocument(source.toString('utf8'), { file, relativeFile }));
+    const parsed = memo.remember(source, [file, relativeFile], () => {
+      const { text, nul } = decodeDocument(source);
+      const document = parseDocument(text, { file, relativeFile });
+      if (!nul) return document;
+      const warning: SpecWarning = { location: { file, relativeFile, line: 1, column: 1 }, kind: 'unreadable-encoding', message: NUL_MESSAGE, hint: NUL_HINT };
+      return { ...document, warnings: [warning, ...(document.warnings ?? [])] };
+    });
     const status = statusless.has(file) ? undefined : parsed.status;
     errors.push(...parsed.errors);
     // A status that is not read cannot be one that could not be read, and

@@ -17,10 +17,10 @@
 import path from 'node:path';
 
 import { escapeRegExp } from './engine.js';
-import { nodeIo, readText, type Io } from './io.js';
+import { nodeIo, type Io } from './io.js';
 import { proveSpecGuard } from './prove.js';
 import { elapsed } from './runner.js';
-import { readSpecs, specPath, type IgnoreStatus } from './specs.js';
+import { decodeDocument, readSpecs, specPath, type IgnoreStatus } from './specs.js';
 import type { ConfigUse, Directive, ProveResult } from './types.js';
 import { claimsIn, type Claim, type ListItem, type MarkdownScan } from './parser.js';
 import { patternListError, specPatternError } from './glob.js';
@@ -264,7 +264,7 @@ export async function findClaimsReport(options: ClaimsOptions): Promise<ClaimsRe
   const findings: ClaimFinding[] = [];
   const prose: ProseLabel[] = [];
   for (const document of set.documents) {
-    const source = await readText(io, document.file);
+    const { text: source } = decodeDocument(await io.readFile(document.file));
     const { claims, scan, statusLine } = claimsIn(source, vocabulary);
     for (const { offset, label } of proseLabels(scan, claims, vocabulary)) {
       const { line, column } = scan.index.positionAt(offset);
