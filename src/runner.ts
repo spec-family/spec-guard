@@ -52,8 +52,10 @@ import {
   type ImportIndex,
   type ModuleReference,
 } from "./imports.js";
+import { aliasBlindSpot, blindSpotWarnings, isAlias, modulePathBlindSpots, type FileReference } from "./blind.js";
 import { BUILT_IN_ONLY, commentTable, type CommentTable } from "./comments.js";
-import { checkLayers, type LayerInput } from "./layers.js";
+import { checkLayers, referenceForms, type LayerInput } from "./layers.js";
+import type { ModuleLanguage } from "./polyglot.js";
 import { readSpecs, specPath, unmatchedSpecs, type DocumentMemo, type IgnoreStatus, type SpecSet } from "./specs.js";
 import {
   createScope,
@@ -72,6 +74,7 @@ import {
 import type {
   Assertion,
   AssertionResult,
+  BlindSpot,
   BaselineEntry,
   Bounds,
   Directive,
@@ -1412,6 +1415,7 @@ async function executeImportAssertion(
 
   const matchesModule = createExcludeMatcher(query.modules);
   const matches: MatchLocation[] = [];
+  const aliases: FileReference[] = [];
 
   for (const { file, references } of analysed) {
     const hit = references.find((reference) => {
@@ -1430,8 +1434,26 @@ async function executeImportAssertion(
         text: `${IMPORT_VERBS[hit.kind]} ${hit.specifier}`,
         count: 1,
       });
+    } else {
+      for (const reference of references) {
+        if ((query.includeTypes || !reference.typeOnly) && isAlias(file, reference.specifier)) aliases.push({ file, reference });
+      }
     }
   }
+
+  // Every language whose imports name a module by something other than its
+  // path, C# among them: a C# using never names a folder either.
+  const blindSpots = [
+    ...listed(aliasBlindSpot(aliases, "pattern", options.maxSnippets)),
+    ...(await modulePathBlindSpots(query.modules, analysed, {
+      languages: MODULE_LANGUAGES,
+      names: (file, reference) => moduleNames(reference.specifier, file, reference.namespace),
+      io: options.io,
+      root: options.root,
+      describe: (patterns) => `module ${patterns.length === 1 ? "pattern" : "patterns"} ${patterns.map((pattern) => `"${pattern}"`).join(" and ")}`,
+    })),
+  ];
+  warnings.push(...blindSpotWarnings(blindSpots));
 
   // One reference per file, so the file counts are the matches themselves.
   const fileCounts = new Map(matches.map((match) => [match.file, 1]));
@@ -1454,12 +1476,25 @@ async function executeImportAssertion(
         stale: staleFailure ? stale : [],
         gaps: 0,
       }) + strictSuffix(options, unresolved.length, read.unread),
+    ...blindSpotsField(blindSpots),
     baselinedMatches: excluded,
     staleBaseline: stale,
     fileMatches: [...fileCounts].map(([file, count]) => ({ file, count })),
     matches: matches.filter((match) => shows(match.file)).slice(0, options.maxSnippets),
     durationMs: elapsed(startedAt),
   };
+}
+
+/** The languages whose imports name a module by something other than its path from the root. */
+const MODULE_LANGUAGES: readonly ModuleLanguage[] = ["python", "go", "rust", "csharp"];
+
+function listed<T>(value: T | null): T[] {
+  return value === null ? [] : [value];
+}
+
+/** A result's blind spots, written only when there are some, as JSON leaves out what is undefined. */
+function blindSpotsField(spots: readonly BlindSpot[]): { blindSpots?: BlindSpot[] } {
+  return spots.length > 0 ? { blindSpots: [...spots] } : {};
 }
 
 /** Everything an import rule reads before it decides anything. */
@@ -1591,7 +1626,7 @@ function finishCycles(
  * first, the last two and their `allow-empty` are the same idea - a rule that
  * could not have failed. See ADR-0011.
  */
-function finishLayers(
+async function finishLayers(
   assertion: Assertion,
   order: readonly string[],
   options: Omit<ExecuteOptions, "engine">,
@@ -1599,7 +1634,7 @@ function finishLayers(
   warnings: string[],
   startedAt: number,
   read: ImportRead,
-): AssertionResult {
+): Promise<AssertionResult> {
   const query = assertion.imports as NonNullable<Assertion["imports"]>;
   const report = checkLayers(read.analysed, order, query.includeTypes);
   const quoted = (layers: readonly number[]): string =>
@@ -1625,6 +1660,19 @@ function finishLayers(
   if (blind.length > 0 && emptyAllowed) warnings.push(unreached);
   const uncrossed = "no import in scope reaches a layer other than its own file's, so these layers would pass in any order";
   if (!report.crossed && emptyAllowed) warnings.push(uncrossed);
+
+  // Not C#: a layer no using can reach fails already, said in its own words.
+  const blindSpots = [
+    ...listed(aliasBlindSpot(report.aliases, "layer", options.maxSnippets)),
+    ...(await modulePathBlindSpots(order, read.analysed, {
+      languages: MODULE_LANGUAGES.filter((language) => language !== "csharp"),
+      names: (file, reference) => referenceForms(reference.specifier, file, reference.namespace),
+      io: options.io,
+      root: options.root,
+      describe: (patterns) => `${patterns.length === 1 ? "layer" : "layers"} ${patterns.map((pattern) => `"${pattern}"`).join(" and ")}`,
+    })),
+  ];
+  warnings.push(...blindSpotWarnings(blindSpots));
 
   const fileCounts = new Map(report.violations.map((violation) => [violation.file, 1]));
   const { excluded, stale, shows } = applyBaseline(assertion.baseline, fileCounts);
@@ -1669,6 +1717,7 @@ function finishLayers(
     ok,
     actual,
     message,
+    ...blindSpotsField(blindSpots),
     baselinedMatches: excluded,
     staleBaseline: stale,
     fileMatches: [...fileCounts].map(([file, count]) => ({ file, count })),

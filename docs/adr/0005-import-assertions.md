@@ -384,3 +384,41 @@ The shorter form reads better in isolation, but the grammar of this syntax is
 `@assert-<subject>-<claim>`, and keeping it means a future positive assertion is
 already named: `@assert-import-present`. A syntax this small pays for
 consistency more than it pays for a nicer verb.
+
+## Amended 2026-11-12: what a rule could not follow by path is said
+
+An alias stayed literal, as above, and the rule written for the path passed
+over it: round 29's evaluation put `import { client } from '@/db/client'`
+under tsconfig `paths` beneath `module="src/db/**"`, and the rule reported 0
+matches under `--strict`, as `@assert-layers` did with the import reversed.
+The cycle graph already called such a specifier unresolved, since `@/`,
+`~/`, `#` and a leading `/` cannot name a package (`src/graph.ts`); the
+import and layer rules now read it the same way. A reference written so that
+matches none of a rule's patterns, or reaches none of its layers, is said
+beside the rule with its file and line, and the hint names the alias as it
+is written.
+
+The second blind spot is the same mistake in the other direction: a pattern
+written as a path into the tree, held to files whose language names a module
+by something else. A Python package is named from its import root, which a
+src layout's `src/` is not part of (`from shop.infra.db import x` under
+`src/shop/infra`); a Go package by its module path
+(`github.com/acme/shop/internal/infra`); a Rust module from `crate::`; a C#
+namespace. `module="src/shop/infra/**"` matched none of them. A pattern is
+said for a language when every one of these holds, so that one written right
+is left alone: it starts at a folder, the language's files in scope make
+imports that name a module from somewhere, none of those starts at the
+folder, the pattern matched none of the language's references, and the path
+it starts with holds code of the language, looked for three folders down. A
+Python folder holding `__init__.py` is a package whose path is its module's
+name, and is left alone too. `@assert-layers` leaves C# to its own check
+(ADR-0011), which fails a layer no using can reach.
+
+Both are warnings: on the directive in every format, as a warning
+notification in SARIF, and as `blindSpots` in JSON. Neither fails a rule,
+`--strict` included, while spec-core's ADR-0009 holds the format freeze,
+which lets a release add a finding and not a failure; the release after it
+makes both fail `--strict`. Resolving an alias through tsconfig `paths`, and
+naming a module per language from `__init__.py` chains, `go.mod` and the
+crate, are the larger answer, and still not made: each is a resolution
+algorithm, and this one only says where the rule did not look.

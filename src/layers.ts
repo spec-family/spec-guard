@@ -11,6 +11,7 @@
  * Cycles are the opposite case, and live in `graph.ts` - see ADR-0011.
  */
 
+import { isAlias, type FileReference } from './blind.js';
 import { createExcludeMatcher } from './glob.js';
 import { candidates, isGraphFile } from './graph.js';
 import { moduleNames, resolveModule, type ModuleReference } from './imports.js';
@@ -80,6 +81,11 @@ export interface LayerReport {
    * and never the first layer, which every layer may depend on anyway.
    */
   unreachable: Array<{ layer: number; namespace: string }>;
+  /**
+   * References written as a path alias that reach no layer, from files one
+   * layer holds: where they lead was not checked (`blind.ts`).
+   */
+  aliases: FileReference[];
 }
 
 /** A function from a path to the indices of every layer that matches it. */
@@ -121,6 +127,7 @@ export function checkLayers(inputs: readonly LayerInput[], order: readonly strin
   const unassigned: string[] = [];
   const ambiguous: LayerReport['ambiguous'] = [];
   const violations: LayerViolation[] = [];
+  const aliases: FileReference[] = [];
   let crossed = false;
   // For each layer, how many of its files declare each namespace - and whether
   // any of them is one a using could reach it by.
@@ -149,6 +156,7 @@ export function checkLayers(inputs: readonly LayerInput[], order: readonly strin
     for (const reference of references) {
       if (reference.typeOnly && !includeTypes) continue;
       const reached = referenceForms(reference.specifier, file, reference.namespace).flatMap(reachedBy);
+      if (reached.length === 0 && isAlias(file, reference.specifier)) aliases.push({ file, reference });
       if (reached.some((layer) => layer !== from)) crossed = true;
       const to = Math.max(from, ...reached);
       if (to > from) {
@@ -167,5 +175,5 @@ export function checkLayers(inputs: readonly LayerInput[], order: readonly strin
     const [namespace] = [...counts].reduce((most, entry) => (entry[1] > most[1] ? entry : most));
     return [{ layer, namespace }];
   });
-  return { members, unassigned, ambiguous, violations, crossed, unreachable };
+  return { members, unassigned, ambiguous, violations, crossed, unreachable, aliases };
 }
