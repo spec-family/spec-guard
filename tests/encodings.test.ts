@@ -111,8 +111,11 @@ describe('decoding a document', () => {
     expect(decodeDocument(Buffer.from('ab')).nul).toBe(false);
   });
 
-  it('reads one byte of a mark as UTF-8, since a mark is two', () => {
+  it('reads either byte of a mark alone as UTF-8, since a mark is two', () => {
     expect(decodeDocument(Buffer.from([0xff, 0x41])).text).toBe('�A');
     expect(decodeDocument(Buffer.from([0xfe, 0x41])).text).toBe('�A');
+    // Latin-1's þ and ÿ, second in a file, are a mark's second byte.
+    expect(decodeDocument(Buffer.from([0x41, 0xfe, 0x42, 0x43])).text).toBe('A�BC');
+    expect(decodeDocument(Buffer.from([0x41, 0xff, 0x42, 0x43])).text).toBe('A�BC');
   });
 });
