@@ -225,6 +225,16 @@ function scopeNotes(ledger: ScopeLedger): string[] {
     notes.push(`${countLabel(unreadable, 'path')} could not be read: ${sample.join(', ')}`);
   }
 
+  const stopped = ledger.skipped.filter((entry) => entry.reason === 'timed-out');
+  if (stopped.length > 0) {
+    notes.push(
+      `${countLabel(stopped.length, 'file')} not searched to the end: the regular expression was still matching when its time ran out, as one that backtracks without end does: ${stopped
+        .slice(0, 3)
+        .map((entry) => entry.path)
+        .join(', ')}`,
+    );
+  }
+
   const binary = ledger.skipped.filter((entry) => entry.reason === 'binary');
   if (binary.length > 0) {
     const matches = binary.reduce((total, entry) => total + (entry.matches ?? 0), 0);
