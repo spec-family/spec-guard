@@ -14,6 +14,21 @@ is deprecated before it goes, is spec-core's
 
 ### Added
 
+- **An import or layer rule says what it could not follow by path.** A
+  TypeScript path alias (`@/db/client` under tsconfig `paths`) reached no
+  pattern written as a path, so `module="src/db/**"` reported 0 matches and
+  passed `--strict`; a pattern written as a path into the tree passed the
+  same way over a Python src layout (`shop.infra.db` under `src/shop/infra`),
+  a Go module path, Rust's `crate::` and a C# namespace. Each is now a
+  warning beside the rule with what to write instead, a `warning` annotation
+  in `--format github` and GitLab, a warning notification in SARIF, and a
+  `blindSpots` list on the result in JSON (`rule` is `unresolved-alias` or
+  `module-path-pattern`). A pattern written right is left alone. Neither
+  fails a rule, `--strict` included, during the format freeze; the release
+  after it fails `--strict` on both
+  ([ADR-0005](https://github.com/spec-family/spec-guard/blob/main/docs/adr/0005-import-assertions.md#amended-2026-11-12-what-a-rule-could-not-follow-by-path-is-said),
+  amended 2026-11-12).
+
 - **A file larger than 20 MiB is named, not left out without a word.** The
   scanner reads a file whole and ripgrep was handed `--max-filesize`, so a
   file over 20 MiB in a directory scope was searched by neither, JSON said

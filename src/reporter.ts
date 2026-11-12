@@ -659,6 +659,9 @@ export function formatJson(report: RunResult): string {
         baselinedMatches: result.baselinedMatches,
         staleBaseline: result.staleBaseline,
         fileMatches: result.fileMatches,
+        // Written only where an import rule could not see something, as JSON
+        // leaves out what is undefined.
+        blindSpots: result.blindSpots,
         skipped: result.scope.skipped,
         engine: result.engine,
         durationMs: Math.round(result.durationMs * 1000) / 1000,
@@ -761,6 +764,14 @@ function inactiveNotifications(report: RunResult): Array<{ level: string; messag
       level: 'warning',
       message: { text: `${warning.location.relativeFile}:${warning.location.line} ${warning.message}` },
     })),
+    // A rule that could not see part of what it governs passes on the page
+    // with no alert, which is the silence this slot is for.
+    ...report.results.flatMap((result) =>
+      (result.blindSpots ?? []).map((spot) => ({
+        level: 'warning',
+        message: { text: `${result.location.relativeFile}:${result.location.line} ${spot.message} (${spot.hint})` },
+      })),
+    ),
   ];
 }
 
@@ -855,7 +866,7 @@ export function formatSarif(report: RunResult, options: { version?: string } = {
         {
           // Present only when there is something to say. An empty invocations
           // block is noise in every consumer that renders one.
-          ...(report.inactiveSpecs.length + (report.specWarnings?.length ?? 0) > 0
+          ...(inactiveNotifications(report).length > 0
             ? {
                 invocations: [
                   { executionSuccessful: report.ok, toolExecutionNotifications: inactiveNotifications(report) },
@@ -1269,6 +1280,26 @@ function warningAnnotations(warnings: readonly SpecWarning[] | undefined): Annot
 }
 
 /**
+ * What an import rule could not have seen, on its directive: a warning, which
+ * fails nothing, and is said of a passing rule too, since a pass is when it
+ * matters (`blind.ts`).
+ */
+function blindSpotAnnotations(results: readonly AssertionResult[]): Annotation[] {
+  return results.flatMap((result) =>
+    (result.blindSpots ?? []).map((spot) => ({
+      rule: spot.rule,
+      identity: [spot.rule, ...assertionIdentity(result)],
+      level: 'warning',
+      severity: 'minor',
+      file: result.location.relativeFile,
+      line: result.location.line,
+      message: `${result.description}: ${spot.message}${spot.at.length > 0 ? ` (${spot.at.join('; ')})` : ''}`,
+      hint: spot.hint,
+    })),
+  );
+}
+
+/**
  * A run or a proof under `--strict` that verified nothing, which fails it: one
  * finding, placed on the first spec's first line, since it is about the specs
  * matched and no line of them. Its identity is its rule alone: there is one to
@@ -1341,6 +1372,7 @@ export function runAnnotations(report: RunResult): Annotation[] {
     ...failed,
     ...errorAnnotations(report.errors),
     ...nothingVerifiedAnnotations(report, NOTHING_VERIFIED),
+    ...blindSpotAnnotations(report.results),
     ...warningAnnotations(report.specWarnings),
     ...inactiveAnnotations(report.inactiveSpecs, 'assertion', 'executed'),
   ];
