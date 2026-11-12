@@ -21,6 +21,7 @@
 
 import { spawn } from 'node:child_process';
 import path from 'node:path';
+import vm from 'node:vm';
 
 import { BUILT_IN_ONLY, createCommentMask, type CommentMask, type CommentTable } from './comments.js';
 import { buildRegexRule, readBytes, shownLine, WORD_END, WORD_START } from './dialect.js';
@@ -59,6 +60,48 @@ export const MAX_FILE_SIZE = 20 * 1024 * 1024;
  */
 export function withinSizeLimit(size: number): boolean {
   return size <= MAX_FILE_SIZE;
+}
+
+/**
+ * How long a regex rule may match one file: a second, and a second more for
+ * each MiB. A regular expression that matches in time proportional to its
+ * text is far inside it, on the largest file read (`MAX_FILE_SIZE`) too; one
+ * that backtracks without end, as `(a+)+$` does over thirty `a`s and a `!`,
+ * is stopped (ADR-0007, amended 2026-11-12).
+ */
+export function regexBudget(bytes: number): number {
+  return 1000 + Math.floor(bytes / (1024 * 1024)) * 1000;
+}
+
+// One context and one script for every budgeted call: the work is handed
+// over through the context, and a new context each call would cost more than
+// the watchdog thread the timeout starts.
+const BUDGET_CONTEXT = vm.createContext({ work: undefined as (() => unknown) | undefined });
+const BUDGET_SCRIPT = new vm.Script('work()');
+
+/**
+ * Runs `work`, and stops it once it has run `ms` milliseconds.
+ *
+ * Nothing in a thread can interrupt a regular expression that is matching:
+ * a timer waits for it, and so does every other request an MCP server has.
+ * V8's linear engine, which cannot backtrack, refuses what a regex rule is
+ * built with - lookaround for ripgrep's `^` and `$`, and the `v` flag -
+ * so it cannot take the match over either. A script run with a timeout is
+ * stopped by a watchdog thread, which ends whatever it called, a match among
+ * them, and the thread goes on. An exception `work` throws is thrown on.
+ */
+export function withinBudget<T>(work: () => T, ms: number): { done: true; value: T } | { done: false } {
+  BUDGET_CONTEXT.work = work;
+  try {
+    return { done: true, value: BUDGET_SCRIPT.runInContext(BUDGET_CONTEXT, { timeout: ms }) as T };
+  } catch (error) {
+    if ((error as { code?: unknown } | null)?.code === 'ERR_SCRIPT_EXECUTION_TIMEOUT') return { done: false };
+    throw error;
+  } finally {
+    // So that the context holds no file's text past its scan. Left out, the
+    // next call replaces it: an equivalent mutant.
+    BUDGET_CONTEXT.work = undefined;
+  }
 }
 
 /** Hard cap on collected locations; the reporter only ever shows a handful. */
@@ -808,6 +851,8 @@ interface CandidateFile {
 /** What one file's scan found, for every pattern of a pass. */
 interface FileScan {
   tallies: Map<string, Tally>;
+  /** The patterns a regex rule was stopped on in this file, past its budget. */
+  timedOut: Set<string>;
   binary: boolean;
   /** Whether every byte of the file was UTF-8. */
   utf8: boolean;
@@ -825,18 +870,37 @@ interface FileScan {
  * decide the comment syntax), the patterns and how they match, which is what lets a watch session remember
  * it (ADR-0014).
  */
-function scanFile(buffer: Buffer, relativePath: string, regexps: ReadonlyMap<string, RegExp>, ignoreComments: boolean, comments: CommentTable): FileScan {
+function scanFile(
+  buffer: Buffer,
+  relativePath: string,
+  regexps: ReadonlyMap<string, RegExp>,
+  ignoreComments: boolean,
+  comments: CommentTable,
+  regex: boolean,
+): FileScan {
   const { text: content, utf8 } = readBytes(buffer);
   let mask: CommentMask | undefined;
   const getMask = ignoreComments ? (): CommentMask => (mask ??= createCommentMask(content, relativePath, comments)) : undefined;
 
   const tallies = new Map<string, Tally>();
+  const timedOut = new Set<string>();
+  // Only a regex rule is timed. A literal is escaped before it is built, and
+  // matches in time proportional to the text, so a watchdog thread for each
+  // of its files would be cost and nothing else: `if (false)` here is an
+  // equivalent mutant, slower and with the same answers.
+  const budget = regexBudget(buffer.length);
   for (const [pattern, regexp] of regexps) {
-    tallies.set(pattern, scanContent(content, relativePath, regexp, getMask));
+    if (!regex) {
+      tallies.set(pattern, scanContent(content, relativePath, regexp, getMask));
+      continue;
+    }
+    const scanned = withinBudget(() => scanContent(content, relativePath, regexp, getMask), budget);
+    if (scanned.done) tallies.set(pattern, scanned.value);
+    else timedOut.add(pattern);
   }
   // Read after the loop, where every pattern has had its chance to ask.
   const built = mask as CommentMask | undefined;
-  return { tallies, binary: isBinary(buffer), utf8, classified: built?.classified };
+  return { tallies, timedOut, binary: isBinary(buffer), utf8, classified: built?.classified };
 }
 
 class JavaScriptEngine implements Engine {
@@ -929,7 +993,7 @@ class JavaScriptEngine implements Engine {
           file.relativePath,
           buffer === null
             ? null
-            : this.memo.remember(buffer, [...scanInputs, file.relativePath], () => scanFile(buffer, file.relativePath, regexps, ignoreComments, comments)),
+            : this.memo.remember(buffer, [...scanInputs, file.relativePath], () => scanFile(buffer, file.relativePath, regexps, ignoreComments, comments, regex)),
         );
       }
     };
@@ -945,6 +1009,9 @@ class JavaScriptEngine implements Engine {
         for (const ledger of ledgers.values()) ledger.add(file.relativePath, 'unreadable');
         continue;
       }
+      // A file a regex rule was stopped on might hold a match nobody counted:
+      // a gap, as a file that could not be read is.
+      for (const pattern of scan.timedOut) ledgers.get(pattern)!.add(file.relativePath, 'timed-out');
       for (const [pattern, tally] of scan.tallies) {
         if (scan.binary) {
           // Searched, but not counted. Skipping binary files silently was a way
