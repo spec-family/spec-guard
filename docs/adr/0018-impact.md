@@ -214,3 +214,13 @@ and a C# file:
 
 `tests/impact.test.ts` holds each language's note to its file and line,
 and a file with two to one count and two lines.
+
+## Amended 2026-11-12: a Python file's headline says what is followed
+
+A Python file is followed by its relative imports alone; an absolute one
+names a module, and which file a module is depends on `sys.path`. The
+headline of a Python file no relative import names still said "nothing in
+scope imports it", which is untrue of a module only absolute imports name
+(round 29). It now says `no relative import in scope names it; an absolute
+Python import names a module, which is not followed`, and a count of
+dependents says `by relative imports`.

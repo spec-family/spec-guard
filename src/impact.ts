@@ -455,12 +455,18 @@ export function formatImpact(report: ImpactReport): string {
     const direct = result.dependents.filter((dependent) => dependent.depth === 1).length;
     const deepest = result.dependents.reduce((most, dependent) => Math.max(most, dependent.depth), 0);
     const left = result.truncated ?? 0;
+    // A Python file is followed only by its relative imports: an absolute
+    // one names a module, which this does not resolve (ADR-0018), so "nothing
+    // imports it" was untrue of a module only absolute imports name.
+    const python = result.shape === 'file' && languageFor(result.path) === 'python';
     out.push(
       left > 0
         ? `  ${plural(result.dependents.length + left, 'file depends', 'files depend')} on it; ${result.dependents.length === 0 ? 'none is listed' : `the nearest ${result.dependents.length} are listed`}, and ${left} more counted`
         : result.dependents.length === 0
-          ? '  nothing in scope imports it'
-          : `  ${plural(result.dependents.length, 'file depends', 'files depend')} on it, ${direct} directly${deepest > 1 ? `, up to ${deepest} imports away` : ''}`,
+          ? python
+            ? '  no relative import in scope names it; an absolute Python import names a module, which is not followed'
+            : '  nothing in scope imports it'
+          : `  ${plural(result.dependents.length, 'file depends', 'files depend')} on it, ${direct} directly${deepest > 1 ? `, up to ${deepest} imports away` : ''}${python ? ', by relative imports; an absolute Python import is not followed' : ''}`,
     );
     const width = Math.max(0, ...result.dependents.map((dependent) => displayWidth(dependent.file)));
     for (const dependent of result.dependents) {

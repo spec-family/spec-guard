@@ -1540,3 +1540,18 @@ Measured through the launcher on 0.27.0 and on this build (Windows 11 build
 `tests/two-values.test.ts` holds both orders on each command on Windows,
 another letter and the rest of a path in another case refused there as
 before, and the two letters refused elsewhere.
+
+## Amended 2026-11-12: a byte order mark before the configuration
+
+A `.spec-guard.json` or `package.json` an editor on Windows began with a
+UTF-8 byte order mark was refused: `JSON.parse` does not read one, and its
+message quoted a character nobody can see, so the refusal named no cause a
+reader could find. spec-graph and spec-brief read past the mark. Both files
+are now read past a mark at their start; one anywhere else is still no JSON.
+
+A run from a subdirectory of a repository said only that no spec matched,
+since `docs/**/*.md` is read from the root and the root was the
+subdirectory. Where the root holds no `.git`, the nearest directory above it
+that does is the repository's top, and the specs match there, the message
+names the top and the `--root` that reads it. The root is not moved: a run
+reads where it was told to (round 29).

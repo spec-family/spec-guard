@@ -24,7 +24,7 @@ spec-guard impact <paths...>           # the files that depend on each path, and
 
 | Option | Description |
 | --- | --- |
-| `-r, --root <path>` | Codebase root that assertions resolve against, a directory (default: cwd). One that is not there, or is a file, is exit 2 from every command |
+| `-r, --root <path>` | Codebase root that assertions resolve against, a directory (default: cwd). One that is not there, or is a file, is exit 2 from every command. Where no spec matched from a root inside a repository whose top holds matches, the message names the top and the `--root` that reads it |
 | `--spec <pattern>` | A spec glob or path, repeatable. `query` and `mcp` take their specs only from here. An empty one is refused: `.` is every Markdown file under the root. So is one that matches no file beside others that do (below) |
 | `-v, --verbose` | Print passing assertions too; for `claims`, where each label in prose is. `-v` says on stderr that it becomes `--version`, as it is in the family's other tools, in the release after the format freeze: write `--verbose` |
 | `--watch` | Report, then report again as the tree changes, until Ctrl+C |

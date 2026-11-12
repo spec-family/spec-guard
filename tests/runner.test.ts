@@ -195,7 +195,8 @@ describe.each(ENGINES)('runSpecGuard [%s engine]', (engine) => {
 
     expect(report.ok).toBe(false);
     expect(report.results[0]?.message).toBe('target path does not exist: src/does-not-exist');
-    expect(report.results[0]?.warnings).toEqual(['target path not found: src/does-not-exist']);
+    // Said once, in the message, and not again beside it in other words.
+    expect(report.results[0]?.warnings).toEqual([]);
   });
 
   it('tolerates a missing target only when asked, and then has nothing left to search', async () => {

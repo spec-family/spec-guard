@@ -321,11 +321,20 @@ function parserSaid(error: unknown): string {
   return (error as Error).message.replace(/\s+/g, ' ');
 }
 
+/**
+ * A file's text without the byte order mark an editor on Windows may write
+ * first, which `JSON.parse` refuses with a message that quotes a character
+ * nobody can see. spec-graph and spec-brief read past one.
+ */
+function withoutMark(text: string): string {
+  return text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
+}
+
 /** The `"specGuard"` value of a `package.json`'s text, unchecked, or undefined when there is none. */
 function manifestOptions(text: string, file: string): unknown {
   let manifest: unknown;
   try {
-    manifest = JSON.parse(text);
+    manifest = JSON.parse(withoutMark(text));
   } catch (error) {
     throw new ConfigError(`${file} is not valid JSON (${parserSaid(error)}), so its "${CONFIG_KEY}" options cannot be read.`);
   }
@@ -380,7 +389,7 @@ export function parseConfig(text: string, file = 'package.json'): ProjectConfig 
 export function parseStandaloneConfig(text: string, file = CONFIG_FILE): ProjectConfig {
   let options: unknown;
   try {
-    options = JSON.parse(text);
+    options = JSON.parse(withoutMark(text));
   } catch (error) {
     throw new ConfigError(`${file} is not valid JSON (${parserSaid(error)}), so its options cannot be read.`);
   }

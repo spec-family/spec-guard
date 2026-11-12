@@ -92,7 +92,9 @@ stops it being mistaken for a complete answer.
   counted and reported**, so a rule pointed at the wrong tree says "analysed 2
   of 3 files; 1 is in a language whose imports spec-guard cannot read (.razor)"
   rather than quietly passing - and if *none* of them can be read, the
-  assertion fails rather than passing on an empty analysis. Under
+  assertion fails rather than passing on an empty analysis, and names the
+  languages it reads and the text rule that holds the others, not
+  `allow-empty`, which would pass it with nothing held to account. Under
   `--strict` such a file fails an import or layer rule, as a reference it
   could not resolve does: leave it out with `exclude`. A cycle rule claims
   nothing of a file outside its graph, and says it without failing.

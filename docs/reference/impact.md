@@ -38,7 +38,9 @@ src/db/client.ts
   Python imports name modules, and which file a module is depends on `go.mod`,
   the crate's module tree, the compiler or `sys.path`. A path in one of those
   languages says its dependents are not computed, rather than showing an empty
-  list.
+  list. A Python file is followed by its relative imports alone, and its
+  headline says so: `no relative import in scope names it`, or `by relative
+  imports` after a count, since an absolute import of it is not followed.
 - **Listed, never guessed**: an import naming no file, an alias such as `@/db`,
   a dynamic `import(name)`. Any of them may depend on the path.
 

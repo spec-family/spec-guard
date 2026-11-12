@@ -234,7 +234,8 @@ describe('a run with a pattern that matched no file beside one that did', () => 
   });
 
   it('leaves the pattern spec-guard reads when none is given as it was', async () => {
-    const root = await tree();
+    // A repository's top, which a tree under this one is not without it.
+    const root = await tree({ '.git': 'gitdir: elsewhere\n' });
     await fs.rm(path.join(root, 'docs'), { recursive: true });
 
     expect(await cli(root, [])).toEqual({ code: EXIT_ERROR, out: [], err: ['spec-guard: no spec files matched "docs/**/*.md"'] });

@@ -466,7 +466,9 @@ describe('executing one assertion twice', () => {
 
     for (const allowMissingTargets of [true, false]) {
       const first = await execute(allowMissingTargets);
-      expect(first.warnings).toContain('target path not found: src/gone');
+      // Said beside a rule it does not fail; one it fails says it once, in
+      // its message.
+      expect(first.warnings.includes('target path not found: src/gone')).toBe(allowMissingTargets);
       expect(await execute(allowMissingTargets)).toEqual(first);
     }
     expect((await execute(false)).message).toBe('target path does not exist: src/gone');
@@ -781,6 +783,22 @@ describe('an import assertion that verified nothing', () => {
     expect(result?.message).toBe(
       'none of the 1 files here are in a language whose imports spec-guard can read, ' +
         'so this assertion verified nothing (add allow-empty="true" if that is expected)',
+    );
+  });
+
+  it('names the languages read, and not allow-empty, where a file in scope may hold an import none of them is', async () => {
+    const root = await repo({
+      'src/App.java': 'import com.acme.db.Client;\n',
+      'src/notes.txt': 'not code\n',
+      'docs/a.md': '<!-- @assert-import-absence target="src" module="com/acme/db" -->\n',
+    });
+
+    const result = (await run(root)).results[0];
+
+    expect(result?.ok).toBe(false);
+    expect(result?.message).toBe(
+      'none of the 2 files here are in a language whose imports spec-guard can read, so this assertion verified nothing ' +
+        '(their imports are read in JavaScript, TypeScript, Python, Go, Rust and C#, and these are .java: a text rule, @assert-absence on how the import is written, holds a rule over them)',
     );
   });
 

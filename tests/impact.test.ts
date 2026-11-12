@@ -796,7 +796,9 @@ describe('spec-guard impact', () => {
   });
 
   it('exits 2 when no spec matched, as a query does, having written the dependents, and 0 under --allow-empty', async () => {
-    const root = await makeTempRepo({ 'src/a.ts': 'export {};\n', 'src/b.ts': "import './a.js';\n" });
+    // A repository's top, which a tree under this one is not without it: the
+    // line would point at this repository's docs.
+    const root = await makeTempRepo({ '.git': 'gitdir: elsewhere\n', 'src/a.ts': 'export {};\n', 'src/b.ts': "import './a.js';\n" });
     try {
       const at = async (...argv: string[]) => {
         const out: string[] = [];

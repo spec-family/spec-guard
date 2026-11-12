@@ -22,7 +22,7 @@
  * what a status line means. ADR-0002.
  */
 
-import { lineStarts, locate } from './text.js';
+import { locate } from './text.js';
 import {
   findClaims,
   findEntry,
@@ -38,6 +38,7 @@ import {
   type MarkdownScan,
   type TableCell,
 } from './vendor/spec-core/markdown/index.js';
+import { lineStarts as documentLineStarts } from './vendor/spec-core/text/lines.js';
 import type {
   Directive,
   DirectiveError,
@@ -850,11 +851,11 @@ export function parseDocument(source: string, context: ParseContext): ParsedDocu
 function directivesOf(source: string, scan: MarkdownScan, context: ParseContext): ParseResult {
   const directives: Directive[] = [];
   const errors: DirectiveError[] = [];
-  // Lines as they have always been counted here, by `\n`, so a directive is
-  // reported where it was. The scanner counts a lone `\r` as well, and reads
-  // the document by it, but a line number in a report is not the place to
-  // change what a line is.
-  const starts = lineStarts(source);
+  // Lines as spec-core counts them, at `\n`, `\r\n` and a lone `\r`, which
+  // is how the scanner reads the document. Counted by `\n` alone, every
+  // directive of a file whose lines end in a lone `\r` was reported on line 1
+  // (round 29); a file of `\n` or `\r\n` is counted as it was.
+  const starts = documentLineStarts(source);
   const masked = directivesView(source, scan);
 
   DIRECTIVE_RE.lastIndex = 0;
