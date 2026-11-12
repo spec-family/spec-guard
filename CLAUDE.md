@@ -95,7 +95,8 @@ spec-core's
 conditions. A pull request that moves Stryker or vitest sweeps every mutant,
 since an incremental file is restored only by the toolchain that wrote it.
 The order keeps its own record of the file that failed last
-(`lastRun`), as vitest 5's cache does not.
+(`lastRun`), as vitest 5's cache does not, and a shard's workers share
+it through a file in the sandbox, as they shared vitest 4's cache.
 
 The mutation `break` and the coverage floors in `vitest.config.ts` sit below
 the last measurement. They move up with the measurement and never down to make

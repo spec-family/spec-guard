@@ -2992,3 +2992,38 @@ Eight shards stay: a ninth would cost every sweep a runner's set-up and a
 dry run, for a slowest shard held up by one file all the same. The next
 sweeps on main measure the table, and the rule above holds: past 20
 minutes, move files again.
+
+## Amended 2026-11-12: the order's record, shared between a sweep's workers
+
+The order keeps its own record of the file that failed when the worker
+last ran it (the amendment of 2026-11-09), and kept it in the worker's
+memory. A worker Stryker starts in place of one that timed out began with
+none, where on vitest 4 it read the cache file every worker rewrote after
+each run. Static mutants run last in each shard, after the timeouts, so
+mostly on such workers. spec-core found it in an experiment and took the
+fix first (its
+[ADR-0007](https://github.com/spec-family/spec-core/blob/main/docs/adr/0007-verification.md),
+the entry of 2026-11-12, and
+[ADR-0008](https://github.com/spec-family/spec-core/blob/main/docs/adr/0008-toolchain.md),
+amended 2026-11-12): its static mutants' tests before their kills came to
+25,743 to 29,259 in main's sweeps with the record in memory alone, against
+11,731 to 17,936 on vitest 4, and 17,664 with the record shared.
+
+**What changed.** `vitest.mutation.config.ts` shares the record as
+spec-core's does: where the process is one of Stryker's workers
+(`STRYKER_MUTATOR_WORKER`), through `.vitest-order-record.json` in the
+folder it runs in, the shard's sandbox, read once when the worker loads
+the configuration and written whole after each run, through a file of the
+process's own renamed over it. A process that is not a worker, `npm test`
+or a test, reads and writes none. No workflow changes, and both tiers
+share it, the incremental one for the mutants it runs.
+`tests/mutation-order.test.ts` holds it as spec-core's test does: vitest
+made as Stryker's runner makes it, in processes of their own in a sandbox
+of two files, and the functions that name, read and write the file as a
+library.
+
+**What it measured.** Main's last two full sweeps, of ad46b21 and 4566965
+(runs 43073021582 and 43065997393), read 99.26% over 15,761, 115
+survivors, and 1,134,197 and 1,138,407 tests before the kills of 2,692
+static mutants, 600 and 603 of them after more than 200 tests. The pull
+request's full sweep, dispatched on its branch, is set beside them below.
