@@ -351,3 +351,10 @@ and ci.yml's concurrency group names the workflow, which is the caller's when
 called, so a push to main cannot cancel a release's CI. The mutation sweep is
 not called here, as spec-brief's release calls its: step 2 above waits for
 main's full sweep before the release pull request is opened.
+
+Called from another workflow, `github` is the caller's context, so the event
+ci.yml's matrix reads is the release's own, the tag's push or a dispatch, and
+neither narrows it to a pull request's three legs. `ci` fails when any job of
+ci.yml does, since its `all green` needs every one, and `verify` and
+`publish` wait on it with no condition that runs them after a failure.
+`tests/release-ci.test.ts` holds all three.
