@@ -38,8 +38,11 @@ is deprecated before it goes, is spec-core's
   Static mutants run last, mostly on such workers. The workers of one shard
   now share the record through a file in Stryker's sandbox, read once when
   a worker starts and written whole after each run, as spec-core's do
-  (ADR-0003, amended 2026-11-12). Development tooling only: nothing
-  spec-guard checks or reports changed. Upgrading: nothing to do.
+  (ADR-0003, amended 2026-11-12). The static mutants' tests before their
+  kills fell from 1,134,197 and 1,138,407 in main's last two sweeps to
+  1,077,674 in the sweep of the change, with the score and the survivors
+  unchanged. Development tooling only: nothing spec-guard checks or reports
+  changed. Upgrading: nothing to do.
 
 ## 0.34.0
 
