@@ -146,7 +146,7 @@ export async function resolveQueryPath(input: string, root: string, io: Io = nod
   // written against that spelling, and `SRC/LOANS.JS` on Windows found no
   // rule for the file it opens (round 29).
   const posix = await spelling(io, root, written);
-  const absolutePath = posix === written ? resolved : path.resolve(root, posix);
+  const absolutePath = path.resolve(root, posix);
   const stats = await io.stat(absolutePath);
   const shape = stats ? (stats.isDirectory() ? 'directory' : 'file') : /[\\/]$/.test(input) ? 'directory' : 'file';
   return { path: posix || '.', shape, absolutePath, exists: stats !== null };

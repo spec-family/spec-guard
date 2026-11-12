@@ -74,15 +74,16 @@ export function watchTree(root: string, listener: TreeListener, onError: (error:
  * differs from it only in case. A segment that opens nothing ends the
  * reading, and the rest is kept as written: `SRC/new.ts` is `src/new.ts` on
  * Windows, and stays `SRC/new.ts` on Linux, where `SRC` is a directory still
- * to make. spec-harness spells a path the same way, through the filesystem's
- * own real path.
+ * to make. A directory that cannot be listed keeps the segment as written,
+ * and the reading goes on below it. The root, `.` or empty, names nothing a
+ * directory holds and is kept as it is. spec-harness spells a path the same
+ * way, through the filesystem's own real path.
  */
 export async function spelledOnDisk(
   relative: string,
   names: (directory: string) => Promise<readonly string[] | null>,
   opens: (written: string) => Promise<boolean>,
 ): Promise<string> {
-  if (relative === '.' || relative === '') return relative;
   const segments = relative.split('/');
   const spelled: string[] = [];
   for (const [at, segment] of segments.entries()) {
@@ -103,7 +104,10 @@ export async function spelledOnDisk(
 export function spelling(io: Io, root: string, relative: string): Promise<string> {
   return spelledOnDisk(
     relative,
-    async (directory) => (await io.readDirectory(path.join(root, directory)).catch(() => null))?.map((entry) => entry.name) ?? null,
+    async (directory) => {
+      const entries = await io.readDirectory(path.join(root, directory)).catch(() => null);
+      return entries === null ? null : entries.map((entry) => entry.name);
+    },
     async (written) => (await io.stat(path.join(root, written))) !== null,
   );
 }

@@ -975,10 +975,9 @@ async function partitionTargets(
   for (const target of targets) {
     const found = await pathExists(options.io, path.resolve(options.root, target));
     (found ? existing : missing).push(target);
-    if (found) {
-      const warning = await miscasedTarget(target, options);
-      if (warning !== null) miscased.push(warning);
-    }
+    // A missing target has no real path, so it is said nothing of here.
+    const warning = await miscasedTarget(target, options);
+    if (warning !== null) miscased.push(warning);
   }
   return { existing, missing, miscased };
 }

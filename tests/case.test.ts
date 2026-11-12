@@ -13,7 +13,7 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { impactOf } from '../src/impact.js';
-import { spelledOnDisk, type Io } from '../src/io.js';
+import { spelledOnDisk, spelling, type Io } from '../src/io.js';
 import { queryRules, resolveQueryPath } from '../src/query.js';
 import { runSpecGuard } from '../src/runner.js';
 import { memoryIo } from './helpers.js';
@@ -61,6 +61,15 @@ describe('the spelling of a path on disk', () => {
     expect(await spelledOnDisk('src/NEW/x.ts', names(LISTING), async () => true)).toBe('src/NEW/x.ts');
   });
 
+  it('spells every segment, however deep', async () => {
+    const deep = { '.': ['src'], src: ['Lib'], 'src/Lib': ['Money.ts'] };
+    expect(await spelledOnDisk('SRC/LIB/MONEY.TS', names(deep), async () => true)).toBe('src/Lib/Money.ts');
+  });
+
+  it('keeps a segment as written where its directory cannot be listed, and spells on below it', async () => {
+    expect(await spelledOnDisk('SRC/LOANS.TS', names({ SRC: ['Loans.ts'] }), async () => true)).toBe('SRC/Loans.ts');
+  });
+
   it('chooses no entry where two differ from the segment only in case', async () => {
     expect(await spelledOnDisk('src/a.Ts', names(LISTING), async () => true)).toBe('src/a.Ts');
   });
@@ -77,6 +86,13 @@ describe('a path asked about in another case', () => {
 
     expect(await resolveQueryPath('SRC/LOANS.JS', ROOT, io)).toMatchObject({ path: 'src/loans.js', exists: true, absolutePath: path.resolve(ROOT, 'src/loans.js') });
     expect(await resolveQueryPath('SRC/new.ts', ROOT, io)).toMatchObject({ path: 'src/new.ts', exists: false });
+  });
+
+  it('is spelled below a directory that cannot be listed', async () => {
+    const io = ignoringCase(TREE);
+    const unlisted: Io = { ...io, readDirectory: (directory) => (directory === ROOT ? Promise.reject(new Error('EACCES')) : io.readDirectory(directory)) };
+
+    expect(await spelling(unlisted, ROOT, 'SRC/LOANS.JS')).toBe('SRC/loans.js');
   });
 
   it('is left as written on a filesystem that tells case apart', async () => {
