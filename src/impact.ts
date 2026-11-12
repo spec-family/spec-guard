@@ -458,7 +458,7 @@ export function formatImpact(report: ImpactReport): string {
     // A Python file is followed only by its relative imports: an absolute
     // one names a module, which this does not resolve (ADR-0018), so "nothing
     // imports it" was untrue of a module only absolute imports name.
-    const python = result.shape === 'file' && languageFor(result.path) === 'python';
+    const python = languageFor(result.path) === 'python';
     out.push(
       left > 0
         ? `  ${plural(result.dependents.length + left, 'file depends', 'files depend')} on it; ${result.dependents.length === 0 ? 'none is listed' : `the nearest ${result.dependents.length} are listed`}, and ${left} more counted`

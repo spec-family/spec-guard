@@ -1548,7 +1548,7 @@ function blindSpotsField(spots: readonly BlindSpot[]): { blindSpots?: BlindSpot[
  */
 function unreadHint(files: readonly { relativePath: string }[]): string {
   const kinds = [...new Set(files.map((file) => path.posix.extname(file.relativePath) || path.posix.basename(file.relativePath)))].sort();
-  return `their imports are read in JavaScript, TypeScript, Python, Go, Rust and C#, and these are ${kinds.slice(0, 5).join(", ")}: a text rule, @assert-absence on how the import is written, holds a rule over them`;
+  return `their imports are read in JavaScript, TypeScript, Python, Go, Rust and C#, and these are ${kinds.join(", ")}: a text rule, @assert-absence on how the import is written, holds a rule over them`;
 }
 
 /** Everything an import rule reads before it decides anything. */

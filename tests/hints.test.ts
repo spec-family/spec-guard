@@ -14,6 +14,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { main, type CliIO } from '../src/cli.js';
 import { parseConfig, parseStandaloneConfig } from '../src/config.js';
 import { formatImpact, impactOf } from '../src/impact.js';
+import { runSpecGuard } from '../src/runner.js';
 import { makeTempRepo, memoryIo, removeTempRepo } from './helpers.js';
 
 const temporary: string[] = [];
@@ -74,6 +75,34 @@ describe('a configuration file that starts with a byte order mark', () => {
     await fs.writeFile(path.join(root, '.spec-guard.json'), `${MARK}{"specs":["docs/*.md"]}\n`);
 
     expect((await cli(root, [])).code).toBe(0);
+  });
+});
+
+describe('a missing target', () => {
+  const ROOT = path.resolve('/virtual/hints-missing');
+
+  it('is said beside a rule it does not fail, every kind of rule, and only in the message of one it fails', async () => {
+    const io = memoryIo(ROOT, {
+      'docs/adr.md': [
+        '# ADR',
+        '',
+        '<!-- @assert-absence symbol="X" target="src, gone" -->',
+        '<!-- @assert-import-absence module="db" target="src, gone" -->',
+        '<!-- @assert-structure target="src, gone" glob="*.ts" pattern="*.ts" -->',
+        '',
+      ].join('\n'),
+      'src/a.ts': "import './b';\n",
+      'src/b.ts': '',
+    });
+    const allowed = await runSpecGuard({ patterns: ['docs/adr.md'], root: ROOT, io, engine: 'javascript', allowMissingTargets: true });
+    const failing = await runSpecGuard({ patterns: ['docs/adr.md'], root: ROOT, io, engine: 'javascript' });
+
+    expect(allowed.results.map((result) => result.warnings.includes('target path not found: gone'))).toEqual([true, true, true]);
+    expect(failing.results.map((result) => [result.ok, result.message, result.warnings.includes('target path not found: gone')])).toEqual([
+      [false, 'target path does not exist: gone', false],
+      [false, 'target path does not exist: gone', false],
+      [false, 'target path does not exist: gone', false],
+    ]);
   });
 });
 

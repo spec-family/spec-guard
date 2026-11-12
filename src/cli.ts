@@ -998,7 +998,7 @@ async function noSpecsMatched(patterns: readonly string[], root: string): Promis
   const said = `spec-guard: no spec files matched ${patterns.map((p) => `"${p}"`).join(', ')}`;
   const top = await repositoryAbove(root);
   if (top === null) return said;
-  const found = await expandSpecs(patterns, top).catch(() => ({ files: [] }));
+  const found = await expandSpecs(patterns, top);
   if (found.files.length === 0) return said;
   const relative = toPosix(path.relative(root, top));
   return `${said} here; the repository starts at ${relative}, where ${found.files.length === 1 ? '1 spec matches' : `${found.files.length} specs match`}: run from there, or pass --root ${relative}`;
