@@ -24,7 +24,7 @@ import { createExcludeMatcher, createPathMatcher, globBase, isGlob, pathPatternE
 import { nodeIo, type Io } from './io.js';
 import { INACTIVE_STATUSES, parseStatus, parseTitle } from './parser.js';
 import { createScope, isBinary, type SkipReason } from './scope.js';
-import { readSpecs, unmatchedSpecs } from './specs.js';
+import { decodeDocument, readSpecs, unmatchedSpecs } from './specs.js';
 import { lineStarts, locate } from './text.js';
 import type { CiteFamily, CiteFamilyReport, CiteFinding, CiteGap, CitesReport, SpecStatus } from './types.js';
 
@@ -366,7 +366,7 @@ export async function findDocuments(family: CiteFamily, root: string, io: Io, de
     const source = sources[index] as Buffer | Error;
     // A document that cannot be read is read as one with no title and no
     // status, which the empty text is.
-    const text = source instanceof Error ? '' : source.toString('utf8');
+    const text = source instanceof Error ? '' : decodeDocument(source).text;
     const key = numberKey(spelled);
     documents.set(key, [...(documents.get(key) ?? []), { file, spelled, title: parseTitle(text), status: parseStatus(text) }]);
   });

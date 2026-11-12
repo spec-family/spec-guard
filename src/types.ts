@@ -108,7 +108,7 @@ export interface SpecStatus {
 export interface SpecWarning {
   location: SourceLocation;
   /** Which of them, in words that stay the same while the document changes around it. */
-  kind: 'unreadable-status' | 'unclosed-front-matter' | 'unclosed-block';
+  kind: 'unreadable-status' | 'unclosed-front-matter' | 'unclosed-block' | 'unreadable-encoding';
   message: string;
   /** What to do, where the warning says it itself rather than leave it to its kind: write a status that cannot be read as an English word. */
   hint?: string;

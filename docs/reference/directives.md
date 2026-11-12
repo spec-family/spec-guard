@@ -51,6 +51,12 @@ this page, never executes it.
   stays in force, and the warning, on line 1, says so and says to close it
   with `---`, or `+++` for TOML, on a line of its own. Neither fails a run,
   under `--strict` either.
+- **A spec is read as UTF-8, or as UTF-16 when a byte order mark says so**,
+  as Windows PowerShell 5.1 writes a file with `>` or `Out-File`. A spec with
+  NUL bytes and no mark, which no UTF-8 text holds, is a warning on line 1
+  (`unreadable-encoding` in JSON's `specWarnings`): its directives may not
+  have been read, so save it as UTF-8, or as UTF-16 with a mark. It fails no
+  run, under `--strict` either.
 - **Line numbers stay exact.** Masking preserves every offset and line
   terminator.
 

@@ -258,3 +258,19 @@ failure message should say *why* the rule exists.
 ignored as "not a directive". It is an error instead, because a spec tool whose
 typos silently assert nothing is worse than no spec tool. The count of
 `ALLOWED_ATTRIBUTES` above keeps the table that decides it wired in.
+
+## Amended 2026-11-12: a spec in UTF-16
+
+Windows PowerShell 5.1 writes UTF-16LE with a byte order mark for `>` and
+`Out-File`, which is how a spec written from a script on Windows often
+starts. Read as UTF-8, its text was a NUL between every character: no
+directive was read, and the run said `1 spec - 0 assertions` and nothing
+else. spec-graph already warned of the NUL.
+
+A byte order mark is now read: `FF FE` is UTF-16LE and `FE FF` UTF-16BE,
+decoded before the document is scanned, so its directives run and their
+lines are its own. The run, `claims` and `cites` read a document the same
+way. A file with no mark is read as UTF-8 as before, since no byte says
+otherwise, but a NUL in it, which UTF-8 text never holds, is the
+`unreadable-encoding` warning on line 1, with what to do. A warning fails
+nothing, `--strict` included: the document may be one that names no rule.
