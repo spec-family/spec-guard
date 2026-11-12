@@ -11,9 +11,10 @@
  */
 
 import path from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { buildRipgrepArgs, javascriptEngine, MAX_FILE_SIZE, resolveEngine, type SearchRequest } from '../src/engine.js';
+import { nodeIo } from '../src/io.js';
 import { formatJson, formatReport } from '../src/reporter.js';
 import { runSpecGuard } from '../src/runner.js';
 import { UNCERTAIN_REASONS } from '../src/scope.js';
@@ -57,6 +58,21 @@ describe('a file over the size limit in a directory scope', () => {
 
     expect(formatReport(report, { color: false, verbose: false })).toContain('1 file larger than 20 MiB not read: data/dump.sql');
     expect(JSON.parse(formatJson(report)).results[0].skipped).toEqual([{ path: 'data/dump.sql', reason: 'too-large' }]);
+  });
+
+  it('is counted and named three at a time, apart from what else was not read', async () => {
+    const report = await run(`<!-- @assert-absence symbol="${TOKEN}" target="data" -->`, { 'data/a.sql': '' });
+    const result = report.results[0]!;
+    const skipped = [
+      ...['data/1.sql', 'data/2.sql', 'data/3.sql', 'data/4.sql'].map((file) => ({ path: file, reason: 'too-large' as const })),
+      { path: 'data/x.bin', reason: 'binary' as const, matches: 1 },
+      { path: 'wt', reason: 'worktree' as const },
+    ];
+    const lines = formatReport({ ...report, results: [{ ...result, scope: { ...result.scope, skipped } }] }, { color: false, verbose: false }).split('\n');
+
+    expect(lines.filter((line) => line.includes('larger than 20 MiB')).map((line) => line.trim())).toEqual([
+      expect.stringMatching(/4 files larger than 20 MiB not read: data\/1\.sql, data\/2\.sql, data\/3\.sql$/),
+    ]);
   });
 
   it('is not named when the rule leaves it out', async () => {
@@ -121,5 +137,25 @@ describe('ripgrep and a file over the size limit', () => {
       { path: 'data/with.sql', reason: 'too-large' },
       { path: 'data/without.sql', reason: 'too-large' },
     ]);
+  });
+
+  // A file can go between ripgrep naming it and its size being read. Not
+  // knowing its size is no reason to call it large: it is read, and the read
+  // says what it found.
+  it.skipIf(!rgPath)('searches a file it named whose size could not be read', async () => {
+    const root = await makeTempRepo({ 'data/a.sql': `${TOKEN}\n` });
+    temporary.push(root);
+    process.env.SPEC_GUARD_RG = rgPath as string;
+    const ripgrep = await resolveEngine('ripgrep');
+    const stat = nodeIo.stat;
+    const unsized = vi.spyOn(nodeIo, 'stat').mockImplementation((target) => (target.endsWith('a.sql') ? Promise.resolve(null) : stat(target)));
+    try {
+      const searched = await ripgrep.search({ root, symbol: TOKEN, targets: ['data'], options: searchOptions() });
+      expect(unsized).toHaveBeenCalled();
+      expect(searched.count).toBe(1);
+      expect(searched.scope.skipped).toEqual([]);
+    } finally {
+      unsized.mockRestore();
+    }
   });
 });
