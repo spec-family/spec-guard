@@ -607,7 +607,8 @@ export function parseArgs(argv: readonly string[], cwd: string): CliOptions {
         // either is read by both until the family settles on one after the
         // format freeze (spec-core's ADR-0005, amended 2026-11-12).
         // Whether it is a format at all is decided just below, by the lists.
-        const value = (written === 'pretty' ? 'human' : written) as OutputFormat;
+        const named = written === 'pretty' ? 'human' : written;
+        const value = named as OutputFormat;
         // mcp refused --format above, so every command that gets here writes one.
         const formats = FORMATS[command as Exclude<Command, 'mcp'>];
         if (!formats.includes(value)) {
