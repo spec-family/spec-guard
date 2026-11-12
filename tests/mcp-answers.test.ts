@@ -63,8 +63,10 @@ describe('get_dependents', () => {
 
   it('writes no truncated where every dependent is listed, and lists up to MAX_DEPENDENTS by default', async () => {
     const [result] = (await tool('get_dependents', { paths: ['chain/c0.ts'] })).structuredContent?.['results'] as Array<Record<string, unknown>>;
+    const [exact] = (await tool('get_dependents', { paths: ['chain/c0.ts'], max_files: CHAIN - 1 })).structuredContent?.['results'] as Array<Record<string, unknown>>;
 
     expect(result).not.toHaveProperty('truncated');
+    expect(exact).not.toHaveProperty('truncated');
     expect(MAX_DEPENDENTS).toBe(200);
   });
 });
@@ -87,6 +89,8 @@ describe('check_architecture', () => {
 
     expect(called).toMatchObject({ isError: true });
     expect(called.content[0]?.text).toBe('"src/domain/new.ts" is not on disk, so no rule can be checked for it: save it first, or pass its text in "contents".');
+    const two = await tool('check_architecture', { paths: ['src/a.ts', 'src/domain/order.ts', 'src/b.ts'] });
+    expect(two.content[0]?.text).toBe('"src/a.ts", "src/b.ts" are not on disk, so no rule can be checked for them: save them first, or pass their text in "contents".');
   });
 
   it('checks a file not yet saved from contents, and the rules that govern it alone', async () => {

@@ -407,7 +407,7 @@ export function createMcpHandler(options: McpServerOptions): (message: unknown) 
     // checked, it passed, which said nothing true about it (round 29).
     const absent = (paths ?? []).filter((query) => !query.exists).map((query) => query.path);
     if (absent.length > 0) {
-      return toolError(`${absent.map((file) => `"${file}"`).join(', ')} ${absent.length === 1 ? 'is' : 'are'} not on disk, so no rule can be checked for ${absent.length === 1 ? 'it' : 'them'}: save it first, or pass its text in "contents".`);
+      return toolError(`${absent.map((file) => `"${file}"`).join(', ')} ${absent.length === 1 ? 'is' : 'are'} not on disk, so no rule can be checked for ${absent.length === 1 ? 'it' : 'them'}: save ${absent.length === 1 ? 'it' : 'them'} first, or pass ${absent.length === 1 ? 'its' : 'their'} text in "contents".`);
     }
 
     const settings = await current();
