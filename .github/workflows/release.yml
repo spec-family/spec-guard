@@ -22,12 +22,13 @@ name: Release
 # ever ticked, the stage step below becomes `npm publish` and the approval step
 # disappears.
 #
-# Two jobs, because the job holding the OIDC token should run as little code as
-# it can. `verify` installs the devDependencies - Stryker, vitest, a ripgrep
-# binary in a package for the platform - runs the suite, and packs a tarball.
-# `publish` checks out nothing and installs no dependencies at all; it hands
-# that same tarball to npm. What reaches the registry is the artifact the tests
-# ran against, not a second build that merely shares a commit with it.
+# The job holding the OIDC token runs as little code as it can. `check` reads
+# the commit and the version before anything is installed, `ci` is ci.yml on
+# the tagged commit, every leg of its matrix, `verify` installs the
+# devDependencies and packs a tarball, and `publish` checks out nothing and
+# installs no dependencies at all; it hands that same tarball to npm. What
+# reaches the registry is the artifact packed from the commit the tests ran
+# on, not a second build that merely shares a commit with it.
 
 on:
   push:
@@ -59,17 +60,14 @@ permissions:
   contents: read
 
 jobs:
-  verify:
-    name: verify and pack
+  check:
+    name: the commit and the version
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 5
 
     steps:
       # Pinned to commits, with the tag beside each: a moved tag would be a
-      # way into the tarball. The checkout keeps no token for `npm ci` and
-      # the suite to find, and no dependency cache is restored: other runs
-      # write it, and the tarball comes from the lockfile and the registry
-      # alone.
+      # way into the tarball. The checkout keeps no token.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # All of history, so the tagged commit can be checked against main.
@@ -104,11 +102,6 @@ jobs:
           else
             echo "$GITHUB_SHA is not on main: a rehearsal from $GITHUB_REF_NAME, which stages nothing."
           fi
-
-      # No dependency's install script runs: the tree needs none, npm 12 runs
-      # none unless package.json allows the package, and the flag has npm 10 and
-      # 11 run none either (tests/npm.test.ts).
-      - run: npm ci --ignore-scripts
 
       # The tag is the version claim and the changelog is the description of it.
       # Disagreement means the tag is wrong, and saying so costs a minute;
@@ -148,19 +141,45 @@ jobs:
           fi
           echo "Releasing $version from $GITHUB_REF_NAME." >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Type check
-        run: npm run lint
+  # Every leg of the matrix, on the commit being released, where this file
+  # used to run the suite on one: a tag push runs no CI, and main's CI is
+  # cancelled by a newer push, so a tagged commit may never have finished one.
+  # Its own ADRs, `prove` and `cites` run there too. A called workflow is
+  # handed no more than its caller's job names, and ci.yml's code scanning
+  # uploads SARIF.
+  ci:
+    needs: check
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
+      security-events: write
+
+  verify:
+    name: verify and pack
+    needs: [check, ci]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+
+    steps:
+      # The checkout keeps no token, and no dependency cache is restored:
+      # other runs write it, and the tarball comes from the lockfile and the
+      # registry alone.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          package-manager-cache: false
+
+      # No dependency's install script runs: the tree needs none, npm 12 runs
+      # none unless package.json allows the package, and the flag has npm 10 and
+      # 11 run none either (tests/npm.test.ts).
+      - run: npm ci --ignore-scripts
 
       - name: Build
         run: npm run build
-
-      - name: Test
-        run: npm test
-
-      # The same step CI runs. A release that cannot execute its own ADRs is not
-      # a release this package is entitled to make.
-      - name: Execute this repository's own specs
-        run: node ./bin/spec-guard.js --verbose
 
       # `npm pack` rather than `npm publish`, so the exact bytes can be listed
       # and hashed in the log before anything is sent. Packing does not run

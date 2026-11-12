@@ -201,7 +201,8 @@ documentation (spec-core's
    or shown equivalent: a comment beside the code says why, and ADR-0003 records
    it. A change to `src/` other than such a comment goes through a pull request,
    and back to the start of this step.
-3. **Commit `release: <x.y.z>` on main**:
+3. **Open the release pull request**, from a branch `release-<x.y.z>` cut
+   from main, with one commit, `release: <x.y.z>`:
    `npm version <x.y.z> --no-git-tag-version` for `package.json` and
    `package-lock.json`; the same version in `server.json`, twice, as
    `version` and as the package's `version`, which `npm version` does not
@@ -210,17 +211,22 @@ documentation (spec-core's
    figures in the README's line under "spec-guard checks itself" and in a new
    `### <x.y.z>: ...` section of ADR-0003, above the last release's. The commit
    message gives the sweep - its commit, score, mutants and survivors - and
-   what was done about each new survivor.
-4. **Tag it and push both**:
+   what was done about each new survivor. Main's ruleset takes nothing but a
+   pull request whose `all green` check passed, so the release commit is one
+   too.
+4. **The maintainer merges it** once its checks are green.
+5. **Tag the merge commit and push the tag**, by the commit the pull request
+   names as its merge, since another merge may have moved main since:
 
    ```bash
-   git tag -a v<x.y.z> -m v<x.y.z>
-   git push origin main v<x.y.z>
+   git fetch origin
+   git tag -a v<x.y.z> -m v<x.y.z> <merge-commit>
+   git push origin v<x.y.z>
    ```
 
-5. **CI stages it**, as below.
-6. **The maintainer approves it** with a second factor.
-7. **The maintainer lists it in the MCP Registry**, once npm serves it:
+6. **CI stages it**, as below.
+7. **The maintainer approves it** with a second factor.
+8. **The maintainer lists it in the MCP Registry**, once npm serves it:
 
    ```bash
    gh workflow run mcp-registry.yml --ref main -f version=<x.y.z>
@@ -232,9 +238,11 @@ documentation (spec-core's
 
 1. refuses the release unless the tagged commit is on main, and the tag,
    `package.json`, both versions in `server.json` and a `## <version>`
-   heading in `CHANGELOG.md` all agree;
-2. type checks, builds, runs the suite and executes this repository's own ADRs.
-   A tag push does not run CI, so the release job runs those steps itself;
+   heading in `CHANGELOG.md` all agree, before anything of the commit is
+   installed;
+2. runs `ci.yml` on the tagged commit, every leg of its matrix, its own
+   ADRs, `prove` and `cites` among them: a tag push does not run CI, and
+   main's CI may have been cancelled by a newer push before it finished;
 3. `npm pack`s the tarball, prints its file list and its SHA-256, and hands that
    exact file to the publishing job. Nothing is rebuilt in between, so what
    reaches the registry is the artifact the tests ran against;
