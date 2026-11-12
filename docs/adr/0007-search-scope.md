@@ -699,3 +699,46 @@ the format is frozen, so `too-large` is in `NAMED_REASONS` and not in
 walk's answer and ripgrep's must agree on a large file that holds no match,
 which means reading one in pieces rather than whole, or measuring it with
 ripgrep: that is the decision to make with the move.
+
+## Amended 2026-11-12: a regex rule runs within a time budget
+
+`symbol="(a+)+$" regex="true"` over a file holding thirty `a`s and a `!`
+held the scanner until CI killed the job, 20 seconds in round 29's
+reproduction. Under ripgrep it held too once a second line matched, since
+the scanner counts each file ripgrep names, and the MCP server, which runs
+the same scan, stopped answering. ADR-0015 took backtracking out of every
+glob and ADR-0017 out of every citation pattern; a regex rule is a `RegExp`
+by design, and nothing said what one could cost.
+
+V8 has an engine that cannot backtrack. Measured on Node 24.22.1:
+`--enable-experimental-regexp-engine-on-excessive-backtracks`, set at
+runtime through `v8.setFlagsFromString`, took `(a+)+$` with the `gm` flags
+from a hang to 2 ms. It cannot take a regex rule over. A rule is built with
+look-ahead and look-behind for ripgrep's `^` and `$` and with the `v` flag
+(amended 2026-10-24), and the linear engine refuses each - "Cannot be
+executed in linear time" for the rule as built, with `v`, with `u` and with
+neither - as it refuses a back-reference, a look-ahead, `\b` and `\p{...}`
+under `u`, `i` with `m`, and the `d` flag. Rebuilding the dialect without
+them would undo what made both engines read one rule one way. A rule the
+linear engine refuses falls back to nothing: the same pattern with a
+back-reference took 10 seconds with the flag set.
+
+What does stop a match is a watchdog. `vm`'s `runInContext` with a
+`timeout` starts a thread that ends whatever the script called once the time
+is up, a match in the middle of backtracking among them, and the thread
+then goes on: the same `(a+)+$` stopped 8 ms past a 500 ms budget, and the
+next call ran. It costs about 160 µs a call on Windows, for the thread, so a
+literal rule, escaped before it is built and matched in time proportional to
+its text, is not timed, and neither is a file ripgrep finds no match in. A
+regex rule's match on each file it scans runs within a budget of a second,
+and a second more for each whole MiB, which a match proportional to its text
+does not reach on the largest file read.
+
+A file a rule was stopped on is `timed-out` in the ledger, and a gap: it may
+hold a match nobody counted, as an unreadable file may, so `--strict` fails
+on it and a plain run says it. Under ripgrep the ledger can name fewer such
+files than under the scanner, since ripgrep's regex crate cannot backtrack
+and a file it found no match in is read and clean. The budget's test runs
+on Node 22, 24 and 26 in CI.
+
+<!-- @assert-count target="src/engine.ts" symbol="withinBudget(() => scanContent(" expected="1" reason="a regex rule's match on a file runs within a time budget" -->

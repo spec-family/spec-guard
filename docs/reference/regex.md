@@ -37,6 +37,27 @@ and `[\w-.]` read as they did
 ([ADR-0007](https://github.com/spec-family/spec-guard/blob/main/docs/adr/0007-search-scope.md),
 amended 2026-10-24).
 
+## Time
+
+A `regex` can backtrack without end on some text, as `(a+)+$` does over
+thirty `a`s and a `!`, and nothing in a thread can interrupt a match once it
+has started. So the scanner gives a regex rule's match on each file a time
+budget: a second, and a second more for each whole MiB of the file, far more
+than a match takes that runs in time proportional to its text. A file a rule
+was stopped on is named, and is a gap, as a file that could not be read is:
+`--strict` fails on it, and `--json` has it in `skipped` with
+`reason: "timed-out"`.
+
+```text
+⚠ 1 file not searched to the end: the regular expression was still matching when its time ran out, as one that backtracks without end does: src/trap.txt
+```
+
+ripgrep's regex crate cannot backtrack, so a file ripgrep finds no match in
+is not timed at all. A literal `symbol` is never timed: it is escaped before
+it is built. V8's linear engine, which cannot backtrack either, refuses the
+look-around and the `v` flag the scanner builds a rule with
+([ADR-0007](https://github.com/spec-family/spec-guard/blob/main/docs/adr/0007-search-scope.md#amended-2026-11-12-a-regex-rule-runs-within-a-time-budget)).
+
 ## A byte that is no UTF-8
 
 A byte that is no UTF-8, in a Latin-1 file say, is no character to a rule,
