@@ -95,7 +95,8 @@ spec-core's
 conditions. A pull request that moves Stryker or vitest sweeps every mutant,
 since an incremental file is restored only by the toolchain that wrote it.
 The order keeps its own record of the file that failed last
-(`lastRun`), as vitest 5's cache does not.
+(`lastRun`), as vitest 5's cache does not, and a shard's workers share
+it through a file in the sandbox, as they shared vitest 4's cache.
 
 The mutation `break` and the coverage floors in `vitest.config.ts` sit below
 the last measurement. They move up with the measurement and never down to make
@@ -157,10 +158,13 @@ A release ([ADR-0019](docs/adr/0019-releases-are-staged-by-ci.md)):
 2. Wait for main's full mutation sweep, and replay every survivor it has that
    the last release did not: killed, deleted, or shown equivalent with a
    comment at the code and a record in ADR-0003.
-3. Commit `release: <x.y.z>` on main: the version (in `package.json`,
-   `package-lock.json` and twice in `server.json`), `## Unreleased` renamed,
-   and the sweep's figures in the README and in a new section of ADR-0003.
-4. Tag it `v<x.y.z>` and push. CI stages the version on npm with provenance.
+3. Open the release pull request, `release: <x.y.z>`, from a branch
+   `release-<x.y.z>`: the version (in `package.json`, `package-lock.json` and
+   twice in `server.json`), `## Unreleased` renamed, and the sweep's figures in
+   the README and in a new section of ADR-0003. The maintainer merges it once
+   `all green` passes: main's ruleset takes no direct push (since 2026-11-12).
+4. Tag the merge commit `v<x.y.z>`, annotated, and push the tag. CI stages
+   the version on npm with provenance.
 5. The maintainer approves it with a second factor.
 6. Once npm serves it, the maintainer dispatches `mcp-registry.yml` from main
    with the version, which lists the MCP server in the official MCP Registry
