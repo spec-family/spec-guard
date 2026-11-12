@@ -666,3 +666,36 @@ that reads another version fails it, with a message that says what moved
 and that this paragraph and the README's are what to update.
 
 <!-- @assert-count target="src/engine.ts" symbol="readBytes(buffer)" expected="1" reason="the scanner reads a file's bytes as ripgrep does" -->
+
+## Amended 2026-11-12: a file over the size limit is named
+
+Both engines left a file over `MAX_FILE_SIZE`, 20 MiB, out of a directory's
+search, and nothing said so: ripgrep was handed the number as
+`--max-filesize`, which skips such a file silently, and the walk passed over
+it before it reached the ledger. Round 29's evaluation put a 21 MiB file
+holding the forbidden symbol under a rule, and the run passed `--strict` with
+`skipped: []`. The limit was written in no document. It is the one skip
+spec-guard decided that no reader was told of, the case this ADR exists to
+refuse.
+
+A file over the limit is now `too-large` in the ledger. The walk names every
+one it meets, a target named directly among them, since it reads none of
+them. ripgrep is handed no limit: it searches a file of any size without
+holding it whole, so a file it found nothing in was read and is clean. The
+files it names are measured, a few `stat` calls where the walk that measures
+every file is what ripgrep is there to spare, and one over the limit is
+named instead of handed to the scanner, which reads a file whole. The two
+engines' ledgers therefore differ in one way: the walk names a large file
+it could not search, and ripgrep only one that held a symbol. Neither names
+a file that was read, and neither leaves one unsaid that might hold a match.
+
+An import rule names one too, beside the work trees it already named: no
+analysis saw it. The report says `1 file larger than 20 MiB not read`, and
+JSON has it in `skipped` with `reason: "too-large"`.
+
+It fails nothing yet. spec-core's ADR-0009 holds what fails `--strict` while
+the format is frozen, so `too-large` is in `NAMED_REASONS` and not in
+`UNCERTAIN_REASONS`, and the release after the freeze moves it. By then the
+walk's answer and ripgrep's must agree on a large file that holds no match,
+which means reading one in pieces rather than whole, or measuring it with
+ripgrep: that is the decision to make with the move.

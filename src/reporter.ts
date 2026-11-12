@@ -236,6 +236,18 @@ function scopeNotes(ledger: ScopeLedger): string[] {
     );
   }
 
+  // Not failed on yet, and said for that reason: a rule that passes over a
+  // file it never read says which one (ADR-0007, amended 2026-11-12).
+  const large = ledger.skipped.filter((entry) => entry.reason === 'too-large');
+  if (large.length > 0) {
+    notes.push(
+      `${countLabel(large.length, 'file')} larger than 20 MiB not read: ${large
+        .slice(0, 3)
+        .map((entry) => entry.path)
+        .join(', ')}`,
+    );
+  }
+
   // Not a gap, and said for that reason: a checkout's run that passes because
   // a worktree inside it was not read must say which one it did not read.
   const trees = ledger.skipped.filter((entry) => entry.reason === 'worktree');
