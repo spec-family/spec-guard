@@ -2992,3 +2992,66 @@ Eight shards stay: a ninth would cost every sweep a runner's set-up and a
 dry run, for a slowest shard held up by one file all the same. The next
 sweeps on main measure the table, and the rule above holds: past 20
 minutes, move files again.
+
+## Amended 2026-11-12: the order's record, shared between a sweep's workers
+
+The order keeps its own record of the file that failed when the worker
+last ran it (the amendment of 2026-11-09), and kept it in the worker's
+memory. A worker Stryker starts in place of one that timed out began with
+none, where on vitest 4 it read the cache file every worker rewrote after
+each run. Static mutants run last in each shard, after the timeouts, so
+mostly on such workers. spec-core found it in an experiment and took the
+fix first (its
+[ADR-0007](https://github.com/spec-family/spec-core/blob/main/docs/adr/0007-verification.md),
+the entry of 2026-11-12, and
+[ADR-0008](https://github.com/spec-family/spec-core/blob/main/docs/adr/0008-toolchain.md),
+amended 2026-11-12): its static mutants' tests before their kills came to
+23,734 to 29,259 in main's seven sweeps with the record in memory alone,
+against 11,731 to 17,936 on vitest 4, and with the record shared 17,664 in
+its experiment and 17,621 in the sweep of its pull request, spec-core#77.
+
+**What changed.** `vitest.mutation.config.ts` shares the record as
+spec-core's does: where the process is one of Stryker's workers
+(`STRYKER_MUTATOR_WORKER`), through `.vitest-order-record.json` in the
+folder it runs in, the shard's sandbox, read once when the worker loads
+the configuration and written whole after each run, through a file of the
+process's own renamed over it. A process that is not a worker, `npm test`
+or a test, reads and writes none. No workflow changes, and both tiers
+share it, the incremental one for the mutants it runs.
+`tests/mutation-order.test.ts` holds it as spec-core's test does: vitest
+made as Stryker's runner makes it, in processes of their own in a sandbox
+of two files, and the functions that name, read and write the file as a
+library.
+
+**What it measured.** Main's last two full sweeps, of ad46b21 and 4566965
+(runs 43073021582 and 43065997393), read 99.26% over 15,761, 115
+survivors, and 1,134,197 and 1,138,407 tests before the kills of 2,692
+static mutants, 600 and 603 of them after more than 200 tests. The pull
+request's full sweep, dispatched on its branch, is set beside them below.
+
+**The pull request's sweep.** Run 43183613342, of 9ce5df5, dispatched on
+the branch with `full`:
+
+| | ad46b21 (43073021582) | 4566965 (43065997393) | 9ce5df5 (43183613342) |
+| --- | --- | --- | --- |
+| Score | 99.26% | 99.26% | 99.26% |
+| The static mutants' tests before their kills | 1,134,197 | 1,138,407 | 1,077,674 |
+| Static kills after more than 200 tests | 600 | 603 | 565 |
+| Tests to a kill, not static | 9.50 | 9.13 | 9.33 |
+| Eight shards, the slowest (minutes) | 124.3, 19.8 | 126.6, 19.6 | 131.6, 20.0 |
+
+- **The score and the 116 undetected mutants are main's**, by file, mutated
+  text and replacement: none new and none gone against either sweep.
+- **The static mutants ran 5% fewer tests before their kills**, still above
+  vitest 4's 647,610 to 755,265. The record moved what it reaches: the
+  static mutants of `src/cites.ts`, `src/polyglot.ts`, `src/parser.ts` and
+  `src/glob.ts` ran 6 to 18% fewer, where a worker started after a timeout
+  now leads with the file that failed before. `src/cli.ts` ran 244,999, as
+  on main: its option tables are killed only by the files that run whole
+  commands, and after the file that failed last a static mutant runs the
+  rest by the times of vitest 5's cache, which put those files last
+  (the amendment of 2026-11-09). The record does not reach that order.
+- **The shards took 131.6 minutes, 5 to 7 more than main's two**, and the
+  slowest 20.0 against the job's 30. The record costs a worker one read and
+  each run one write of a small file, seconds over a sweep, so the rest is
+  the runners'.

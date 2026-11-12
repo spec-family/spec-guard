@@ -29,6 +29,21 @@ is deprecated before it goes, is spec-core's
   ([ADR-0005](https://github.com/spec-family/spec-guard/blob/main/docs/adr/0005-import-assertions.md#amended-2026-11-12-what-a-rule-could-not-follow-by-path-is-said),
   amended 2026-11-12).
 
+### Changed
+
+- **A worker of the mutation sweep that Stryker starts after a timeout
+  begins with the order's record the others left, as on vitest 4.** The
+  record of each test file's last verdict was kept in each worker's memory,
+  so a worker started in place of one that timed out began with none.
+  Static mutants run last, mostly on such workers. The workers of one shard
+  now share the record through a file in Stryker's sandbox, read once when
+  a worker starts and written whole after each run, as spec-core's do
+  (ADR-0003, amended 2026-11-12). The static mutants' tests before their
+  kills fell from 1,134,197 and 1,138,407 in main's last two sweeps to
+  1,077,674 in the sweep of the change, with the score and the survivors
+  unchanged. Development tooling only: nothing spec-guard checks or reports
+  changed. Upgrading: nothing to do.
+
 ## 0.34.0
 
 `"ignoreStatus"` takes a list of spec patterns, whose documents are read
