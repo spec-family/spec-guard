@@ -728,3 +728,42 @@ The real path and not the directories' listings, because a watch session
 runs a rule again when what it read changes, and the root's listing changes
 with every file made there. Case leaves the list of what the arithmetic
 cannot see above; content and symbolic links stay on it.
+
+## Amended 2026-11-12: bounded answers, honest checks, and the claims
+
+Round 29's evaluation found the server's answers unbounded and two of its
+checks untrue. `get_dependents` on a chain of 5,000 files answered 571 KB of
+text and 26.4 MB of structured content, some 6.7 million tokens no model can
+read. `check_architecture` on a path that is not there checked no rule and
+said every assertion held; on a spec's own path it ran none of the rules the
+spec states, since a spec governs other files, so an agent could not run the
+directive it had just written; and it read only what was saved, though
+`src/overlay.ts` reads a tree with changes in memory for `prove`. There was
+no claims tool, and `get_architectural_rules` took one path.
+
+- `get_dependents` lists at most `max_files` dependents of each path, 200
+  unless asked, the nearest first, and counts the rest in `truncated`,
+  which is there only when some were left out; `summary` lists none. The
+  text says how many depend on the path and how many are listed. The rules
+  in play are still those of every dependent.
+- `check_architecture` refuses a path neither on disk nor in `contents`,
+  with what to do. `contents` maps paths to text read in place of the disk
+  through `overlayIo`, with nothing written, and with no `paths` the files
+  it holds are the ones checked. A path that is a spec runs the rules it
+  states beside those that govern it, so a directive written in `contents`
+  is run before it is saved. A run handed a door reads with the scanner,
+  so a check with no `contents` is handed none and chooses its engine as
+  before.
+- `check_claims` runs `claims` under the configuration's `"claims"`, read
+  afresh with each request as the rest is, and is refused where there are
+  none.
+- `get_architectural_rules` takes `paths` for several, beside `path`.
+- Each tool declares an `outputSchema`: an object, with the keys a reader of
+  its structured content starts from. No deeper: each document's shape is
+  the reference's, and a schema restating it would be a second copy.
+
+Reading the client's roots with `roots/list`, as spec-harness does, waits:
+the server would have to send a request of its own and wait for the answer,
+which spec-core's `jsonrpc` module, which this server is built on, does not
+yet do. The root is the one the server was started in, or `--root`, as
+before.

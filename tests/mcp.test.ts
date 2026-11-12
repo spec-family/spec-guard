@@ -364,19 +364,29 @@ describe('the era helpers', () => {
 /* --------------------------------------------------------------------- tools */
 
 describe('tools/list', () => {
-  it('lists the three tools, read-only and closed-world, with schemas that refuse extra arguments', async () => {
+  it('lists the four tools, read-only and closed-world, with schemas that refuse extra arguments', async () => {
     const listed = (await result('tools/list')) as { tools: Array<Record<string, unknown>> };
     expect(listed).toEqual({ tools: TOOLS });
     // Pinned as a list on purpose: a tool added or dropped is a decision about
     // what an agent is offered, and should arrive here as a diff. The third,
-    // get_dependents, was added on 2026-09-26 (ADR-0018).
-    expect(listed.tools.map((entry) => entry['name'])).toEqual(['get_architectural_rules', 'check_architecture', 'get_dependents']);
+    // get_dependents, was added on 2026-09-26 (ADR-0018), and the fourth,
+    // check_claims, on 2026-11-12 (ADR-0012).
+    expect(listed.tools.map((entry) => entry['name'])).toEqual(['get_architectural_rules', 'check_architecture', 'get_dependents', 'check_claims']);
     // --help named two of them for a release after the third arrived.
     for (const entry of listed.tools) expect(HELP).toContain(entry['name'] as string);
     for (const entry of listed.tools) {
       expect(entry['annotations']).toEqual({ readOnlyHint: true, idempotentHint: true, openWorldHint: false });
       expect(entry['inputSchema']).toMatchObject({ type: 'object', additionalProperties: false });
+      // A shape a client can hold structured content to: an object, with the
+      // keys a reader starts from.
+      expect(entry['outputSchema']).toMatchObject({ type: 'object', additionalProperties: true });
     }
+    expect(listed.tools.map((entry) => (entry['outputSchema'] as { required: string[] }).required)).toEqual([
+      ['root', 'specFiles', 'results', 'documents', 'errors'],
+      ['ok', 'paths', 'rules', 'failures', 'errors'],
+      ['root', 'results', 'rules'],
+      ['ok', 'totals', 'claims', 'findings'],
+    ]);
     // The words a model decides by. Pinned whole, because a description that
     // lost a clause would still be a string of plausible length.
     expect(listed.tools.map((entry) => [entry['title'], entry['description']])).toEqual([
@@ -393,7 +403,9 @@ describe('tools/list', () => {
         'Check the architecture rules',
         'Runs the architecture rules in force against the files on disk and reports every violation, as CI would. ' +
           'Given paths, runs only the rules that govern them - each over its whole scope, so a count or a cycle is judged ' +
-          'exactly as CI judges it - and marks which violations lie in those paths. Save your edits before calling.',
+          'exactly as CI judges it - and marks which violations lie in those paths. A path that is a spec document runs the rules it states too, ' +
+          'so a directive just written can be seen to hold. A file not saved yet is checked from contents, in memory; ' +
+          'a path that is neither on disk nor in contents is refused, since no rule can be checked for it.',
       ],
       [
         'Files that depend on a path',
@@ -406,6 +418,12 @@ describe('tools/list', () => {
           'and Go, Rust, C# and absolute Python imports, which name modules rather than files, are counted, never guessed, ' +
           'so a short list is not mistaken for a complete one. Reads the codebase on disk, so every path must exist.',
       ],
+      [
+        'Check the labelled claims',
+        "Holds each claim the project's specifications label - Implemented, Specified and the rest, as the configuration's \"claims\" names them - " +
+          'to the evidence its label asks for: a directive under it that names a test and can be shown to fail, a criterion, one label each. ' +
+          'Reports every claim that falls short, with what to do. Refused where the project configures no claims.',
+      ],
     ]);
     expect(INSTRUCTIONS).toBe(
       "spec-guard enforces what this project's Markdown documents - specs, ADRs, READMEs and the like - say about its code. " +
@@ -413,16 +431,18 @@ describe('tools/list', () => {
         'imports it must not make, the layer it belongs to, what it must be named and the files it needs beside it, text it must not contain. ' +
         'Before changing a file that other files import - renaming or removing an export, changing what a function takes or returns - ' +
         'call get_dependents with its path to learn every file the change can reach and the rules in force over them. ' +
-        'After changing files, call check_architecture with their paths to find violations before CI does. ' +
+        'After changing files, call check_architecture with their paths to find violations before CI does; ' +
+        "pass a file not yet saved, a spec among them, in contents, and a spec's own rules are checked when its path is given. " +
+        'Where the project labels its claims, check_claims holds each to the evidence its label asks for. ' +
         'Rules in draft, proposed, rejected, deprecated, superseded or archived documents - the status written in English, such as status: superseded - are not in force and are only counted.',
     );
     expect(listed.tools[0]?.['inputSchema']).toEqual({
       type: 'object',
       properties: {
-        path: { type: 'string', description: 'A file or directory, relative to the project root or absolute inside it.' },
+        path: { type: 'string', description: 'A file or directory, relative to the project root or absolute inside it. Give this or paths.' },
+        paths: { type: 'array', items: { type: 'string' }, minItems: 1, description: 'Several files or directories, each answered in turn. Give this or path.' },
         include_inactive: { type: 'boolean', description: 'Also list rules from draft, proposed, rejected, deprecated, superseded and archived documents, the status written in English.' },
       },
-      required: ['path'],
       additionalProperties: false,
     });
     expect(listed.tools[1]?.['inputSchema']).toEqual({
@@ -431,7 +451,12 @@ describe('tools/list', () => {
         paths: {
           type: 'array',
           items: { type: 'string' },
-          description: 'Files or directories to check the rules of, relative to the project root. Omit to run every rule.',
+          description: 'Files or directories to check the rules of, relative to the project root. Omit to run every rule, or the rules of the files in contents.',
+        },
+        contents: {
+          type: 'object',
+          additionalProperties: { type: 'string' },
+          description: 'Files as they would be saved, by path relative to the project root, read in place of what is on disk. Nothing is written.',
         },
       },
       additionalProperties: false,
@@ -447,6 +472,8 @@ describe('tools/list', () => {
         },
         depth: { type: 'integer', minimum: 1, description: 'Follow dependents at most this many imports away. Omit to follow every one.' },
         include_inactive: { type: 'boolean', description: 'Also list rules from draft, proposed, rejected, deprecated, superseded and archived documents, the status written in English.' },
+        max_files: { type: 'integer', minimum: 1, description: 'List at most this many dependents of each path, the nearest first, and count the rest in truncated. Default 200.' },
+        summary: { type: 'boolean', description: 'Count the dependents of each path in truncated and list none of them.' },
       },
       required: ['paths'],
       additionalProperties: false,
@@ -565,18 +592,20 @@ describe('get_architectural_rules', () => {
 
   it('tells the model what to fix about its arguments, as a tool error it can read', async () => {
     const cases: Array<[unknown, string]> = [
-      [{}, '"path" is required and must be a string.'],
-      [{ path: 3 }, '"path" is required and must be a string.'],
+      [{}, '"path" is required and must be a string, or "paths" an array of them.'],
+      [{ path: 3 }, '"path" is required and must be a string, or "paths" an array of them.'],
       [{ path: 'src', include_inactive: 'yes' }, '"include_inactive" must be true or false.'],
-      [{ path: 'src', paths: ['a'] }, 'Unknown argument "paths"; this tool takes path and include_inactive.'],
-      [{ path: 'src', a: 1, b: 2 }, 'Unknown arguments "a", "b"; this tool takes path and include_inactive.'],
+      [{ path: 'src', paths: ['a'] }, 'Give "path" or "paths", not both.'],
+      [{ paths: [] }, '"paths" must be a non-empty array of strings.'],
+      [{ paths: ['src', 3] }, '"paths" must be a non-empty array of strings.'],
+      [{ path: 'src', a: 1, b: 2 }, 'Unknown arguments "a", "b"; this tool takes path, paths and include_inactive.'],
       [{ path: '' }, 'A path to query must not be empty.'],
       [{ path: '../elsewhere' }, `"../elsewhere" is outside the root ${root.replace(/\\/g, '/')}.`],
     ];
     for (const [args, message] of cases) {
       expect(await tool('get_architectural_rules', args)).toEqual({ content: [{ type: 'text', text: message }], isError: true });
     }
-    expect(await tool('get_architectural_rules')).toEqual({ content: [{ type: 'text', text: '"path" is required and must be a string.' }], isError: true });
+    expect(await tool('get_architectural_rules')).toEqual({ content: [{ type: 'text', text: '"path" is required and must be a string, or "paths" an array of them.' }], isError: true });
   });
 
   it('says how to point the server at the specs when there are none', async () => {
@@ -793,16 +822,16 @@ describe('check_architecture', () => {
     const domain = await tool('check_architecture', { paths: ['src/domain'] });
     expect(domain.structuredContent).toMatchObject({ paths: ['src/domain'], rules: { inForce: 3, checked: 3, failed: 1 } });
     expect((domain.structuredContent?.['failures'] as Array<{ matches: Array<{ inPaths: boolean }> }>)[0]?.matches[0]?.inPaths).toBe(false);
-    expect(domain.content[0]?.text.startsWith('Checked 3 of 3 rules in force - the ones that govern src/domain.\n\n')).toBe(true);
+    expect(domain.content[0]?.text.startsWith('Checked 3 of 3 rules in force - the ones that govern or are stated in src/domain.\n\n')).toBe(true);
 
     const db = await tool('check_architecture', { paths: ['src/infra/db.ts', 'README.md'] });
     expect((db.structuredContent?.['failures'] as Array<{ matches: Array<{ inPaths: boolean }> }>)[0]?.matches[0]?.inPaths).toBe(true);
     expect(db.structuredContent).toMatchObject({ rules: { inForce: 3, checked: 2 } });
-    expect(db.content[0]?.text.startsWith('Checked 2 of 3 rules in force - the ones that govern src/infra/db.ts, README.md.\n\n')).toBe(true);
+    expect(db.content[0]?.text.startsWith('Checked 2 of 3 rules in force - the ones that govern or are stated in src/infra/db.ts, README.md.\n\n')).toBe(true);
 
     const readme = await tool('check_architecture', { paths: ['README.md'] });
     expect(readme.structuredContent).toMatchObject({ ok: true, paths: ['README.md'], rules: { inForce: 3, checked: 0, passed: 0, failed: 0 }, failures: [] });
-    expect(readme.content[0]?.text.startsWith('Checked 0 of 3 rules in force - the ones that govern README.md.\n\n')).toBe(true);
+    expect(readme.content[0]?.text.startsWith('Checked 0 of 3 rules in force - the ones that govern or are stated in README.md.\n\n')).toBe(true);
   });
 
   it('passes the run settings it was started with to the run', async () => {
@@ -816,7 +845,10 @@ describe('check_architecture', () => {
     const cases: Array<[unknown, string]> = [
       [{ paths: 'src' }, '"paths" must be an array of strings.'],
       [{ paths: ['src', 3] }, '"paths" must be an array of strings.'],
-      [{ path: 'src' }, 'Unknown argument "path"; this tool takes paths.'],
+      [{ path: 'src' }, 'Unknown argument "path"; this tool takes paths and contents.'],
+      [{ contents: ['x'] }, '"contents" must be an object of file paths to their text.'],
+      [{ contents: { 'src/a.ts': 3 } }, '"contents" must be an object of file paths to their text.'],
+      [{ paths: ['src/domain/gone.ts'] }, '"src/domain/gone.ts" is not on disk, so no rule can be checked for it: save it first, or pass its text in "contents".'],
       [{ paths: ['/../../..'] }, `"/../../.." is outside the root ${root.replace(/\\/g, '/')}.`],
     ];
     for (const [args, message] of cases) {
@@ -934,7 +966,10 @@ describe('get_dependents', () => {
       [{ paths: ['src'], depth: 1.5 }, depth],
       [{ paths: ['src'], depth: '2' }, depth],
       [{ paths: ['src'], include_inactive: 'yes' }, '"include_inactive" must be true or false.'],
-      [{ path: 'src' }, 'Unknown argument "path"; this tool takes paths, depth and include_inactive.'],
+      [{ path: 'src' }, 'Unknown argument "path"; this tool takes paths, depth, include_inactive, max_files and summary.'],
+      [{ paths: ['src'], max_files: 0 }, '"max_files" must be a whole number of 1 or more.'],
+      [{ paths: ['src'], max_files: 1.5 }, '"max_files" must be a whole number of 1 or more.'],
+      [{ paths: ['src'], summary: 'yes' }, '"summary" must be true or false.'],
       [{ paths: ['src/domain/gone.ts'] }, '"src/domain/gone.ts" does not exist, so nothing depends on it yet'],
       [{ paths: ['../elsewhere'] }, `"../elsewhere" is outside the root ${root.replace(/\\/g, '/')}.`],
     ];

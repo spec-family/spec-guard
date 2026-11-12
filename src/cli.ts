@@ -319,9 +319,9 @@ modules, and are counted rather than followed; an import that names no file is
 listed, never guessed at.
 
 query answers from the specs alone, without reading the codebase, so it works
-for a file that does not exist yet. mcp offers the same answer, a check and
-impact's, as the tools get_architectural_rules, check_architecture and
-get_dependents.
+for a file that does not exist yet. mcp offers the same answer, a check,
+impact's and the claims check, as the tools get_architectural_rules,
+check_architecture, get_dependents and check_claims.
 
 Exit codes
   0 all assertions passed   1 an assertion failed, or none ran under --strict
@@ -1116,11 +1116,12 @@ async function runMcp(options: CliOptions, commandLine: CliOptions, io: CliIO, u
     patterns: options.patterns,
     version: version(),
     run: runOptionsOf(options),
+    claims: options.claims,
     settings: async () => {
       const fresh: CliOptions = { ...commandLine, patterns: [...commandLine.patterns] };
       const found = await findConfig(options.root, (file) => readText(nodeIo, file));
       const config = applyConfig(fresh, found.config, found.file);
-      return { patterns: fresh.patterns, run: runOptionsOf(fresh), config };
+      return { patterns: fresh.patterns, run: runOptionsOf(fresh), config, claims: fresh.claims };
     },
   });
   // stderr is the one channel the stdio binding leaves free for people.
