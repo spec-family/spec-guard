@@ -24,10 +24,11 @@ import { createExcludeMatcher, createPathMatcher, moduleWitness } from './glob.j
 import { isGraphFile } from './graph.js';
 import { ANALYSABLE_EXTENSIONS, createImportIndex, JS_EXTENSIONS } from './imports.js';
 import { nodeIo, readText, type Io } from './io.js';
+import { createMemo, type Memo } from './memo.js';
 import { layerMatcher } from './layers.js';
 import { overlayIo, readOnce, type TreeEdit } from './overlay.js';
 import { governs, within } from './rules.js';
-import { createScopeProbe, DEFAULT_MAX_SNIPPETS, elapsed, executeAssertion, planRun, type RunOptions } from './runner.js';
+import { createScopeProbe, DEFAULT_CONCURRENCY, DEFAULT_MAX_SNIPPETS, elapsed, executeAssertion, planRun, type RunOptions } from './runner.js';
 import { readSpecs, specPath } from './specs.js';
 import { createTreeIndex, expandPartner } from './structure.js';
 import type {
@@ -53,6 +54,7 @@ export type ProveOptions = Pick<
   | 'comments'
   | 'exclude'
   | 'ignoreStatus'
+  | 'concurrency'
   | 'io'
 >;
 
@@ -71,20 +73,30 @@ interface Context {
   /** The tree as it is, read once. */
   io: Io;
   options: ProveOptions;
+  /**
+   * What one rule's executions have scanned and read, by the file's bytes: a
+   * violation changes a file or two, and every other file of the rule's tree
+   * is the one the execution before it scanned. Made for each rule, so one
+   * rule's scans are held only while it is proved.
+   */
+  memo?: Memo;
 }
 
-/** Executes one assertion over a tree, sharing nothing with any other execution. */
+/**
+ * Executes one assertion over a tree, sharing nothing with any other
+ * execution but the rule's memo, which answers only for bytes it has seen.
+ */
 function execute(assertion: Assertion, io: Io, context: Context): Promise<AssertionResult> {
-  const { options, root } = context;
+  const { options, root, memo } = context;
   return executeAssertion(assertion, {
     root,
     io,
-    engine: createJavaScriptEngine(io),
+    engine: createJavaScriptEngine(io, memo),
     allowMissingTargets: options.allowMissingTargets ?? false,
     strictTargets: options.strictTargets ?? false,
     allowEmptyScope: options.allowEmptyScope ?? false,
     maxSnippets: DEFAULT_MAX_SNIPPETS,
-    imports: createImportIndex(io),
+    imports: createImportIndex(io, memo),
     hasFiles: createScopeProbe(io),
     tree: createTreeIndex(root, io),
   });
@@ -580,8 +592,9 @@ async function probe(assertion: Assertion, claim: ProveClaim, now: AssertionResu
   return first as ProveProbe;
 }
 
-async function proveAssertion(assertion: Assertion, context: Context): Promise<ProveResult> {
+async function proveAssertion(assertion: Assertion, shared: Context): Promise<ProveResult> {
   const startedAt = performance.now();
+  const context: Context = { ...shared, memo: createMemo() };
   const base = { kind: assertion.kind, location: assertion.location, description: assertion.description, reason: assertion.reason };
   const now = await execute(assertion, context.io, context);
   if (!now.ok) {
@@ -619,9 +632,9 @@ async function proveAssertion(assertion: Assertion, context: Context): Promise<P
  * ones failed.
  *
  * Reads through `options.io` as a run does, and through the filesystem when it
- * is given none, and writes nothing. Rules are proved one at a time, each over
- * its own tree, in the order the specs state them, so the report is the same
- * every time the tree is.
+ * is given none, and writes nothing. Rules are proved `concurrency` at a time,
+ * each over its own tree, and reported in the order the specs state them, so
+ * the report is the same every time the tree is, at any concurrency.
  */
 export async function proveSpecGuard(options: ProveOptions): Promise<ProveReport> {
   const startedAt = performance.now();
@@ -630,8 +643,18 @@ export async function proveSpecGuard(options: ProveOptions): Promise<ProveReport
   const plan = planRun(await readSpecs(options.patterns, root, io, undefined, options.ignoreStatus), root, options);
   const context: Context = { root, io, options };
 
+  // Each result in its rule's place, whichever finishes first: a place a
+  // worker skipped is a hole the report would show, and one it took twice a
+  // rule proved twice, the same.
   const results: ProveResult[] = [];
-  for (const assertion of plan.assertions) results.push(await proveAssertion(assertion, context));
+  let next = 0;
+  const worker = async (): Promise<void> => {
+    while (next < plan.assertions.length) {
+      const at = next++;
+      results[at] = await proveAssertion(plan.assertions[at]!, context);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(options.concurrency ?? DEFAULT_CONCURRENCY, plan.assertions.length) }, worker));
 
   const count = (outcome: ProveResult['outcome']): number => results.filter((result) => result.outcome === outcome).length;
   return {

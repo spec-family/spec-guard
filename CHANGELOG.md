@@ -75,6 +75,10 @@ is deprecated before it goes, is spec-core's
 
 - **`--format pretty` is `--format human`**, as spec-graph names the report.
 
+- **`prove` takes `--concurrency`**, and the configuration's `concurrency`:
+  that many rules are proved at once, eight by default, and the report lists
+  them in the order the specs state them.
+
 ### Changed
 
 - **A worker of the mutation sweep that Stryker starts after a timeout
@@ -124,6 +128,15 @@ is deprecated before it goes, is spec-core's
   type-only, as `import type` is; `import('./a').then(...)` and an `else:`
   branch still count
   ([ADR-0005](https://github.com/spec-family/spec-guard/blob/main/docs/adr/0005-import-assertions.md#amended-2026-11-12-what-only-a-type-checker-reads),
+  amended 2026-11-12).
+
+- **`prove` scans a file once for each rule, not once for each violation.**
+  A rule's violations change a file or two, and each rescanned the whole
+  tree: 1,000 rules over 5,000 files took 100 seconds. A rule's executions
+  now share a memo of the scans of the files they did not change; 200 rules
+  over 2,000 files went from 18 seconds to 3, and to 1.6 at the default
+  concurrency
+  ([ADR-0016](https://github.com/spec-family/spec-guard/blob/main/docs/adr/0016-rules-seen-to-fail.md#amended-2026-11-12-a-rules-violations-reuse-its-scans-and-rules-are-proved-at-once),
   amended 2026-11-12).
 
 ## 0.34.0

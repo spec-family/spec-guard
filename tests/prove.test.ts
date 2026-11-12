@@ -989,8 +989,18 @@ describe('spec-guard prove', () => {
     ]);
   });
 
+  it('takes --concurrency, and reports the same rules in the same order at any', async () => {
+    const one = await run(['--concurrency', '1', '--json']);
+    const many = await run(['--concurrency', '3', '--json']);
+    const results = (out: string) => (JSON.parse(out) as { results: Array<Record<string, unknown>> }).results.map(({ durationMs: _, ...rest }) => rest);
+
+    expect(one.code).toBe(many.code);
+    expect(results(many.out)).toEqual(results(one.out));
+    expect(results(one.out).map((result) => result['kind'])).toEqual(['assert-absence', 'assert-structure', 'assert-absence']);
+  });
+
   it('refuses the options that mean nothing to a proof', async () => {
-    for (const option of ['--engine', '--concurrency', '--max-snippets']) {
+    for (const option of ['--engine', '--max-snippets']) {
       const { code, err } = await run([option, '1']);
       expect(code).toBe(2);
       expect(err).toEqual([`spec-guard: Option ${option} does not apply to spec-guard prove.`]);
