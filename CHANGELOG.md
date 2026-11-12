@@ -98,6 +98,10 @@ is deprecated before it goes, is spec-core's
   [ADR-0018](https://github.com/spec-family/spec-guard/blob/main/docs/adr/0018-impact.md#amended-2026-11-12-a-python-files-headline-says-what-is-followed),
   amended 2026-11-12).
 
+- **A recipe for no deep imports**, in the import rules' reference:
+  `module="src/db/**" exclude="src/db"` lets a module be imported by its
+  entry point and never past it.
+
 ### Changed
 
 - **A worker of the mutation sweep that Stryker starts after a timeout

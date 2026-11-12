@@ -43,6 +43,18 @@ as `module="lodash"` covers `lodash/fp`: `module="Shop.Application"` matches
 matches `use crate::db::pool`. Matching is case-sensitive, so a rule spanning C#
 and Go needs both conventions: `module="app/db/** App/Db/**"`.
 
+**No deep imports.** A pattern ending in `/**` matches what lies beneath a
+folder and not the folder, so a module may be imported by its entry point
+and never past it:
+
+```md
+<!-- @assert-import-absence module="src/db/**" target="src" exclude="src/db" reason="the database is reached through its index" -->
+```
+
+`import { pool } from '../db'` passes; `import { pool } from
+'../db/internal/pool'` fails, on its line. `exclude` leaves the folder's own
+files out, which import what lies beneath them.
+
 The unit counted is **files** that depend on the module. For JavaScript and
 TypeScript it understands:
 
