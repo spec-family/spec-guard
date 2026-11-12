@@ -89,3 +89,18 @@ Those are reported, and `--strict` fails on them:
 ```
 
 The counts are in `--json` too, as `skipped` on each result.
+
+**A file larger than 20 MiB is not read, and is named.** The built-in scanner
+reads a file whole, so a file over 20 MiB (20,971,520 bytes; a file of
+exactly that size is read) is left out of every rule and said:
+
+```text
+⚠ 1 file larger than 20 MiB not read: data/dump.sql
+```
+
+`--json` has it in `skipped` with `reason: "too-large"`. ripgrep searches a
+file of any size, so under it only a large file that holds the symbol is
+named, since one it found nothing in was read. `--strict` does not fail on it
+yet; the release after the family's format freeze does
+([ADR-0007](https://github.com/spec-family/spec-guard/blob/main/docs/adr/0007-search-scope.md#amended-2026-11-12-a-file-over-the-size-limit-is-named)).
+To leave such a file out on purpose, `exclude` it.

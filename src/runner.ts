@@ -1103,11 +1103,12 @@ async function prepareAssertion(
 
   if (!options.allowEmptyScope && !assertion.allowEmpty && (nothingLeft || !(await options.hasFiles(request)))) {
     // An empty scope's walk went everywhere, and the other work trees it left
-    // out are where a reader will look for the files it did not find.
+    // out, and the files too large to read, are where a reader will look for
+    // the files it did not find.
     const left = nothingLeft ? EMPTY_LEDGER.skipped : (await enumerateCandidates(request, ANY_FILE_PROBE, options.io)).skipped;
     return {
       ...base,
-      scope: { skipped: left.filter((entry) => entry.reason === "worktree") },
+      scope: { skipped: left.filter((entry) => entry.reason === "worktree" || entry.reason === "too-large") },
       ok: false,
       actual: 0,
       message: `no files were inspected, so this assertion verified nothing (${EMPTY_SCOPE_HINT})`,
@@ -1315,8 +1316,9 @@ async function executeImportAssertion(
           options.io,
         );
   // The other work trees the walk left out are said, as a text rule says
-  // them. What it could not read is not, as before.
-  const said = { ...base, scope: { skipped: enumeration.skipped.filter((entry) => entry.reason === "worktree") } };
+  // them, and so is a file too large to read, which no analysis saw. What it
+  // could not list is not, as before.
+  const said = { ...base, scope: { skipped: enumeration.skipped.filter((entry) => entry.reason === "worktree" || entry.reason === "too-large") } };
 
   // Why a missing target fails the assertion, or null when it does not. Decided
   // before scope, so a rule whose only target is gone says so rather than that

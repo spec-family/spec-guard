@@ -36,11 +36,16 @@ import {
 } from './glob.js';
 import { nodeIo, type Io } from './io.js';
 import { NO_MEMO, type Memo } from './memo.js';
-import { isBinary, LedgerBuilder, UNCERTAIN_REASONS, type ScopePolicy, type SkippedPath } from './scope.js';
+import { isBinary, LedgerBuilder, NAMED_REASONS, type ScopePolicy, type SkippedPath } from './scope.js';
 import { CUT_MARK, lineStarts, locate, MAX_SNIPPET_LENGTH } from './text.js';
 import type { EngineName, MatchLocation, SearchOptions, SearchResult } from './types.js';
 
-/** Files larger than this are skipped by both engines, keeping them in sync. */
+/**
+ * Files larger than this are read by neither engine's scanner, which reads a
+ * file whole. Each is named in the ledger as `too-large` (ADR-0007, amended
+ * 2026-11-12): the walk names every one it meets, and ripgrep, which searches
+ * a file of any size, hands over the ones that hold a symbol.
+ */
 export const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
 /**
@@ -49,9 +54,8 @@ export const MAX_FILE_SIZE = 20 * 1024 * 1024;
  * It used to be written twice and spelled differently each time - `size <=
  * MAX_FILE_SIZE` where a file was admitted and `size > MAX_FILE_SIZE` where one
  * was skipped - so the boundary was defined by two expressions that had to be
- * kept complementary by hand. ripgrep is given the same number as
- * `--max-filesize`, which is also inclusive, so all three now agree by
- * construction rather than by inspection.
+ * kept complementary by hand. Inclusive, as ripgrep's `--max-filesize` was
+ * while ripgrep was handed the number.
  */
 export function withinSizeLimit(size: number): boolean {
   return size <= MAX_FILE_SIZE;
@@ -403,7 +407,10 @@ export function buildRipgrepArgs(request: SearchRequest, patterns: readonly stri
     //                 The scanner decides what is binary, once, for both
     //                 engines; ripgrep's job is only to say which files matched.
     '--text',
-    `--max-filesize=${MAX_FILE_SIZE}`,
+    //   no --max-filesize: ripgrep searches a file of any size without
+    //                 holding it whole, and skipped one over the limit
+    //                 without a word. A file it names that is too large for
+    //                 the scanner is named in the ledger instead of read.
     //   --crlf        a line ends at CRLF and at a lone CR as well as at LF,
     //                 as the scanner's `^` and `$` read one. Without it `$`
     //                 met no line end before a CRLF and `^` none after a lone
@@ -599,9 +606,16 @@ class RipgrepEngine implements Engine {
     // 882 ms over 40,000 files where this listing took 139 and the search
     // 1,389 (ADR-0007, amended 2026-10-19).
     const [found, trees] = await Promise.all([this.filesWithMatches(first, patterns), this.workTreesBelow(first)]);
-    const { files, unreadable } = setAsideWorkTrees(trees, first.root, found);
+    const { files: matched, unreadable } = setAsideWorkTrees(trees, first.root, found);
     const names = namesWorkTree(first.options);
     const left: SkippedPath[] = trees.flatMap(({ tops }) => tops.filter(names).map((top): SkippedPath => ({ path: top, reason: 'worktree' })));
+    // Only the files ripgrep named are measured: a few, where the walk that
+    // measures every file is what ripgrep is here to spare. What it searched
+    // and found nothing in needs no saying, so the ledger names fewer files
+    // here than the scanner's walk does, and none that was read.
+    const sizes = await Promise.all(matched.map((file) => nodeIo.stat(file.absolutePath)));
+    const files = matched.filter((_, index) => withinSizeLimit(sizes[index]?.size ?? 0));
+    left.push(...matched.flatMap((file, index): SkippedPath[] => (withinSizeLimit(sizes[index]?.size ?? 0) ? [] : [{ path: file.relativePath, reason: 'too-large' }])));
     const results = await javascriptEngine.searchFiles(files, requests, unreadable, left);
     // The result names ripgrep because ripgrep is what searched the tree; the
     // scanner is a shared post-step, not a different engine.
@@ -1050,7 +1064,7 @@ export async function enumerateCandidates(
     // each time would bury the entries that do mean something. It also keeps
     // the two engines' ledgers identical, since ripgrep is only ever asked
     // about files it did not skip, and lists the work trees for itself.
-    if (reason === 'worktree' ? !names(relativePath) : !UNCERTAIN_REASONS.has(reason)) return;
+    if (reason === 'worktree' ? !names(relativePath) : !NAMED_REASONS.has(reason)) return;
     ledger.add(relativePath, reason);
   };
   let bytes = 0;
@@ -1073,9 +1087,9 @@ export async function enumerateCandidates(
 
     if (stats.isFile()) {
       const relativePath = toPosix(path.relative(request.root, absoluteTarget));
-      if (withinSizeLimit(stats.size) && admits(absoluteTarget, relativePath)) {
-        if (!admit(absoluteTarget, relativePath, stats.size)) break outer;
-      }
+      if (!admits(absoluteTarget, relativePath)) continue;
+      if (!withinSizeLimit(stats.size)) note(relativePath, 'too-large');
+      else if (!admit(absoluteTarget, relativePath, stats.size)) break outer;
       continue;
     }
 
@@ -1088,9 +1102,12 @@ export async function enumerateCandidates(
     };
 
     for await (const file of walkFiles(absoluteTarget, walkOptions)) {
-      if (!withinSizeLimit(file.size)) continue;
       const relativePath = toPosix(path.relative(request.root, file.absolutePath));
       if (!admits(file.absolutePath, relativePath)) continue;
+      if (!withinSizeLimit(file.size)) {
+        note(relativePath, 'too-large');
+        continue;
+      }
       if (!admit(file.absolutePath, relativePath, file.size)) break outer;
     }
   }

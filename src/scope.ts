@@ -37,15 +37,26 @@
  *
  * `worktree` is a directory below where a walk starts that holds a `.git` of
  * its own: another checkout, of this repository or of another one, whose
- * files are not this one's (ADR-0007, amended 2026-10-19).
+ * files are not this one's (ADR-0007, amended 2026-10-19). `too-large` is a
+ * file over the size neither engine reads whole (ADR-0007, amended
+ * 2026-11-12).
  */
-export type SkipReason = 'vcs' | 'dependencies' | 'unreadable' | 'binary' | 'worktree';
+export type SkipReason = 'vcs' | 'dependencies' | 'unreadable' | 'binary' | 'worktree' | 'too-large';
 
 /**
  * Reasons that represent a gap in the analysis rather than a deliberate
  * omission. These are what `--strict` refuses to pass over.
  */
 export const UNCERTAIN_REASONS: ReadonlySet<SkipReason> = new Set<SkipReason>(['unreadable', 'binary']);
+
+/**
+ * Reasons a ledger names a path for, beyond the gaps: a file too large to
+ * read, which went unsaid until round 29 found a rule passing `--strict` over
+ * one. Named and not yet failed: spec-core's ADR-0009 holds what fails
+ * `--strict` while the format is frozen, and the release after it moves
+ * `too-large` into `UNCERTAIN_REASONS`.
+ */
+export const NAMED_REASONS: ReadonlySet<SkipReason> = new Set<SkipReason>([...UNCERTAIN_REASONS, 'too-large']);
 
 /**
  * The entries of a ledger that are gaps in the answer, which is what

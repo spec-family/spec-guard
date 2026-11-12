@@ -127,8 +127,8 @@ describe('buildRipgrepArgs', () => {
     expect(buildRipgrepArgs(request({ targets: [] })).at(-1)).toBe('.');
   });
 
-  it('carries the shared file size limit', () => {
-    expect(buildRipgrepArgs(request()).some((argument) => argument.startsWith('--max-filesize='))).toBe(true);
+  it('carries no file size limit, since ripgrep searches a file of any size', () => {
+    expect(buildRipgrepArgs(request()).some((argument) => argument.startsWith('--max-filesize'))).toBe(false);
   });
 });
 

@@ -29,6 +29,19 @@ is deprecated before it goes, is spec-core's
   ([ADR-0005](https://github.com/spec-family/spec-guard/blob/main/docs/adr/0005-import-assertions.md#amended-2026-11-12-what-a-rule-could-not-follow-by-path-is-said),
   amended 2026-11-12).
 
+- **A file larger than 20 MiB is named, not left out without a word.** The
+  scanner reads a file whole and ripgrep was handed `--max-filesize`, so a
+  file over 20 MiB in a directory scope was searched by neither, JSON said
+  `skipped: []`, and a rule passed `--strict` over one that held the
+  forbidden symbol. Each is now `too-large` in `skipped`, and the report says
+  `1 file larger than 20 MiB not read`. ripgrep is handed no limit, so under
+  it a large file is named only when it holds the symbol. An import rule
+  names one too. `--strict` does not fail on it during the format freeze;
+  the release after it does. The limit is documented in
+  [what gets searched](https://github.com/spec-family/spec-guard/blob/main/docs/reference/search-scope.md)
+  ([ADR-0007](https://github.com/spec-family/spec-guard/blob/main/docs/adr/0007-search-scope.md#amended-2026-11-12-a-file-over-the-size-limit-is-named),
+  amended 2026-11-12).
+
 ### Changed
 
 - **A worker of the mutation sweep that Stryker starts after a timeout
