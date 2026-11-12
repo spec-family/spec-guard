@@ -14,6 +14,16 @@ is deprecated before it goes, is spec-core's
 
 ### Added
 
+- **A spec in UTF-16 is read when a byte order mark says so, and one
+  with NUL bytes and no mark is warned of.** Windows PowerShell 5.1 writes
+  UTF-16LE with a mark for `>` and `Out-File`, and read as UTF-8 such a spec
+  held no directive: the run said `1 spec - 0 assertions` and nothing else.
+  A mark now decides UTF-16LE or UTF-16BE, in the run, `claims` and `cites`;
+  a file with NUL bytes and no mark is an `unreadable-encoding` warning on
+  line 1 (a new `kind` in `specWarnings`), which fails nothing
+  ([ADR-0002](https://github.com/spec-family/spec-guard/blob/main/docs/adr/0002-directive-format.md#amended-2026-11-12-a-spec-in-utf-16),
+  amended 2026-11-12).
+
 - **An import or layer rule says what it could not follow by path.** A
   TypeScript path alias (`@/db/client` under tsconfig `paths`) reached no
   pattern written as a path, so `module="src/db/**"` reported 0 matches and
