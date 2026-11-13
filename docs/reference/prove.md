@@ -38,8 +38,10 @@ regular expression's maximum twice: with its text at a file's start, and
 below a line of prove's own, so a pattern whose `^` or `$` met only a file's
 ends survives. `prove` exits 1 when a rule survived, and under `--strict`
 when one is unprovable. It takes the run's `--root`, `--spec`, `--exclude`,
-`--ignore-status`, `--json` and `--format sarif|github|gitlab`, and the
-configuration's specs, exclusions and strictness.
+`--ignore-status`, `--json`, `--format sarif|github|gitlab` and
+`--concurrency`, the rules proved at once (default 8), and the
+configuration's specs, exclusions, strictness and concurrency. The report
+lists the rules in the order the specs state them at any concurrency.
 
 A kill means the rule can fail, not that it catches the way the code is
 written: `module="src/db.ts"` is killed by `import 'src/db.ts'` though every

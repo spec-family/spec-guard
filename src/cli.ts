@@ -228,7 +228,7 @@ Options
       --ignore-status     Execute directives in documents not in force too (see Directives)
       --include-specs     Also count matches inside the spec files themselves
       --max-snippets <n>  Failure snippets per assertion (default: ${DEFAULT_MAX_SNIPPETS})
-      --concurrency <n>   Assertions executed in parallel, 1 or more (default: ${DEFAULT_CONCURRENCY})
+      --concurrency <n>   Assertions executed, or rules proved, in parallel, 1 or more (default: ${DEFAULT_CONCURRENCY})
       --depth <n>         impact: follow dependents at most n imports away (default: all)
       --allow-empty       Let a run, prove or impact through when no spec file matched, or when
                           one pattern matched none beside others that did (not an assertion)
@@ -404,7 +404,7 @@ const NOT_FOR: Record<Exclude<Command, 'check'>, ReadonlySet<string>> = {
   mcp: new Set(['--verbose', '--watch', '--fail-fast', '--json', '--format', '--print-baseline', '--allow-empty', '--color', '--no-color', '--ascii', '--no-ascii']),
   // A proof runs every rule, one at a time, with the scanner reading through a
   // door ripgrep cannot see through, and prints no snippets.
-  prove: new Set(['--watch', '--fail-fast', '--print-baseline', '--engine', '--concurrency', '--max-snippets']),
+  prove: new Set(['--watch', '--fail-fast', '--print-baseline', '--engine', '--max-snippets']),
   // Citations are read from comments, not from rules: nothing is executed, so
   // nothing about how rules run applies, and a document's status is the
   // answer rather than something to ignore.
@@ -1160,6 +1160,7 @@ async function runProve(options: CliOptions, io: CliIO, use: ConfigUse | undefin
         comments: options.comments,
         exclude: options.exclude,
         ignoreStatus: options.ignoreStatus,
+        concurrency: options.concurrency,
       })),
       config: use,
     };

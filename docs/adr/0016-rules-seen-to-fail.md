@@ -222,3 +222,23 @@ survived; with this change, both probes kill each.
   its anchors.
 
 Each regex rule runs once more than it did.
+
+## Amended 2026-11-12: a rule's violations reuse its scans, and rules are proved at once
+
+`prove` executed every violation of a rule over a fresh engine, so each
+scanned every file of the rule's tree again, though a violation changes one
+file or two; and it proved rules one at a time, refusing `--concurrency`.
+Round 29 measured 100.7 seconds for 1,000 rules over 5,000 files, where the
+run took 2.
+
+Each rule now has a memo its executions share, the one a watch session keeps
+(ADR-0014): a scan or an import analysis is remembered by the file's bytes,
+its path and what the rule asks, so a file a violation did not change is
+scanned once for the rule, and a changed file, whose bytes differ, is scanned
+again. The memo is the rule's own and goes with it. And `--concurrency`,
+with the configuration's `concurrency`, proves that many rules at once,
+eight by default, each over its own tree; the report lists them in the order
+the specs state them whatever order they finish in. Measured on 200 rules
+over 2,000 files: 18.0 seconds before, 3.0 at a concurrency of 1, and 1.6 at
+8. A proof of only the rules a change touched, against a base, is the larger
+answer and is not made here.
