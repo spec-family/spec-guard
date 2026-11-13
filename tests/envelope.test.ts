@@ -73,6 +73,24 @@ describe('the command line', () => {
     expect(JSON.parse(out.join('\n'))).toMatchObject({ tool: 'spec-guard', toolVersion: version(), command: 'check' });
   });
 
+  it('writes it from every command, and where no spec matched', async () => {
+    const asked: Array<[string, string[]]> = [
+      ['check', ['nothing/*.md', '--json']],
+      ['query', ['query', 'src/core', '--spec', 'docs/adr/*.md', '--json']],
+      ['query', ['query', 'src/core', '--spec', 'nothing/*.md', '--json']],
+      ['query', ['query', 'src/core', '--spec', 'docs/adr/*.md', '--spec', 'nothing/*.md', '--json']],
+      ['prove', ['prove', 'docs/adr/0001-passing.md', '--json']],
+      ['impact', ['impact', 'src/core', '--spec', 'docs/adr/*.md', '--json']],
+      ['cites', ['cites', '--json']],
+      ['claims', ['claims', '--root', path.join(DEMO_REPO, '..', 'claims-corpus'), '--json']],
+    ];
+    for (const [command, argv] of asked) {
+      const { out, err } = await cli(argv);
+      expect(out.length, `${argv.join(' ')}: ${err.join('\n')}`).toBeGreaterThan(0);
+      expect(JSON.parse(out.join('\n')), argv.join(' ')).toMatchObject({ tool: 'spec-guard', toolVersion: version(), command });
+    }
+  });
+
   it('says on stderr that -v becomes --version, and reads it as --verbose meanwhile', async () => {
     const short = await cli(['docs/adr/0001-passing.md', '-v', '--engine', 'js']);
     const long = await cli(['docs/adr/0001-passing.md', '--verbose', '--engine', 'js']);
