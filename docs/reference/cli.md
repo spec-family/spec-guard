@@ -41,7 +41,7 @@ spec-guard impact <paths...>           # the files that depend on each path, and
 | `--ignore-status` / `--no-ignore-status` | Execute directives in documents not in force too: draft, proposed, rejected, deprecated, superseded or archived |
 | `--include-specs` / `--no-include-specs` | Also count matches inside the spec files themselves |
 | `--max-snippets <n>` | Failure snippets per assertion (default 5) |
-| `--concurrency <n>` | Search passes in flight at once, 1 or more (default 8) |
+| `--concurrency <n>` | Search passes in flight at once, 1 or more (default 8); for `prove`, the rules proved at once |
 | `--depth <n>` | `impact` only: follow dependents at most `n` imports away (default: all) |
 | `--allow-empty` | Let a run, `prove` or `impact` through when no spec file matched the patterns, or when one pattern matched none beside others that did, each of which is exit 2 without it; such a pattern is still named on stderr (about the run, not an assertion) |
 | `--color` / `--no-color` | Force colour on or off. Without either flag, `NO_COLOR` set to anything turns it off; otherwise `FORCE_COLOR` turns it on, and `FORCE_COLOR=0` or `FORCE_COLOR=false` off; otherwise `TERM=dumb` turns it off; otherwise a terminal has colour. `NO_COLOR` or `FORCE_COLOR` set to nothing is as unset |

@@ -90,6 +90,10 @@ is deprecated before it goes, is spec-core's
 - **`get_architectural_rules` takes `paths`**, and every tool declares an
   `outputSchema`.
 
+- **`prove` takes `--concurrency`**, and the configuration's `concurrency`:
+  that many rules are proved at once, eight by default, and the report lists
+  them in the order the specs state them.
+
 - **A run from a subdirectory of a repository says where the specs are.**
   Where no spec matched and the repository's top above the root holds
   matches, the message names it and the `--root` that reads it
@@ -163,6 +167,15 @@ is deprecated before it goes, is spec-core's
 - **`check_architecture` on a path that is not there is refused** with what
   to do, where it checked no rule and said every assertion held
   ([ADR-0012](https://github.com/spec-family/spec-guard/blob/main/docs/adr/0012-query-and-mcp.md#amended-2026-11-12-bounded-answers-honest-checks-and-the-claims),
+  amended 2026-11-12).
+
+- **`prove` scans a file once for each rule, not once for each violation.**
+  A rule's violations change a file or two, and each rescanned the whole
+  tree: 1,000 rules over 5,000 files took 100 seconds. A rule's executions
+  now share a memo of the scans of the files they did not change; 200 rules
+  over 2,000 files went from 18 seconds to 3, and to 1.6 at the default
+  concurrency
+  ([ADR-0016](https://github.com/spec-family/spec-guard/blob/main/docs/adr/0016-rules-seen-to-fail.md#amended-2026-11-12-a-rules-violations-reuse-its-scans-and-rules-are-proved-at-once),
   amended 2026-11-12).
 
 - **A directive in a document whose lines end in a lone CR is reported on its

@@ -115,7 +115,7 @@ describe('an option that is set and names nothing', () => {
 
   it('says so in the help, where each option is', () => {
     expect(HELP).toContain('  -r, --root <path>       Codebase root that assertions are resolved against, a directory (default: cwd)');
-    expect(HELP).toContain('      --concurrency <n>   Assertions executed in parallel, 1 or more (default: 8)');
+    expect(HELP).toContain('      --concurrency <n>   Assertions executed, or rules proved, in parallel, 1 or more (default: 8)');
     expect(HELP).toContain(
       [
         '      --engine <name>     auto | rg | js  (default: auto - scanner for small trees, ripgrep for big ones)',
