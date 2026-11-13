@@ -103,7 +103,7 @@ describe('failure messages', () => {
     const root = await repo({
       'docs/a.md': '<!-- @assert-absence target="gone" symbol="X" -->\n<!-- @assert-absence target="a,b" symbol="X" -->\n',
     });
-    const report = await runSpecGuard({ patterns: ['docs/a.md'], root, engine: 'javascript' });
+    const report = await runSpecGuard({ patterns: ['docs/a.md'], root, engine: 'javascript', allowMissingTargets: true });
 
     expect(report.results[0]?.warnings).toEqual(['target path not found: gone']);
     expect(report.results[1]?.warnings).toEqual(['target paths not found: a, b']);

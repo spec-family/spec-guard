@@ -139,7 +139,7 @@ describe('formatReport', () => {
   });
 
   it('surfaces target warnings in verbose mode', async () => {
-    const output = formatReport(await report('docs/adr/0005-missing-target.md'), { color: false, verbose: true });
+    const output = formatReport(await report('docs/adr/0005-missing-target.md', { patterns: [], allowMissingTargets: true }), { color: false, verbose: true });
     expect(output).toContain('target path not found: src/does-not-exist');
   });
 
