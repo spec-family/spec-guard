@@ -61,6 +61,15 @@ describe('get_dependents', () => {
     expect(called.content[0]?.text).toContain(`  ${CHAIN - 1} files depend on it; none is listed, and ${CHAIN - 1} more counted\n`);
   });
 
+  it('says one dependent in the singular, and lists one where max_files is 1', async () => {
+    const one = await tool('get_dependents', { paths: [`chain/c${CHAIN - 2}.ts`], summary: true });
+    expect(one.content[0]?.text).toContain('  1 file depends on it; none is listed, and 1 more counted\n');
+
+    const [first] = (await tool('get_dependents', { paths: ['chain/c0.ts'], max_files: 1 })).structuredContent?.['results'] as Array<{ dependents: unknown[]; truncated?: number }>;
+    expect(first).toMatchObject({ dependents: [expect.anything()], truncated: CHAIN - 2 });
+    expect((await tool('get_dependents', { paths: ['chain/c0.ts'], max_files: 0 })).isError).toBe(true);
+  });
+
   it('writes no truncated where every dependent is listed, and lists up to MAX_DEPENDENTS by default', async () => {
     const [result] = (await tool('get_dependents', { paths: ['chain/c0.ts'] })).structuredContent?.['results'] as Array<Record<string, unknown>>;
     const [exact] = (await tool('get_dependents', { paths: ['chain/c0.ts'], max_files: CHAIN - 1 })).structuredContent?.['results'] as Array<Record<string, unknown>>;
@@ -91,6 +100,15 @@ describe('check_architecture', () => {
     expect(called.content[0]?.text).toBe('"src/domain/new.ts" is not on disk, so no rule can be checked for it: save it first, or pass its text in "contents".');
     const two = await tool('check_architecture', { paths: ['src/a.ts', 'src/domain/order.ts', 'src/b.ts'] });
     expect(two.content[0]?.text).toBe('"src/a.ts", "src/b.ts" are not on disk, so no rule can be checked for them: save them first, or pass their text in "contents".');
+  });
+
+  it('refuses contents that are not file paths to their text', async () => {
+    for (const contents of [null, [], 'text', 1, { 'src/a.ts': 1 }, { 'src/a.ts': 'text', 'src/b.ts': null }]) {
+      expect(await tool('check_architecture', { contents }), JSON.stringify(contents)).toEqual({
+        content: [{ type: 'text', text: '"contents" must be an object of file paths to their text.' }],
+        isError: true,
+      });
+    }
   });
 
   it('checks a file not yet saved from contents, and the rules that govern it alone', async () => {
@@ -127,6 +145,22 @@ describe('check_claims', () => {
 
       expect(response.result.structuredContent).toMatchObject({ ok: false, totals: { Implemented: 1 }, findings: [{ rule: 'unevidenced-claim', file: 'spec/a.md', line: 1 }] });
       expect(response.result.content[0]?.text).toContain('unevidenced-claim');
+    } finally {
+      await removeTempRepo(claimed);
+    }
+  });
+
+  it('answers in plain ASCII, and says where a label stands in prose', async () => {
+    const claimed = await makeTempRepo({ 'spec/a.md': '- `Implemented`: the order is stored.\n\nWhat is `Implemented` here is said above.\n', 'docs/adr.md': '# ADR\n' });
+    try {
+      const handle = createMcpHandler({ root: claimed, patterns: ['docs/**/*.md'], version: '9.9.9', claims: { files: ['spec/*.md'], labels: { Implemented: { evidence: 'test' } }, testPrefixes: ['fn test_'] } });
+      const response = (await handle({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'check_claims', arguments: {} } })) as unknown as { result: ToolResult };
+      const text = response.result.content[0]!.text;
+      const prose = (response.result.structuredContent?.['prose'] as Array<{ line: number }>)[0];
+
+      expect(prose).toMatchObject({ line: 3 });
+      expect(text).toMatch(/^[\x20-\x7e\n]*$/);
+      expect(text).toContain('spec/a.md:3:');
     } finally {
       await removeTempRepo(claimed);
     }

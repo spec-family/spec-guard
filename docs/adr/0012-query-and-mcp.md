@@ -756,7 +756,8 @@ no claims tool, and `get_architectural_rules` took one path.
   before.
 - `check_claims` runs `claims` under the configuration's `"claims"`, read
   afresh with each request as the rest is, and is refused where there are
-  none.
+  none. Its text says where a label stands in prose, as `claims --verbose`
+  does, since a client has no flag to ask for it.
 - `get_architectural_rules` takes `paths` for several, beside `path`.
 - Each tool declares an `outputSchema`: an object, with the keys a reader of
   its structured content starts from. No deeper: each document's shape is

@@ -402,6 +402,8 @@ export function createMcpHandler(options: McpServerOptions): (message: unknown) 
     const given = contents ?? {};
     const unsaved = Object.entries(given as Record<string, string>);
     const written = await Promise.all(unsaved.map(async ([file, text]): Promise<[string, string]> => [(await resolveQueryPath(file, options.root)).path, text]));
+    // An overlay of nothing reads what the disk holds, so `false` here is an
+    // equivalent mutant: the door is only spared.
     const io: Io = written.length === 0 ? nodeIo : overlayIo(nodeIo, options.root, { write: new Map(written), remove: new Set() });
     const asked = rawPaths === undefined ? (written.length === 0 ? undefined : written.map(([file]) => file)) : (rawPaths as string[]);
     const paths: Array<QueryPath & { exists: boolean }> | undefined = asked === undefined ? undefined : await Promise.all(asked.map((entry) => resolveQueryPath(entry, options.root, io)));
@@ -538,7 +540,9 @@ export function createMcpHandler(options: McpServerOptions): (message: unknown) 
       comments: settings.run?.comments,
     });
     const structured = { ok: report.ok, totals: report.totals, claims: report.claims, findings: report.findings, prose: report.prose, files: report.files, unmatched: report.unmatched, config: settings.config };
-    return { text: formatClaims(report, { color: false, verbose: false, ascii: true }), structured };
+    // Verbose, since a client has no --verbose to ask for where a label
+    // stands in prose; plain and ASCII, as every answer's text is.
+    return { text: formatClaims(report, { color: false, verbose: true, ascii: true }), structured };
   }
 
   function rulesResource(ruleSet: RuleSet): JsonObject {
