@@ -687,10 +687,13 @@ describe('offsets through the scanner', () => {
     expect(parseDirectives('```\r\nx\r\n```\r\n<!-- @assert-absence symbol="X" -->\r\n', context).directives[0]?.location.line).toBe(4);
   });
 
-  it('counts lines by line feeds, as a report always has', () => {
-    // A lone carriage return ends a line to the scanner, which reads the fence
-    // above as closed; a report still counts the lines a line feed ends.
+  it('counts lines as the scanner reads them, a lone carriage return ending one', () => {
+    // Counted by line feeds alone, every directive of a file whose lines end
+    // in a lone \r was reported on line 1 (round 29).
     const { directives } = parseDirectives('```\rx\r```\r<!-- @assert-absence symbol="X" -->', context);
-    expect(directives[0]?.location).toMatchObject({ line: 1, column: 11 });
+    expect(directives[0]?.location).toMatchObject({ line: 4, column: 1 });
+    // A CRLF ends one line, as a line feed does.
+    const crlf = parseDirectives('# A\r\n\r\n<!-- @assert-absence symbol="X" -->', context);
+    expect(crlf.directives[0]?.location).toMatchObject({ line: 3, column: 1 });
   });
 });

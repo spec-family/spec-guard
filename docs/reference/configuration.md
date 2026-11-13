@@ -14,7 +14,8 @@ hold the same rules the same way:
 ```
 
 A root with no `package.json` - a Rust, Go or .NET repository, say - keeps the
-same options, at the top level, in `.spec-guard.json`:
+same options, at the top level, in `.spec-guard.json`. Either file may begin
+with the byte order mark an editor on Windows writes, which is read past:
 
 ```json
 {

@@ -274,3 +274,13 @@ way. A file with no mark is read as UTF-8 as before, since no byte says
 otherwise, but a NUL in it, which UTF-8 text never holds, is the
 `unreadable-encoding` warning on line 1, with what to do. A warning fails
 nothing, `--strict` included: the document may be one that names no rule.
+
+## Amended 2026-11-12: a directive's line, where a lone CR ends one
+
+A directive's line was counted by line feeds alone, "as a report always
+has", while the scanner, which decides what is code and what is a comment,
+read a lone carriage return as a line end. A document whose lines end in a
+lone CR - an old Mac editor's, or one a tool wrote - had every directive
+reported on line 1 (round 29). A directive's line is now counted as
+spec-core counts lines, at `\n`, `\r\n` and a lone `\r`; a document of
+`\n` or `\r\n` lines is counted as it was.

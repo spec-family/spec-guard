@@ -1111,7 +1111,9 @@ async function prepareAssertion(
   const { existing: existingTargets, missing, miscased } = await partitionTargets(assertion.targets, options);
   warnings.push(...miscased);
   const notFound = missingTargets(missing);
-  if (missing.length > 0) warnings.push(notFound.warning);
+  // Said beside the rule only where it does not fail it: failing, the
+  // message says it, and the same thing printed twice in two wordings.
+  if (missing.length > 0 && options.allowMissingTargets) warnings.push(notFound.warning);
 
   if (!options.allowMissingTargets && missing.length > 0) {
     return {
@@ -1237,7 +1239,7 @@ async function executeStructureAssertion(
   );
 
   const notFound = missingTargets(check.missing);
-  if (check.missing.length > 0) warnings.push(notFound.warning);
+  if (check.missing.length > 0 && options.allowMissingTargets) warnings.push(notFound.warning);
 
   const files = check.notDirectories;
   const self = check.selfPartner;
@@ -1333,7 +1335,7 @@ async function executeImportAssertion(
   const { existing: existingTargets, missing: absent, miscased } = await partitionTargets(assertion.targets, options);
   warnings.push(...miscased);
   const notFound = missingTargets(absent);
-  if (absent.length > 0) warnings.push(notFound.warning);
+  if (absent.length > 0 && options.allowMissingTargets) warnings.push(notFound.warning);
 
   // No symbol: an import assertion never runs a text search, and the walk does
   // not depend on one. This used to pass `symbol: ""`, an invented value that
@@ -1376,6 +1378,15 @@ async function executeImportAssertion(
       : ANALYSABLE_EXTENSIONS.has(path.posix.extname(file.relativePath)),
   );
 
+  // A file that can hold no import is neither read nor left unread, so it is
+  // in no count here: a directory of translations beside the code says nothing
+  // about the code (ADR-0005). One by one, as the analysis below reads them.
+  const inAnalysis = new Set(analysable);
+  const unread: Enumeration["files"] = [];
+  for (const file of enumeration.files) {
+    if (!inAnalysis.has(file) && !(await options.imports.holdsNoImport(file.absolutePath, file.relativePath))) unread.push(file);
+  }
+
   if (analysable.length === 0 && missing === null && !options.allowEmptyScope && !assertion.allowEmpty) {
     // For an import rule the bar is higher than "some file exists": a directory
     // of YAML has nothing this can read, so a dependency claim about it is a
@@ -1389,20 +1400,12 @@ async function executeImportAssertion(
           ? `no files were inspected, so this assertion verified nothing (${EMPTY_SCOPE_HINT})`
           : cycles
             ? `none of the ${enumeration.files.length} files here are JavaScript or TypeScript, so there is no import graph to check and this assertion verified nothing (${EMPTY_SCOPE_HINT})`
-            : `none of the ${enumeration.files.length} files here are in a language whose imports spec-guard can read, so this assertion verified nothing (${EMPTY_SCOPE_HINT})`,
+            : `none of the ${enumeration.files.length} files here are in a language whose imports spec-guard can read, so this assertion verified nothing (${unread.length > 0 ? unreadHint(unread) : EMPTY_SCOPE_HINT})`,
       matches: [],
       durationMs: elapsed(startedAt),
     };
   }
 
-  // A file that can hold no import is neither read nor left unread, so it is
-  // in no count here: a directory of translations beside the code says nothing
-  // about the code (ADR-0005). One by one, as the analysis below reads them.
-  const inAnalysis = new Set(analysable);
-  const unread: Enumeration["files"] = [];
-  for (const file of enumeration.files) {
-    if (!inAnalysis.has(file) && !(await options.imports.holdsNoImport(file.absolutePath, file.relativePath))) unread.push(file);
-  }
   if (unread.length > 0) {
     // Which kinds, because "2 files" in a .NET project is a project file and a
     // Razor page, and only one of them can hold an `@using` nothing here reads.
@@ -1535,6 +1538,17 @@ function listed<T>(value: T | null): T[] {
 /** A result's blind spots, written only when there are some, as JSON leaves out what is undefined. */
 function blindSpotsField(spots: readonly BlindSpot[]): { blindSpots?: BlindSpot[] } {
   return spots.length > 0 ? { blindSpots: [...spots] } : {};
+}
+
+/**
+ * What to do about a scope of files whose imports no reader here reads. Not
+ * `allow-empty`, which a rule over a Java or Ruby tree passed with while it
+ * held nothing to account (round 29): the languages read, and what holds a
+ * rule over the others.
+ */
+function unreadHint(files: readonly { relativePath: string }[]): string {
+  const kinds = [...new Set(files.map((file) => path.posix.extname(file.relativePath) || path.posix.basename(file.relativePath)))].sort();
+  return `their imports are read in JavaScript, TypeScript, Python, Go, Rust and C#, and these are ${kinds.join(", ")}: a text rule, @assert-absence on how the import is written, holds a rule over them`;
 }
 
 /** Everything an import rule reads before it decides anything. */

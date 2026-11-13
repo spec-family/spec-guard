@@ -94,6 +94,18 @@ is deprecated before it goes, is spec-core's
   that many rules are proved at once, eight by default, and the report lists
   them in the order the specs state them.
 
+- **A run from a subdirectory of a repository says where the specs are.**
+  Where no spec matched and the repository's top above the root holds
+  matches, the message names it and the `--root` that reads it
+  ([ADR-0002](https://github.com/spec-family/spec-guard/blob/main/docs/adr/0002-directive-format.md#amended-2026-11-12-a-directives-line-where-a-lone-cr-ends-one),
+  [ADR-0014](https://github.com/spec-family/spec-guard/blob/main/docs/adr/0014-configuration-and-watch.md#amended-2026-11-12-a-byte-order-mark-before-the-configuration),
+  [ADR-0018](https://github.com/spec-family/spec-guard/blob/main/docs/adr/0018-impact.md#amended-2026-11-12-a-python-files-headline-says-what-is-followed),
+  amended 2026-11-12).
+
+- **A recipe for no deep imports**, in the import rules' reference:
+  `module="src/db/**" exclude="src/db"` lets a module be imported by its
+  entry point and never past it.
+
 ### Changed
 
 - **A worker of the mutation sweep that Stryker starts after a timeout
@@ -108,6 +120,13 @@ is deprecated before it goes, is spec-core's
   1,077,674 in the sweep of the change, with the score and the survivors
   unchanged. Development tooling only: nothing spec-guard checks or reports
   changed. Upgrading: nothing to do.
+
+- **A missing target that fails its rule is said once.** The rule's message
+  said `target path does not exist` and a warning beside it said
+  `target path not found` of the same path. The warning is now written only
+  where the target does not fail the rule, under `--allow-missing-targets`.
+  Upgrading: a script that read a failing rule's missing target from
+  `warnings` reads it from `message`.
 
 ### Deprecated
 
@@ -158,6 +177,20 @@ is deprecated before it goes, is spec-core's
   concurrency
   ([ADR-0016](https://github.com/spec-family/spec-guard/blob/main/docs/adr/0016-rules-seen-to-fail.md#amended-2026-11-12-a-rules-violations-reuse-its-scans-and-rules-are-proved-at-once),
   amended 2026-11-12).
+
+- **A directive in a document whose lines end in a lone CR is reported on its
+  own line**, not on line 1, as the scanner counts lines.
+
+- **A configuration file that begins with a byte order mark is read**, as
+  spec-graph and spec-brief read one.
+
+- **An import rule over files no reader here reads names the languages it
+  reads**, and the text rule that holds the others, instead of hinting at
+  `allow-empty`, which would pass it with nothing held to account.
+
+- **`impact` on a Python file says only relative imports are followed.**
+  "Nothing in scope imports it" was untrue of a module only absolute imports
+  name.
 
 ## 0.34.0
 

@@ -661,7 +661,7 @@ describe('partner', () => {
     });
     const report = await run(root, ['<!-- @assert-structure target="gone, src" partner="[name].x" -->']);
     expect(outcome(report.results[0])).toMatchObject({ ok: false, message: 'target path does not exist: gone' });
-    expect(report.results[0]?.warnings).toEqual(['target path not found: gone']);
+    expect(report.results[0]?.warnings).toEqual([]);
   });
 });
 
