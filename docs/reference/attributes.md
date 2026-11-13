@@ -10,7 +10,7 @@ A `regex` is read in one dialect, on a page of its own:
 
 | Attribute | Applies to | Meaning |
 | --- | --- | --- |
-| `target` | all but present | Comma-separated paths, relative to `--root`. Default `.` |
+| `target` | all but present | Comma-separated paths, relative to `--root`. Default `.`. One found only because the filesystem ignores case is a warning: on Linux it names nothing |
 | `symbol` | absence, count | The literal string to search for (or a regex with `regex="true"`) |
 | `file` | present | Comma-separated paths that must exist |
 | `expected` | all but present | Exact count for count; an upper bound everywhere else |

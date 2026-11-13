@@ -968,13 +968,45 @@ async function pathExists(io: Io, candidate: string): Promise<boolean> {
 async function partitionTargets(
   targets: readonly string[],
   options: { root: string; io: Io },
-): Promise<{ existing: string[]; missing: string[] }> {
+): Promise<{ existing: string[]; missing: string[]; miscased: string[] }> {
   const existing: string[] = [];
   const missing: string[] = [];
+  const miscased: string[] = [];
   for (const target of targets) {
-    (await pathExists(options.io, path.resolve(options.root, target)) ? existing : missing).push(target);
+    const found = await pathExists(options.io, path.resolve(options.root, target));
+    (found ? existing : missing).push(target);
+    // A missing target has no real path, so it is said nothing of here.
+    const warning = await miscasedTarget(target, options);
+    if (warning !== null) miscased.push(warning);
   }
-  return { existing, missing };
+  return { existing, missing, miscased };
+}
+
+/**
+ * What to say of a target that is found only because the filesystem ignores
+ * case, or null when it is spelled as the disk spells it. Said and not
+ * corrected: the run would pass here and the same rule fail in CI on Linux,
+ * where `target="SRC/APP.JS"` names nothing. A warning, which fails nothing
+ * during the format freeze.
+ */
+async function miscasedTarget(target: string, options: { root: string; io: Io }): Promise<string | null> {
+  const written = toPosix(path.relative(options.root, path.resolve(options.root, target)));
+  // The real path, which a filesystem that ignores case gives in the case its
+  // entries have, read for the root and the target alike, so that a root
+  // given in another case says nothing of the target. A real path and not
+  // the directories' listings: a watch session runs a rule again when what it
+  // read changes, and the root's listing changes with every file made there.
+  // A link on the way gives a real path elsewhere, and that is no case to
+  // speak of.
+  let spelled: string;
+  try {
+    const [root, real] = await Promise.all([options.io.realpath(options.root), options.io.realpath(path.resolve(options.root, target))]);
+    spelled = toPosix(path.relative(root, real));
+  } catch {
+    return null;
+  }
+  if (spelled === written || spelled.toLowerCase() !== written.toLowerCase()) return null;
+  return `"${target}" is spelled "${spelled}" on disk, and found only because this filesystem ignores case: on one that does not, as Linux's in CI, it names nothing (write it as the disk spells it)`;
 }
 
 export interface ExecuteOptions {
@@ -1041,8 +1073,12 @@ async function prepareAssertion(
   if (assertion.kind === "assert-present") {
     const missing: string[] = [];
     for (const file of assertion.files) {
-      if (!(await pathExists(options.io, path.resolve(options.root, file))))
+      if (!(await pathExists(options.io, path.resolve(options.root, file)))) {
         missing.push(file);
+        continue;
+      }
+      const warning = await miscasedTarget(file, options);
+      if (warning !== null) warnings.push(warning);
     }
     const actual = assertion.files.length - missing.length;
     return {
@@ -1072,7 +1108,8 @@ async function prepareAssertion(
     return executeStructureAssertion(assertion, assertion.structure, options, base, warnings, startedAt);
   }
 
-  const { existing: existingTargets, missing } = await partitionTargets(assertion.targets, options);
+  const { existing: existingTargets, missing, miscased } = await partitionTargets(assertion.targets, options);
+  warnings.push(...miscased);
   const notFound = missingTargets(missing);
   if (missing.length > 0) warnings.push(notFound.warning);
 
@@ -1293,7 +1330,8 @@ async function executeImportAssertion(
   startedAt: number,
 ): Promise<AssertionResult> {
   const query = assertion.imports as NonNullable<Assertion["imports"]>;
-  const { existing: existingTargets, missing: absent } = await partitionTargets(assertion.targets, options);
+  const { existing: existingTargets, missing: absent, miscased } = await partitionTargets(assertion.targets, options);
+  warnings.push(...miscased);
   const notFound = missingTargets(absent);
   if (absent.length > 0) warnings.push(notFound.warning);
 

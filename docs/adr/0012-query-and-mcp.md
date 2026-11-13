@@ -700,3 +700,31 @@ a large repository pays. Watching the specs in place of reading them is the
 option on record, for when a repository that size needs the budget more than
 the promise; it would be a new decision, not an amendment of this one.
 `scripts/bench-query.mjs` measures a repository's own figure.
+
+## Amended 2026-11-12: a path in another case
+
+On Windows `query SRC/LOANS.JS` answered "no rules in force govern this
+path" with `exists: true` beside it, the MCP server said the same, and
+`impact` said the file was not JavaScript: the arithmetic compared the path
+as typed with rules written against `src/loans.js`, the one file both
+spellings open. A rule's `target="SRC/APP.JS"` passed on Windows and named
+nothing in CI on Linux. Round 29's evaluation found all four.
+
+A path asked about is now spelled as the disk spells it before anything is
+decided, segment by segment: a segment keeps its spelling where its
+directory holds that entry, and where it holds none but the path as written
+opens anyway, it takes the one entry that differs only in case. A segment
+that opens nothing ends the reading, so a file still to make under `SRC/` is
+`src/new.ts` on Windows and stays `SRC/new.ts` on Linux. spec-harness spells
+a path the same way, through the filesystem's real path. `query`, `impact`
+and the MCP server's tools share the one function that reads a path.
+
+A rule's `target`, and an `@assert-present` path, is said and not corrected:
+corrected, the run would pass on Windows and fail in CI. Where the path is
+found only because the filesystem ignores case - its real path, read beside
+the root's, is the written one in another case - the rule carries a warning
+that names the disk's spelling. It fails nothing during the format freeze.
+The real path and not the directories' listings, because a watch session
+runs a rule again when what it read changes, and the root's listing changes
+with every file made there. Case leaves the list of what the arithmetic
+cannot see above; content and symbolic links stay on it.
