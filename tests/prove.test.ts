@@ -1249,6 +1249,10 @@ describe('the report, rendered', () => {
   it('writes a JSON document a script can read, with durations to the microsecond', () => {
     const document = JSON.parse(formatProveJson(REPORT)) as Record<string, unknown>;
     expect(document).toEqual({
+      tool: 'spec-guard',
+      toolVersion: '0.0.0',
+      command: 'prove',
+      schemaVersion: 1,
       formatVersion: 1,
       ok: false,
       root: ROOT,
@@ -1264,8 +1268,24 @@ describe('the report, rendered', () => {
         ...(result.unprovable === undefined ? {} : { unprovable: result.unprovable }),
         probes: result.probes,
         durationMs: result.durationMs === 1.23456 ? 1.235 : result.durationMs,
+        // A rule that survived is a finding, one no violation could be made
+        // for a note, and one seen to fail none.
+        ...(result.outcome === 'survived'
+          ? { rule: 'rule-cannot-fail', severity: 'error', hint: expect.stringMatching(/^narrow the rule until a violation fails it/) }
+          : result.outcome === 'unprovable'
+            ? { rule: 'rule-unprovable', severity: 'note', hint: "check that the rule's target and glob reach the files it is about" }
+            : {}),
       })),
-      errors: [{ spec: { file: 'docs/typo.md', line: 9, column: 1 }, message: 'Unknown attribute "expct".', raw: '<!-- @assert-count expct="1"\n  target="src" -->' }],
+      errors: [
+        {
+          spec: { file: 'docs/typo.md', line: 9, column: 1 },
+          message: 'Unknown attribute "expct".',
+          raw: '<!-- @assert-count expct="1"\n  target="src" -->',
+          rule: 'invalid-directive',
+          severity: 'error',
+          hint: 'fix the directive: nothing it states is checked until it can be read',
+        },
+      ],
       specWarnings: [],
       maskedDirectives: [],
       inactiveSpecs: REPORT.inactiveSpecs,

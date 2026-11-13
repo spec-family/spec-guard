@@ -211,7 +211,7 @@ Options
       --watch             Run again as the tree changes, until Ctrl+C (human output only)
       --fail-fast         Stop at the first failing assertion
       --json              Emit a machine-readable JSON report (same as --format json)
-      --format <name>     human | json | sarif | github | gitlab  (sarif uploads to code scanning,
+      --format <name>     human (or pretty) | json | sarif | github | gitlab  (sarif uploads to code scanning,
                           github annotates a pull request from the log, gitlab is Code Quality)
       --engine <name>     auto | rg | js  (default: auto - scanner for small trees, ripgrep for big ones)
                           ripgrep is rg on PATH, or the program SPEC_GUARD_RG names; where that
@@ -468,6 +468,9 @@ const NOT_WITH_WATCH: ReadonlyArray<[option: string, reason: string]> = [
 /** The long name of an option, whichever way it was spelled. */
 const LONG_NAMES: Readonly<Record<string, string>> = { '-v': '--verbose', '-r': '--root', '-h': '--help' };
 
+/** What `-v` says while it is still `--verbose`. */
+export const V_DEPRECATED = 'spec-guard: -v is --verbose here and --version in the family\'s other tools, and the release after the format freeze reads it as --version: write --verbose';
+
 /**
  * A resolved root as two of them are compared. On Windows a drive letter
  * names its volume in either case, so `--root C:\x` beside `--root c:\x` is
@@ -600,8 +603,12 @@ export function parseArgs(argv: readonly string[], cwd: string): CliOptions {
       case '--format': {
         const raw = nextValue();
         const written = raw.toLowerCase();
+        // `pretty` is `human`, the word spec-graph uses for the same report:
+        // either is read by both until the family settles on one after the
+        // format freeze (spec-core's ADR-0005, amended 2026-11-12).
         // Whether it is a format at all is decided just below, by the lists.
-        const value = written as OutputFormat;
+        const named = written === 'pretty' ? 'human' : written;
+        const value = named as OutputFormat;
         // mcp refused --format above, so every command that gets here writes one.
         const formats = FORMATS[command as Exclude<Command, 'mcp'>];
         if (!formats.includes(value)) {
@@ -1078,7 +1085,7 @@ async function runQuery(options: CliOptions, io: CliIO, use: ConfigUse | undefin
   }
 
   if (report.specFiles.length === 0) {
-    if (options.format === 'json') io.stdout(formatQueryJson(report));
+    if (options.format === 'json') io.stdout(formatQueryJson(report, { version: version() }));
     else io.stderr(`spec-guard: no spec files matched ${options.patterns.map((p) => `"${p}"`).join(', ')}`);
     return EXIT_ERROR;
   }
@@ -1089,12 +1096,12 @@ async function runQuery(options: CliOptions, io: CliIO, use: ConfigUse | undefin
   // with the patterns in it; a person is told in the line alone.
   const unmatched = unmatchedLine(report.unmatchedSpecs, use, 'final');
   if (unmatched !== null) {
-    if (options.format === 'json') io.stdout(formatQueryJson(report));
+    if (options.format === 'json') io.stdout(formatQueryJson(report, { version: version() }));
     io.stderr(unmatched);
     return EXIT_ERROR;
   }
 
-  io.stdout(options.format === 'json' ? formatQueryJson(report) : formatQuery(report));
+  io.stdout(options.format === 'json' ? formatQueryJson(report, { version: version() }) : formatQuery(report));
   return EXIT_OK;
 }
 
@@ -1176,7 +1183,7 @@ async function runProve(options: CliOptions, io: CliIO, use: ConfigUse | undefin
     options.format === 'sarif'
       ? formatProveSarif(report, { version: version() })
       : options.format === 'json'
-        ? formatProveJson(report)
+        ? formatProveJson(report, { version: version() })
         : options.format === 'gitlab'
           ? formatGitlab(proveAnnotations(report))
           : options.format === 'github'
@@ -1223,7 +1230,7 @@ async function runImpact(options: CliOptions, io: CliIO, use: ConfigUse | undefi
     return EXIT_ERROR;
   }
   const answered = { ...report, config: use };
-  io.stdout(options.format === 'json' ? formatImpactJson(answered) : formatImpact(answered));
+  io.stdout(options.format === 'json' ? formatImpactJson(answered, { version: version() }) : formatImpact(answered));
   if (report.specFiles.length === 0) {
     if (options.format !== 'json') io.stderr(`spec-guard: no spec files matched ${options.patterns.map((p) => `"${p}"`).join(', ')}`);
     return options.allowEmpty ? EXIT_OK : EXIT_ERROR;
@@ -1274,7 +1281,7 @@ async function runCites(options: CliOptions, io: CliIO, use: ConfigUse | undefin
   }
   const written =
     options.format === 'json'
-      ? formatCitesJson(report)
+      ? formatCitesJson(report, { version: version() })
       : options.format === 'sarif'
         ? formatCitesSarif(report, { version: version() })
         : options.format === 'gitlab'
@@ -1332,7 +1339,7 @@ async function runClaims(options: CliOptions, io: CliIO, use: ConfigUse | undefi
   }
   const written =
     options.format === 'json'
-      ? formatClaimsJson(report)
+      ? formatClaimsJson(report, { version: version() })
       : options.format === 'sarif'
         ? formatClaimsSarif(report, { version: version() })
         : options.format === 'gitlab'
@@ -1390,6 +1397,11 @@ async function run(argv: readonly string[], io: CliIO): Promise<number> {
     io.stderr(`spec-guard: ${error instanceof UsageError ? error.message : String(error)}`);
     return EXIT_ERROR;
   }
+
+  // `-v` is `--version` in the family's other tools, and becomes it here
+  // once the format freeze ends: said each time it is read as `--verbose`,
+  // on stderr, where no report a script reads is written.
+  if (argv.includes('-v')) io.stderr(V_DEPRECATED);
 
   if (options.help) {
     io.stdout(HELP);
@@ -1449,7 +1461,7 @@ async function run(argv: readonly string[], io: CliIO): Promise<number> {
     // the job's log is told why, as a person at a terminal is.
     if (options.format === 'sarif' || options.format === 'json' || options.format === 'gitlab') {
       io.stdout(
-        options.format === 'sarif' ? formatSarif(report, { version: version() }) : options.format === 'gitlab' ? formatGitlab([]) : formatJson(report),
+        options.format === 'sarif' ? formatSarif(report, { version: version() }) : options.format === 'gitlab' ? formatGitlab([]) : formatJson(report, { version: version() }),
       );
     } else {
       io.stderr(`spec-guard: no spec files matched ${options.patterns.map((p) => `"${p}"`).join(', ')}`);
@@ -1483,7 +1495,7 @@ async function run(argv: readonly string[], io: CliIO): Promise<number> {
   if (options.format === 'sarif') {
     io.stdout(formatSarif(report, { version: version() }));
   } else if (options.format === 'json') {
-    io.stdout(formatJson(report));
+    io.stdout(formatJson(report, { version: version() }));
   } else if (options.format === 'gitlab') {
     io.stdout(formatGitlab(runAnnotations(report)));
   } else if (options.format === 'github') {

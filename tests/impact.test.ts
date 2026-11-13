@@ -697,6 +697,10 @@ describe('the report', () => {
     const report = await impact(['src/db/client.ts']);
     const json = JSON.parse(formatImpactJson({ ...report, durationMs: 2.34567 })) as Record<string, unknown>;
     expect(Object.keys(json)).toEqual([
+      'tool',
+      'toolVersion',
+      'command',
+      'schemaVersion',
       'formatVersion',
       'root',
       'specFiles',

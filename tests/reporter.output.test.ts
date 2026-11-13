@@ -166,10 +166,13 @@ describe('exact rendered output', () => {
   });
 
   it('versions the JSON document, first, at 1', () => {
-    const parsed = JSON.parse(formatJson(fixture())) as Record<string, unknown>;
+    const parsed = JSON.parse(formatJson(fixture(), { version: '9.9.9' })) as Record<string, unknown>;
     expect(RUN_FORMAT_VERSION).toBe(1);
     expect(parsed.formatVersion).toBe(1);
-    expect(Object.keys(parsed)[0]).toBe('formatVersion');
+    // The family's envelope, then the version it had before, of equal value
+    // until the format freeze ends (spec-core's ADR-0005, amended 2026-11-12).
+    expect(Object.keys(parsed).slice(0, 5)).toEqual(['tool', 'toolVersion', 'command', 'schemaVersion', 'formatVersion']);
+    expect(parsed).toMatchObject({ tool: 'spec-guard', toolVersion: '9.9.9', command: 'check', schemaVersion: 1 });
   });
 
   it('renders an assert-present pass by listing its files', () => {
