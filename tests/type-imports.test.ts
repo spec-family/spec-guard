@@ -55,6 +55,15 @@ describe('an import type in TypeScript', () => {
       ['./a', false],
       ['./b', false],
     ]);
+    // The extension decides, not `.ts` anywhere in the name.
+    expect(typeOnly("const b = typeof import('./b');\n", 'src/gen.ts.js')).toEqual([['./b', false]]);
+  });
+
+  it('is a load at the very start of a file and at its very end', () => {
+    expect(typeOnly("import('./a');\nexport const b = import('./b')", 'src/x.ts')).toEqual([
+      ['./a', false],
+      ['./b', false],
+    ]);
   });
 
   it('leaves require() as it was', () => {
@@ -119,6 +128,10 @@ describe('an import in Python under if TYPE_CHECKING', () => {
       '    pass',
       'elif TYPE_CHECKING:',
       '    import app.elif_branch',
+      'if  TYPE_CHECKING:',
+      '    import app.two_blanks',
+      'if typing . TYPE_CHECKING:',
+      '    import app.dotted',
       '',
     ].join('\n');
 
@@ -126,6 +139,19 @@ describe('an import in Python under if TYPE_CHECKING', () => {
       ['app.tight', true],
       ['app.spaced', true],
       ['app.elif_branch', false],
+      ['app.two_blanks', true],
+      ['app.dotted', true],
+    ]);
+  });
+
+  it('keeps a block inside the block in it', () => {
+    const source = ['if TYPE_CHECKING:', '    import app.a', '    if TYPE_CHECKING:', '        import app.b', '    import app.c', 'import os', ''].join('\n');
+
+    expect(typeOnly(source, 'src/x.py')).toEqual([
+      ['app.a', true],
+      ['app.b', true],
+      ['app.c', true],
+      ['os', false],
     ]);
   });
 
@@ -141,6 +167,16 @@ describe('an import in Python under if TYPE_CHECKING', () => {
     ]);
     // A form feed is one column, and a line indented with one is in the block.
     expect(typeOnly('if TYPE_CHECKING:\n\fimport app.db\n', 'src/x.py')).toEqual([['app.db', true]]);
+    // A tab after spaces reaches the next multiple of eight: four and a tab
+    // are eight, and one and a tab are eight too, which is back at `if b:`
+    // and ends a block opened at nine spaces. Python takes both.
+    expect(typeOnly('if TYPE_CHECKING:\n    \timport app.deep\n', 'src/x.py')).toEqual([['app.deep', true]]);
+    expect(
+      typeOnly('if a:\n \tif b:\n         if TYPE_CHECKING:\n             import app.typed\n \timport app.runs\n', 'src/x.py'),
+    ).toEqual([
+      ['app.typed', true],
+      ['app.runs', false],
+    ]);
   });
 
   it('keeps a comment line from ending the block', () => {

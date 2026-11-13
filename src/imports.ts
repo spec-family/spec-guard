@@ -395,11 +395,12 @@ const PROMISE_METHODS: ReadonlySet<string> = new Set(['then', 'catch', 'finally'
  * `.then`, `.catch` and `.finally` are the promise's, and a load.
  */
 function importType(tokens: readonly Token[], index: number): boolean {
-  const before = tokens[index - 1];
-  if (before?.type === 'word' && before.value === 'typeof') return true;
+  // Nothing but the word can stand before `import(` spelled `typeof`.
+  if (tokens[index - 1]?.value === 'typeof') return true;
   // `import('x').member`: the call closes at index + 3, and a second
   // argument would put a token other than the dot after it.
-  return tokens[index + 4]?.value === '.' && !PROMISE_METHODS.has(String(tokens[index + 5]?.value));
+  const [dot, member] = tokens.slice(index + 4, index + 6).map((token) => token.value);
+  return dot === '.' && !PROMISE_METHODS.has(String(member));
 }
 
 /**

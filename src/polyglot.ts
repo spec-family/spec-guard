@@ -433,6 +433,8 @@ function readPython(collector: Collector): void {
 
   for (const line of logicalLines(code)) {
     const depth = indentation(line.text);
+    // `guard !== null` as `true` is an equivalent mutant: outside a block
+    // there is no guard to end.
     if (guard !== null && depth <= guard) guard = null;
     const opening = guard === null ? PYTHON_TYPE_CHECKING.exec(line.text) : null;
     // On the opening line only what follows the colon is in the block.
