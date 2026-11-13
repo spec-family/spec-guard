@@ -105,9 +105,20 @@ describe('a missing target', () => {
       'src/b.ts': '',
     });
     const allowed = await runSpecGuard({ patterns: ['docs/adr.md'], root: ROOT, io, engine: 'javascript', allowMissingTargets: true });
-    const present = memoryIo(ROOT, { 'docs/adr.md': '# ADR\n\n<!-- @assert-absence symbol="X" target="src" -->\n', 'src/a.ts': '' });
+    const present = memoryIo(ROOT, {
+      'docs/adr.md': [
+        '# ADR',
+        '',
+        '<!-- @assert-absence symbol="X" target="src" -->',
+        '<!-- @assert-import-absence module="db" target="src" -->',
+        '<!-- @assert-structure target="src" glob="*.ts" pattern="*.ts" -->',
+        '',
+      ].join('\n'),
+      'src/a.ts': "import './b';\n",
+      'src/b.ts': '',
+    });
     const none = await runSpecGuard({ patterns: ['docs/adr.md'], root: ROOT, io: present, engine: 'javascript', allowMissingTargets: true });
-    expect(none.results[0]!.warnings).toEqual([]);
+    expect(none.results.map((result) => result.warnings)).toEqual([[], [], []]);
     const failing = await runSpecGuard({ patterns: ['docs/adr.md'], root: ROOT, io, engine: 'javascript' });
 
     expect(allowed.results.map((result) => result.warnings.includes('target path not found: gone'))).toEqual([true, true, true]);

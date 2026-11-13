@@ -886,13 +886,13 @@ function scanFile(
 
   const tallies = new Map<string, Tally>();
   const timedOut = new Set<string>();
-  // Only a regex rule is timed. A literal is escaped before it is built, and
-  // matches in time proportional to the text, so a watchdog thread for each
-  // of its files would be cost and nothing else: `if (false)` here, or the
-  // block below emptied, is an equivalent mutant, slower and with the same
-  // answers.
   const budget = regexBudget(buffer.length);
   for (const [pattern, regexp] of regexps) {
+    // Only a regex rule is timed. A literal is escaped before it is built,
+    // and matches in time proportional to the text, so a watchdog thread for
+    // each of its files would be cost and nothing else: `if (false)` here, or
+    // this block emptied, is an equivalent mutant, slower and with the same
+    // answers.
     if (!regex) {
       tallies.set(pattern, scanContent(content, relativePath, regexp, getMask));
       continue;

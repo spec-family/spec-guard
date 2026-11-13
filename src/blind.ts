@@ -120,9 +120,9 @@ async function holdsLanguage(io: Io, root: string, prefix: string, language: Mod
     );
     const found = listed.flat();
     if (found.some(({ entry }) => entry.isFile() && extensions.includes(path.extname(entry.name).toLowerCase()))) return true;
-    // A file kept here as a folder is listed next time, and its listing,
-    // which fails, holds nothing: `true` for `isDirectory()`, or no filter at
-    // all, is an equivalent mutant.
+    // Folders alone take the places of the next level: a file kept here
+    // would take one, and a folder of many files would leave its folders
+    // unread.
     level = found.filter(({ entry }) => entry.isDirectory()).map(({ directory, entry }) => path.join(directory, entry.name));
   }
   return false;
