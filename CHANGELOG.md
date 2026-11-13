@@ -75,6 +75,21 @@ is deprecated before it goes, is spec-core's
 
 - **`--format pretty` is `--format human`**, as spec-graph names the report.
 
+- **The MCP server's `get_dependents` lists at most `max_files` dependents
+  of each path**, 200 unless asked, the nearest first, and counts the rest
+  in `truncated`; `summary` lists none. A chain of 5,000 files answered
+  26 MB of structured content.
+
+- **`check_architecture` reads unsaved files from `contents`**, in memory,
+  and runs the rules a spec states when the spec's path is given, so a
+  directive just written, saved or not, can be seen to hold.
+
+- **A `check_claims` tool** runs `claims` under the configuration's
+  `"claims"`.
+
+- **`get_architectural_rules` takes `paths`**, and every tool declares an
+  `outputSchema`.
+
 - **`prove` takes `--concurrency`**, and the configuration's `concurrency`:
   that many rules are proved at once, eight by default, and the report lists
   them in the order the specs state them.
@@ -128,6 +143,11 @@ is deprecated before it goes, is spec-core's
   type-only, as `import type` is; `import('./a').then(...)` and an `else:`
   branch still count
   ([ADR-0005](https://github.com/spec-family/spec-guard/blob/main/docs/adr/0005-import-assertions.md#amended-2026-11-12-what-only-a-type-checker-reads),
+  amended 2026-11-12).
+
+- **`check_architecture` on a path that is not there is refused** with what
+  to do, where it checked no rule and said every assertion held
+  ([ADR-0012](https://github.com/spec-family/spec-guard/blob/main/docs/adr/0012-query-and-mcp.md#amended-2026-11-12-bounded-answers-honest-checks-and-the-claims),
   amended 2026-11-12).
 
 - **`prove` scans a file once for each rule, not once for each violation.**
