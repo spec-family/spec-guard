@@ -325,3 +325,36 @@ measure what the release commit already records.
 **Publishing when a version bump merges to main.** It removes the tag, and with
 it the moment somebody says that this commit is the release. The workflow's
 checks, the ruleset and every release so far are keyed on the tag.
+
+## Amended 2026-11-12: the release commit is a pull request, and the release runs CI
+
+Since 2026-11-12 main's ruleset takes a change only through a pull request
+whose `all green` check passed, so the release commit can no longer be pushed
+to main. The 0.34.0 release commit was, and main went red on it. The release
+is now a pull request: a branch `release-<x.y.z>` cut from main, with the one
+commit `release: <x.y.z>` that "The release commit" above describes; its
+checks run as every pull request's do; the maintainer merges it; and the
+annotated tag `v<x.y.z>` goes on the merge commit, as spec-brief, spec-graph
+and spec-harness tag theirs. The tag is still the moment somebody says this
+commit is the release.
+
+`release.yml` now runs three jobs before `publish`. `check` reads the commit
+and the version, as `verify` did first, before anything of the commit is
+installed. `ci` is `ci.yml`, called on the tagged commit, which now takes
+`workflow_call`: every leg of the matrix, where `verify` ran the suite on one,
+and the repository's own ADRs, `prove` and `cites`, which `verify` did not
+run. A tag push runs no CI, and main's CI is cancelled by a newer push, so a
+tagged commit may never have finished one. `verify` then builds and packs, as
+before. A called workflow is handed no more than its caller grants, so the
+`ci` job grants `security-events: write` for ci.yml's code scanning upload,
+and ci.yml's concurrency group names the workflow, which is the caller's when
+called, so a push to main cannot cancel a release's CI. The mutation sweep is
+not called here, as spec-brief's release calls its: step 2 above waits for
+main's full sweep before the release pull request is opened.
+
+Called from another workflow, `github` is the caller's context, so the event
+ci.yml's matrix reads is the release's own, the tag's push or a dispatch, and
+neither narrows it to a pull request's three legs. `ci` fails when any job of
+ci.yml does, since its `all green` needs every one, and `verify` and
+`publish` wait on it with no condition that runs them after a failure.
+`tests/release-ci.test.ts` holds all three.
