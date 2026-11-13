@@ -27,7 +27,7 @@ A `regex` is read in one dialect, on a page of its own:
 | `required` | structure | The entries every chosen directory must hold; a trailing `/` means a directory |
 | `dirs` | structure, with `required` | Which directories below each target: `*` for children, `**` for all; a trailing `/` changes nothing, in braces or out |
 | `partner` | structure | Partner templates, any one of which must exist: `[name].test.[ext]` |
-| `types` | import assertions, layers, cycles | `include` (default) or `ignore` for `import type` |
+| `types` | import assertions, layers, cycles | `include` (default) or `ignore` for what only a type checker reads: `import type`, TypeScript's import types (`import('./a').X`, `typeof import('./a')`), and Python's `if TYPE_CHECKING:` block |
 | `dynamic` | cycles | `include` (default) or `ignore` for `import('x')` |
 | `allow-empty` | all but present | Tolerate a scope that holds no files, a layer that matches none, a layer no C# using can reach, layers no import crosses between, or no chosen directories. Off by default - see below |
 | `baseline` | absence, import-absence, layers, structure | Known violations that do not count: `path` or `path:count` |

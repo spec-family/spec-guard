@@ -94,6 +94,16 @@ is deprecated before it goes, is spec-core's
   `query` did. Each now reads the path in the case the disk has, and names
   it so; on a filesystem that tells case apart a path is taken as written.
 
+- **`types="ignore"` leaves out what only a type checker reads.** A
+  TypeScript import type, `type T = import('./a').X` or
+  `typeof import('./a')`, was read as a load, so a cycle the compiler
+  erases was still counted; an import in Python's `if TYPE_CHECKING:` block
+  was counted as runtime, and `types` did nothing in Python. Both are now
+  type-only, as `import type` is; `import('./a').then(...)` and an `else:`
+  branch still count
+  ([ADR-0005](https://github.com/spec-family/spec-guard/blob/main/docs/adr/0005-import-assertions.md#amended-2026-11-12-what-only-a-type-checker-reads),
+  amended 2026-11-12).
+
 ## 0.34.0
 
 `"ignoreStatus"` takes a list of spec patterns, whose documents are read

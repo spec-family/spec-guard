@@ -228,11 +228,11 @@ interface Collector {
   namespaces?: string[];
 }
 
-function emit(collector: Collector, specifier: string, kind: ReferenceKind, offset: number, namespace?: string): void {
+function emit(collector: Collector, specifier: string, kind: ReferenceKind, offset: number, namespace?: string, typeOnly = false): void {
   const trimmed = specifier.trim();
   if (!trimmed) return;
   const { line, column } = locate(collector.masked.starts, offset);
-  collector.references.push({ specifier: trimmed, kind, typeOnly: false, line, column, namespace });
+  collector.references.push({ specifier: trimmed, kind, typeOnly, line, column, namespace });
 }
 
 function note(collector: Collector, kind: AnalysisNote['kind'], offset: number, detail: string): void {
@@ -405,10 +405,41 @@ function pythonImports(tokens: readonly string[], from: boolean, lazy: boolean):
 
 const PYTHON_DYNAMIC = /\b(__import__|import_module)[ \t]*\(/g;
 
+/**
+ * `if TYPE_CHECKING:`, or `if typing.TYPE_CHECKING:`, at the head of a logical
+ * line: the block of imports a type checker reads and Python never runs, as
+ * TypeScript erases `import type`. What follows the colon on its own line is
+ * in the block too.
+ */
+const PYTHON_TYPE_CHECKING = /^([ \t\f]*)if[ \t\f]+(?:[\p{XID_Start}_]\p{XID_Continue}*[ \t\f]*\.[ \t\f]*)?TYPE_CHECKING[ \t\f]*:/u;
+
+/** A line's indentation as Python measures it: a tab to the next multiple of eight. */
+function indentation(text: string): number {
+  let width = 0;
+  for (const char of text) {
+    if (char === ' ' || char === '\f') width += 1;
+    else if (char === '\t') width += 8 - (width % 8);
+    else break;
+  }
+  return width;
+}
+
 function readPython(collector: Collector): void {
   const { code } = collector.masked;
+  // The indentation of the `if TYPE_CHECKING:` whose block the lines are in,
+  // or null outside one. A line no deeper than it ends the block, an `else:`
+  // among them, whose imports run.
+  let guard: number | null = null;
 
   for (const line of logicalLines(code)) {
+    const depth = indentation(line.text);
+    // `guard !== null` as `true` is an equivalent mutant: outside a block
+    // there is no guard to end.
+    if (guard !== null && depth <= guard) guard = null;
+    const opening = guard === null ? PYTHON_TYPE_CHECKING.exec(line.text) : null;
+    // On the opening line only what follows the colon is in the block.
+    const blockFrom = guard !== null ? 0 : opening === null ? Number.POSITIVE_INFINITY : opening[0].length;
+    if (opening !== null) guard = depth;
     PYTHON_STATEMENT.lastIndex = 0;
     let match: RegExpExecArray | null;
     while ((match = PYTHON_STATEMENT.exec(line.text)) !== null) {
@@ -427,7 +458,7 @@ function readPython(collector: Collector): void {
         continue;
       }
       // Python reads a name in the form NFKC gives it.
-      for (const module of modules) emit(collector, module.normalize('NFKC'), 'import', offset);
+      for (const module of modules) emit(collector, module.normalize('NFKC'), 'import', offset, undefined, first >= blockFrom);
     }
   }
 
