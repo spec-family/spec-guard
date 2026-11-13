@@ -148,6 +148,9 @@ describe('what ripgrep lists', () => {
 
   it('sorts as the walk meets directories: a name at a time', () => {
     expect(['a-b/x', 'a/x/y', 'b', 'a/x', 'a'].sort(compareWalkOrder)).toEqual(['a', 'a/x', 'a/x/y', 'a-b/x', 'b']);
+    // Whichever of a pair a sort asks about first.
+    expect(compareWalkOrder('a-b/x', 'a/x')).toBeGreaterThan(0);
+    expect(compareWalkOrder('a/x', 'a-b/x')).toBeLessThan(0);
   });
 
   it('asks ripgrep for every .git file and HEAD below a target, hidden and ignored ones too, entering a .git directory for its HEAD alone', () => {

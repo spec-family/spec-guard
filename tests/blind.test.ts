@@ -259,6 +259,15 @@ describe('a pattern on a path, held to files that import by module name', () => 
     expect(broad[0]!.blindSpots).toBeUndefined();
   });
 
+  it('counts folders alone among the 64, whatever files stand beside them', async () => {
+    const crowded: Record<string, string> = { 'cmd/main.go': 'package main\nimport "github.com/acme/shop/internal/infra/store"\n' };
+    for (let at = 0; at < 64; at++) crowded[`internal/infra/f${String(at).padStart(2, '0')}.txt`] = 'x\n';
+    crowded['internal/infra/store/db.go'] = 'package store\n';
+    const [result] = await results(['<!-- @assert-import-absence module="internal/infra" target="cmd" -->'], crowded);
+
+    expect(result!.blindSpots?.map((spot) => spot.rule)).toEqual(['module-path-pattern']);
+  });
+
   it('is said for Go, which names a package by its module path, and not for **/ or the standard library', async () => {
     const files = { 'internal/infra/db.go': 'package infra\n', 'internal/domain/order.go': 'package domain\nimport (\n  "fmt"\n  "github.com/acme/shop/internal/infra"\n)\n' };
     const [wrong, anywhere, standard] = await results(
@@ -345,6 +354,28 @@ describe('a pattern on a path, held to files that import by module name', () => 
     expect(result!.ok).toBe(true);
     expect(result!.blindSpots?.map((spot) => spot.message)).toEqual([
       'layers "src/shop/domain/**" and "src/shop/infra/**" name Python code by its path from src/, and the 2 Python files in scope import by a module name that never starts there, such as "shop.domain.order", so they match none of their imports',
+    ]);
+  });
+
+  it('names one layer as one, and two module patterns in the folder as two', async () => {
+    const files = {
+      'src/shop/infra/db.py': 'x = 1\n',
+      'src/shop/db/pool.py': 'x = 1\n',
+      'src/shop/domain/order.py': 'from shop.infra.db import x\n',
+    };
+    const [layer, modules] = await results(
+      [
+        '<!-- @assert-layers order="src/shop/infra/**, domain" target="src/shop/domain" allow-empty="true" -->',
+        '<!-- @assert-import-absence module="src/shop/infra/**, src/shop/db/**" target="src/shop/domain" -->',
+      ],
+      files,
+    );
+
+    expect(layer!.blindSpots?.map((spot) => spot.message)).toEqual([
+      'layer "src/shop/infra/**" names Python code by its path from src/, and the 1 Python file in scope imports by a module name that never starts there, such as "shop.infra.db", so it matches none of its imports',
+    ]);
+    expect(modules!.blindSpots?.map((spot) => spot.message)).toEqual([
+      'module patterns "src/shop/infra/**" and "src/shop/db/**" name Python code by its path from src/, and the 1 Python file in scope imports by a module name that never starts there, such as "shop.infra.db", so they match none of its imports',
     ]);
   });
 
@@ -441,6 +472,48 @@ describe('what a format says of a blind spot', () => {
       expect.objectContaining({ rule: 'unresolved-alias', level: 'warning', severity: 'minor', file: 'docs/adr.md', line: 3 }),
     ]);
     expect(formatGithub(annotations)).toMatch(/^::warning file=docs\/adr.md,line=3,title=unresolved-alias::/);
+  });
+
+  it('says the rule and the spot, and the imports it stands on where it has any, as a finding of its own rule', async () => {
+    const tree = {
+      'docs/adr.md': [
+        '# ADR',
+        '',
+        '<!-- @assert-import-absence module="src/db/**" target="src/domain" -->',
+        '<!-- @assert-import-absence module="src/shop/infra/**" target="src/shop/domain" -->',
+        '',
+      ].join('\n'),
+      ...ALIASED,
+      'src/domain/money.ts': "import { client } from '@/db/client';\nexport const money = client;\n",
+      'src/shop/infra/db.py': 'x = 1\n',
+      'src/shop/domain/order.py': 'from shop.infra.db import x\n',
+    };
+    const annotations = runAnnotations(await runSpecGuard({ patterns: ['docs/adr.md'], root: ROOT, io: memoryIo(ROOT, tree), engine: 'javascript' }));
+
+    expect(annotations).toEqual([
+      {
+        rule: 'unresolved-alias',
+        identity: ['unresolved-alias', 'docs/adr.md', 'assert-import-absence', 'src/db/**', 'src/domain'],
+        level: 'warning',
+        severity: 'minor',
+        file: 'docs/adr.md',
+        line: 3,
+        message:
+          'src/domain must not import "src/db/**": 2 imports are written as a path alias, which spec-guard does not resolve, and they reach no pattern of this rule, so where they lead was not checked (src/domain/money.ts:1 @/db/client; src/domain/order.ts:1 @/db/client)',
+        hint: 'name the alias as it is written as well, as "@/db/**" does, or import by a relative path',
+      },
+      {
+        rule: 'module-path-pattern',
+        identity: ['module-path-pattern', 'docs/adr.md', 'assert-import-absence', 'src/shop/infra/**', 'src/shop/domain'],
+        level: 'warning',
+        severity: 'minor',
+        file: 'docs/adr.md',
+        line: 4,
+        message:
+          'src/shop/domain must not import "src/shop/infra/**": module pattern "src/shop/infra/**" names Python code by its path from src/, and the 1 Python file in scope imports by a module name that never starts there, such as "shop.infra.db", so it matches none of its imports',
+        hint: 'a Python import names a module from its import root, which a src layout\'s folder is not part of: write the module as it is imported, such as "shop.infra" if src is that root',
+      },
+    ]);
   });
 
   it('is in the JSON document only where there is one', async () => {
