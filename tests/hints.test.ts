@@ -11,7 +11,7 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { main, type CliIO } from '../src/cli.js';
+import { main, repositoryAbove, type CliIO } from '../src/cli.js';
 import { parseConfig, parseStandaloneConfig } from '../src/config.js';
 import { formatImpact, impactOf } from '../src/impact.js';
 import { runSpecGuard } from '../src/runner.js';
@@ -45,6 +45,16 @@ describe('a run from a subdirectory of a repository', () => {
 
     expect((await cli(path.join(root, 'src'), [])).err).toEqual(['spec-guard: no spec files matched "docs/**/*.md"']);
     expect((await cli(root, ['notes/*.md'])).err).toEqual(['spec-guard: no spec files matched "notes/*.md"']);
+  });
+
+  it('finds the repository however far above the root it starts, and none above the root of the filesystem', async () => {
+    const root = await makeTempRepo({ '.git/HEAD': 'ref: refs/heads/main\n', 'docs/adr.md': '# ADR\n', 'src/deep/a.ts': '' });
+    temporary.push(root);
+
+    expect((await cli(path.join(root, 'src', 'deep'), [])).err).toEqual([
+      'spec-guard: no spec files matched "docs/**/*.md" here; the repository starts at ../.., where 1 spec matches: run from there, or pass --root ../..',
+    ]);
+    expect(await repositoryAbove(path.parse(root).root)).toBeNull();
   });
 
   it('counts the specs it found there', async () => {
@@ -95,6 +105,9 @@ describe('a missing target', () => {
       'src/b.ts': '',
     });
     const allowed = await runSpecGuard({ patterns: ['docs/adr.md'], root: ROOT, io, engine: 'javascript', allowMissingTargets: true });
+    const present = memoryIo(ROOT, { 'docs/adr.md': '# ADR\n\n<!-- @assert-absence symbol="X" target="src" -->\n', 'src/a.ts': '' });
+    const none = await runSpecGuard({ patterns: ['docs/adr.md'], root: ROOT, io: present, engine: 'javascript', allowMissingTargets: true });
+    expect(none.results[0]!.warnings).toEqual([]);
     const failing = await runSpecGuard({ patterns: ['docs/adr.md'], root: ROOT, io, engine: 'javascript' });
 
     expect(allowed.results.map((result) => result.warnings.includes('target path not found: gone'))).toEqual([true, true, true]);
@@ -103,6 +116,21 @@ describe('a missing target', () => {
       [false, 'target path does not exist: gone', false],
       [false, 'target path does not exist: gone', false],
     ]);
+  });
+});
+
+describe('a rule over files whose imports no reader here reads', () => {
+  it('names their kinds, each once and in order', async () => {
+    const ROOT = path.resolve('/virtual/hints-unread');
+    const io = memoryIo(ROOT, {
+      'docs/adr.md': '# ADR\n\n<!-- @assert-import-absence module="db" target="src" -->\n',
+      'src/a.rb': '',
+      'src/b.java': '',
+      'src/c.rb': '',
+    });
+    const [result] = (await runSpecGuard({ patterns: ['docs/adr.md'], root: ROOT, io, engine: 'javascript' })).results;
+
+    expect(result!.message).toContain('and these are .java, .rb: a text rule');
   });
 });
 

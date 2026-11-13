@@ -1005,7 +1005,7 @@ async function noSpecsMatched(patterns: readonly string[], root: string): Promis
 }
 
 /** The nearest directory above `root` that holds a `.git`, or null when `root` holds one or none above does. */
-async function repositoryAbove(root: string): Promise<string | null> {
+export async function repositoryAbove(root: string): Promise<string | null> {
   const start = path.resolve(root);
   if ((await nodeIo.stat(path.join(start, '.git'))) !== null) return null;
   for (let current = path.dirname(start); ; current = path.dirname(current)) {
