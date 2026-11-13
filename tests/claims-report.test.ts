@@ -102,12 +102,17 @@ describe('the note on labels in prose', () => {
 
 describe('the report for a script', () => {
   it('is a versioned document of the verdict, the totals, the claims, the findings and what was read', () => {
-    expect(JSON.parse(formatClaimsJson(REPORT))).toEqual({
+    expect(JSON.parse(formatClaimsJson(REPORT, { version: '9.9.9' }))).toEqual({
+      tool: 'spec-guard',
+      toolVersion: '9.9.9',
+      command: 'claims',
+      schemaVersion: 1,
       formatVersion: 1,
       ok: false,
       totals: { Implemented: 2, Specified: 1 },
       claims: REPORT.claims,
-      findings: REPORT.findings,
+      // Every finding fails the check: the family's error.
+      findings: REPORT.findings.map((finding) => ({ ...finding, severity: 'error' })),
       prose: [],
       files: ['spec/a.md'],
       unmatched: ['spec/none/*.md', 'specs/*.md'],

@@ -1116,8 +1116,9 @@ describe('the report', () => {
 
   it('is versioned JSON for a script', () => {
     const json = JSON.parse(formatCitesJson({ ...report, durationMs: 1.23456 })) as Record<string, unknown>;
-    expect(Object.keys(json)).toEqual(['formatVersion', 'ok', 'root', 'durationMs', 'families', 'summary', 'findings', 'gaps', 'unclassified', 'workTrees', 'notes', 'exclude']);
+    expect(Object.keys(json)).toEqual(['tool', 'toolVersion', 'command', 'schemaVersion', 'formatVersion', 'ok', 'root', 'durationMs', 'families', 'summary', 'findings', 'gaps', 'unclassified', 'workTrees', 'notes', 'exclude']);
     expect(json['formatVersion']).toBe(1);
+    expect(json).toMatchObject({ tool: 'spec-guard', toolVersion: '0.0.0', command: 'cites', schemaVersion: 1 });
     expect(json['durationMs']).toBe(1.235);
     expect(json['findings']).toEqual(report.findings);
   });

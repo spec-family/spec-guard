@@ -519,7 +519,7 @@ export function createMcpHandler(options: McpServerOptions): (message: unknown) 
     const report = { ...whole, results: whole.results.map((result) => bounded(result, summary ? 0 : (most as number))) };
     // With no spec at all the report says so itself, as it always has.
     const unmatched = report.specFiles.length === 0 ? undefined : report.unmatchedSpecs;
-    return { text: noted(formatImpact(report), unmatched), structured: { ...impactDocument(report) } };
+    return { text: noted(formatImpact(report), unmatched), structured: { ...impactDocument(report, { version: options.version }) } };
   }
 
   async function checkClaims(args: JsonObject): Promise<ToolOutcome> {

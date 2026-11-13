@@ -881,12 +881,15 @@ describe('get_dependents', () => {
   }
 
   /** A report with its timing taken out, which is the one thing two answers need not share. */
-  const timeless = (report: Record<string, unknown> | undefined): Record<string, unknown> => ({ ...report, durationMs: 0 });
+  // And its release, which the server is told and the command reads: the
+  // server here is 9.9.9.
+  const timeless = (report: Record<string, unknown> | undefined): Record<string, unknown> => ({ ...report, durationMs: 0, toolVersion: '' });
 
   it('answers with the document impact --json writes, and its report as the text', async () => {
     const called = await tool('get_dependents', { paths: ['src/domain/user.ts'] });
     expect(called).not.toHaveProperty('isError');
     expect(timeless(called.structuredContent)).toEqual(timeless(await impactJson('src/domain/user.ts')));
+    expect(called.structuredContent).toMatchObject({ tool: 'spec-guard', toolVersion: '9.9.9', command: 'impact', schemaVersion: 1 });
 
     // And what that document holds: the file that imports it, with the
     // import, and the rules over both, the draft's counted and named.

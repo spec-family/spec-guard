@@ -26,11 +26,11 @@ spec-guard impact <paths...>           # the files that depend on each path, and
 | --- | --- |
 | `-r, --root <path>` | Codebase root that assertions resolve against, a directory (default: cwd). One that is not there, or is a file, is exit 2 from every command |
 | `--spec <pattern>` | A spec glob or path, repeatable. `query` and `mcp` take their specs only from here. An empty one is refused: `.` is every Markdown file under the root. So is one that matches no file beside others that do (below) |
-| `-v, --verbose` | Print passing assertions too; for `claims`, where each label in prose is |
+| `-v, --verbose` | Print passing assertions too; for `claims`, where each label in prose is. `-v` says on stderr that it becomes `--version`, as it is in the family's other tools, in the release after the format freeze: write `--verbose` |
 | `--watch` | Report, then report again as the tree changes, until Ctrl+C |
 | `--fail-fast` | Stop at the first failing assertion |
-| `--json` | Machine-readable report on stdout (same as `--format json`), versioned by `formatVersion`. Beside a `--format` that names another format it is refused (below) |
-| `--format <human\|json\|sarif\|github\|gitlab>` | Output format. `sarif` uploads to GitHub code scanning, `github` annotates a pull request from the job's log, `gitlab` is a GitLab Code Quality report. Given twice with two formats it is refused, as every option that takes one value is (below) |
+| `--json` | Machine-readable report on stdout (same as `--format json`). It starts with the family's envelope, `tool`, `toolVersion`, `command` and `schemaVersion`, and `formatVersion` beside them with `schemaVersion`'s value until the format freeze ends; a failed assertion and a directive that could not be read carry `rule`, `severity` and `hint` ([spec-core's ADR-0005](https://github.com/spec-family/spec-core/blob/main/docs/adr/0005-the-family-contract.md)). Beside a `--format` that names another format it is refused (below) |
+| `--format <human\|json\|sarif\|github\|gitlab>` | Output format; `pretty` is `human`, as spec-graph names it. `sarif` uploads to GitHub code scanning, `github` annotates a pull request from the job's log, `gitlab` is a GitLab Code Quality report. Given twice with two formats it is refused, as every option that takes one value is (below) |
 | `--engine <auto\|rg\|js>` | Search engine (default `auto`: scanner for small trees, ripgrep for big ones). ripgrep is `rg` on `PATH`, or the program `SPEC_GUARD_RG` names; `rg` with no ripgrep that runs is exit 2 ([CI integration](ci.md#ripgrep)) |
 | `--strict` / `--no-strict` | Treat analysis that could not be completed as a failure, and a run that executed no assertion: its specs matched and state no rule in force |
 | `--allow-missing-targets` / `--no-allow-missing-targets` | Warn instead of failing when a `target` path does not exist |

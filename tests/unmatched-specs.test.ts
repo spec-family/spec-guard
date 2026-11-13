@@ -177,7 +177,7 @@ describe('a run with a pattern that matched no file beside one that did', () => 
     const report = JSON.parse(json.out.join('\n')) as Record<string, unknown>;
     expect(report).toMatchObject({ formatVersion: 1, ok: true, summary: { specs: 1, total: 1, passed: 1 }, specFiles: ['docs/a.md'], unmatchedSpecs: ['gone', 'old/*.md'] });
     // After the files that were read, where a reader of one looks for the other.
-    expect(Object.keys(report).slice(6, 8)).toEqual(['specFiles', 'unmatchedSpecs']);
+    expect(Object.keys(report).slice(10, 12)).toEqual(['specFiles', 'unmatchedSpecs']);
 
     const sarif = await cli(root, ['docs', 'gone', '--format', 'sarif', '--engine', 'js']);
     expect([sarif.code, sarif.err]).toEqual([EXIT_ERROR, [refusal('gone')]]);
@@ -269,7 +269,7 @@ describe('a proof with a pattern that matched no file beside one that did', () =
     expect([json.code, json.err]).toEqual([EXIT_ERROR, [refusal('gone')]]);
     const report = JSON.parse(json.out.join('\n')) as Record<string, unknown>;
     expect(report).toMatchObject({ formatVersion: 1, ok: true, summary: { specs: 1, killed: 1 }, specFiles: ['docs/a.md'], unmatchedSpecs: ['gone'] });
-    expect(Object.keys(report).slice(5, 7)).toEqual(['specFiles', 'unmatchedSpecs']);
+    expect(Object.keys(report).slice(9, 11)).toEqual(['specFiles', 'unmatchedSpecs']);
     const gitlab = await cli(root, ['prove', 'docs', 'gone', '--format', 'gitlab']);
     expect([gitlab.code, gitlab.out, gitlab.err]).toEqual([EXIT_ERROR, ['[]'], [refusal('gone')]]);
   });
@@ -344,7 +344,7 @@ describe('a query with a pattern that matched no file beside one that did', () =
     expect([json.code, json.err]).toEqual([EXIT_ERROR, [final]]);
     const report = JSON.parse(json.out.join('\n')) as { results: Array<{ rules: unknown[] }> };
     expect(report).toMatchObject({ formatVersion: 1, specFiles: ['docs/a.md'], unmatchedSpecs: ['gone'] });
-    expect(Object.keys(report).slice(2, 4)).toEqual(['specFiles', 'unmatchedSpecs']);
+    expect(Object.keys(report).slice(6, 8)).toEqual(['specFiles', 'unmatchedSpecs']);
     expect(report.results[0]?.rules).toHaveLength(1);
   });
 
@@ -592,7 +592,7 @@ describe('cites with a pattern that matched no file beside one that did', () => 
     const report = JSON.parse(json.out.join('\n')) as Record<string, unknown>;
     expect(report).toMatchObject({ formatVersion: 1, ok: true, families: [{ id: 'ADR-{n}', source: 'derived' }], unmatchedSpecs: ['rfcs/*.md'] });
     // After the families, which are what the pattern left short.
-    expect(Object.keys(report).slice(4, 6)).toEqual(['families', 'unmatchedSpecs']);
+    expect(Object.keys(report).slice(8, 10)).toEqual(['families', 'unmatchedSpecs']);
     // Nothing failed for it, so nothing says that it did.
     expect(report).not.toHaveProperty('unreadFamily');
 
@@ -601,7 +601,7 @@ describe('cites with a pattern that matched no file beside one that did', () => 
     const refused = JSON.parse(strict.out.join('\n')) as Record<string, unknown>;
     // Beside `ok`, which of the document's lists the check failed for.
     expect(refused).toMatchObject({ ok: false, unreadFamily: true, unmatchedSpecs: ['rfcs/*.md'], findings: [], gaps: [] });
-    expect(Object.keys(refused).slice(0, 4)).toEqual(['formatVersion', 'ok', 'unreadFamily', 'root']);
+    expect(Object.keys(refused).slice(4, 8)).toEqual(['formatVersion', 'ok', 'unreadFamily', 'root']);
     // A source file was read, and all of it: this is neither of the other two.
     expect(refused).not.toHaveProperty('nothingRead');
     expect(refused).not.toHaveProperty('unreadComments');

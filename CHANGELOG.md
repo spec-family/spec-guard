@@ -59,6 +59,22 @@ is deprecated before it goes, is spec-core's
   ([ADR-0012](https://github.com/spec-family/spec-guard/blob/main/docs/adr/0012-query-and-mcp.md#amended-2026-11-12-a-path-in-another-case),
   amended 2026-11-12).
 
+- **Every JSON document starts with the family's envelope.** `tool`
+  (`spec-guard`), `toolVersion`, `command` (`check` for a run, `prove`,
+  `cites`, `claims`, `query`, `impact`) and `schemaVersion`, with
+  `formatVersion`'s value, which stays beside it until the format freeze
+  ends. A failed assertion in a run, a rule that survived `prove` or could
+  not be proved, and a directive that could not be read carry `rule` (its
+  SARIF rule), `severity` (its annotation's level, `notice` written `note`)
+  and `hint`; a `claims` finding gains `severity`. The MCP server's
+  `get_dependents` answers with the document `impact --json` writes, envelope
+  and all. Nothing is renamed or removed: round 30 removes `formatVersion`
+  (spec-core's
+  [ADR-0005](https://github.com/spec-family/spec-core/blob/main/docs/adr/0005-the-family-contract.md),
+  amended 2026-11-12).
+
+- **`--format pretty` is `--format human`**, as spec-graph names the report.
+
 - **The MCP server's `get_dependents` lists at most `max_files` dependents
   of each path**, 200 unless asked, the nearest first, and counts the rest
   in `truncated`; `summary` lists none. A chain of 5,000 files answered
@@ -88,6 +104,12 @@ is deprecated before it goes, is spec-core's
   1,077,674 in the sweep of the change, with the score and the survivors
   unchanged. Development tooling only: nothing spec-guard checks or reports
   changed. Upgrading: nothing to do.
+
+### Deprecated
+
+- **`-v` is `--verbose` today, and `--version` in the release after the
+  format freeze**, as it is in the family's other tools. It says so on stderr
+  each time. Upgrading: write `--verbose`.
 
 ### Fixed
 

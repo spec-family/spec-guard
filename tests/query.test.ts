@@ -511,9 +511,9 @@ describe('formatQuery', () => {
   it('writes JSON with the duration rounded to microseconds', async () => {
     const report = await queryRules({ patterns: ['docs/untitled.md'], root, paths: ['src/domain/user.ts'] });
     const json = JSON.parse(formatQueryJson({ ...report, durationMs: 1.23456789 })) as Record<string, unknown>;
-    expect(json).toEqual({ formatVersion: 1, ...report, durationMs: 1.235 });
+    expect(json).toEqual({ tool: 'spec-guard', toolVersion: '0.0.0', command: 'query', schemaVersion: 1, formatVersion: 1, ...report, durationMs: 1.235 });
     // First, where a reader looks before deciding how to read the rest.
-    expect(Object.keys(json)[0]).toBe('formatVersion');
+    expect(Object.keys(json).slice(0, 5)).toEqual(['tool', 'toolVersion', 'command', 'schemaVersion', 'formatVersion']);
     expect(formatQueryJson(report)).toContain('\n  "root": ');
   });
 });
