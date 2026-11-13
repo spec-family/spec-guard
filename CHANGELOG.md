@@ -69,6 +69,18 @@ is deprecated before it goes, is spec-core's
 
 ### Fixed
 
+- **A regex rule that backtracks without end no longer hangs a run or the
+  MCP server.** `symbol="(a+)+$" regex="true"` over thirty `a`s and a `!`
+  held the scanner until CI killed it, under ripgrep too. A regex rule's
+  match on each file now runs within a time budget, a second and a second
+  more for each MiB, and a file it was stopped on is `timed-out` in
+  `skipped`: a gap, which `--strict` fails on as it does on an unreadable
+  file, and a plain run names. V8's linear engine refuses the look-around and
+  the `v` flag a rule is built with, so it could not take the match over.
+  SECURITY.md says what a spec can cost
+  ([ADR-0007](https://github.com/spec-family/spec-guard/blob/main/docs/adr/0007-search-scope.md#amended-2026-11-12-a-regex-rule-runs-within-a-time-budget),
+  amended 2026-11-12).
+
 - **`types="ignore"` leaves out what only a type checker reads.** A
   TypeScript import type, `type T = import('./a').X` or
   `typeof import('./a')`, was read as a load, so a cycle the compiler
