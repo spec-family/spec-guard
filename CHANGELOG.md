@@ -10,7 +10,19 @@ what to do when upgrading; the family's policy, including how a flag or field
 is deprecated before it goes, is spec-core's
 [ADR-0009](https://github.com/spec-family/spec-core/blob/main/docs/adr/0009-versions-before-1-0.md).
 
-## Unreleased
+## 0.35.0
+
+What an import or layer rule could not follow by path, a file over 20 MiB,
+a spec in UTF-16 and a target found only because the filesystem ignores
+case are said rather than passed over; a regex rule that backtracks without
+end runs within a time budget; every JSON document starts with the family's
+envelope; the MCP server's answers are bounded, `check_architecture` reads
+unsaved files and refuses a path that is not there, and `check_claims`
+joins it; and `prove` scans a file once for each rule and proves rules at
+once. Round 29 is a format freeze: no JSON field is renamed or removed, and
+no exit code changes its meaning. A missing target that fails its rule is
+no longer repeated in `warnings`, and a file a regex rule's budget stopped
+is a gap `--strict` fails on, where the run hung before.
 
 ### Added
 

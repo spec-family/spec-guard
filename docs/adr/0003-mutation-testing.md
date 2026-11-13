@@ -1558,6 +1558,49 @@ ran high where they were least measured: `runner.ts` and `text.ts` took 7m35s
 against 15.2 minutes, and `cli.ts` alone 8m18s against 15.1, so the next
 split starts from this run's logs rather than 398fe94's.
 
+### 0.35.0: an equivalent that was not, and five that are
+
+CI's full sweep of db398ad (run 43457852467) came out at **99.27% over
+16,757 mutants with 121 survivors and 1 without coverage**, 240 of them
+detected by timeout; the shards took from 11m30s to 22m26s. Against
+0.34.0's sweep of ad46b21 (run 43088584968), 115 survivors and 1 without
+coverage over 15,761:
+
+- the release has 996 mutants more, those of round 29's pull requests: 263
+  in `src/blind.ts`, which is new, the aliases and module paths an import
+  or layer rule could not follow; 235 in `src/mcp.ts`, the server's bounds,
+  unsaved contents and `check_claims`; 119 in `src/runner.ts` and 81 in
+  `src/reporter.ts`, which say the blind spots and write the envelope; 59
+  in `src/polyglot.ts`, `types="ignore"` over import types and
+  `TYPE_CHECKING`; 47 each in `src/engine.ts`, the regex budget and a file
+  over 20 MiB, and `src/io.ts`, a path read in the case the disk spells
+  it; 146 more across nine other files; and one fewer in `src/cites.ts`;
+- main's sweep of 525d1ae (run 43445693162), after the last of the round's
+  merges, left 25 undetected that 0.34.0's sweep did not, and #125 settled
+  each. Twenty are killed. One of them, the look below a pattern's folder
+  in `src/blind.ts` kept with no filter, its comment had called
+  equivalent; it is not, since a file kept for the next level takes one of
+  its 64 places, so a folder of 64 files left the folder beside them
+  unread. Nine are the blind spot's annotation, its identity and its
+  message, which no test read whole; four are the missing-target warning
+  of a structure and an import rule under `--allow-missing-targets` with
+  every target present, which #123 had held for a text rule alone; five are
+  the singular and plural of the patterns and layers a blind spot names;
+  and one is `compareWalkOrder` with its first path split by character,
+  which the sort test passed in the order the sort asked about the pair.
+  The other five are equivalent, each said beside its code, and are this
+  sweep's new survivors: the regex budget's `finally` emptied, a literal
+  rule run inside the budget (`if (!regex)` made `false`, and its block
+  emptied), the MCP server's overlay of nothing, and Python's
+  `TYPE_CHECKING` guard ended outside a block;
+- one survivor more is `target === '.'` made `true` in `src/impact.ts`,
+  the equivalent its comment names, which 0.34.0's sweep detected and this
+  one did not, as it has gone both ways since 0.18.1. No survivor is gone.
+
+Each of the round's pull requests was swept incrementally before it
+merged, and each ended with every undetected mutant of its own lines killed
+or said equivalent beside its code.
+
 ### 0.34.0: the shards moved, and the equivalent flips back
 
 CI's full sweep of 4566965 (run 43065997393) came out at **99.26% over
