@@ -13,9 +13,11 @@
  */
 
 import { toPosix } from './glob.js';
-import { formatImpact, ImpactError, impactDocument, impactOf } from './impact.js';
-import { nodeIo, readText } from './io.js';
-import { formatReport, unmatchedClause } from './reporter.js';
+import { ClaimsError, findClaimsReport, type ClaimsConfig } from './claims.js';
+import { formatImpact, ImpactError, impactDocument, impactOf, type ImpactPath } from './impact.js';
+import { nodeIo, readText, type Io } from './io.js';
+import { overlayIo } from './overlay.js';
+import { formatClaims, formatReport, unmatchedClause } from './reporter.js';
 import { elapsed, runSpecGuard, type RunOptions } from './runner.js';
 import {
   answerQuery,
@@ -75,10 +77,31 @@ export const INSTRUCTIONS =
   'imports it must not make, the layer it belongs to, what it must be named and the files it needs beside it, text it must not contain. ' +
   'Before changing a file that other files import - renaming or removing an export, changing what a function takes or returns - ' +
   'call get_dependents with its path to learn every file the change can reach and the rules in force over them. ' +
-  'After changing files, call check_architecture with their paths to find violations before CI does. ' +
+  'After changing files, call check_architecture with their paths to find violations before CI does; ' +
+  'pass a file not yet saved, a spec among them, in contents, and a spec\'s own rules are checked when its path is given. ' +
+  'Where the project labels its claims, check_claims holds each to the evidence its label asks for. ' +
   'Rules in draft, proposed, rejected, deprecated, superseded or archived documents - the status written in English, such as status: superseded - are not in force and are only counted.';
 
 const READ_ONLY = { readOnlyHint: true, idempotentHint: true, openWorldHint: false };
+
+/**
+ * A tool's `outputSchema`: an object holding at least these keys. Declared so
+ * a client can tell structured content from text and hold it to a shape;
+ * no deeper than the keys a reader starts from, since each document's full
+ * shape is the reference's, and a schema that restated it would be a second
+ * copy to drift.
+ */
+function answer(required: readonly string[]): JsonObject {
+  return { type: 'object', required: [...required], additionalProperties: true };
+}
+
+/**
+ * How many dependents of a path `get_dependents` lists unless asked for
+ * another number. A chain of 5,000 files answered with 571 KB of text and
+ * 26 MB of structured content (round 29), which no model can read; the rest
+ * are counted, never dropped without a word.
+ */
+export const MAX_DEPENDENTS = 200;
 
 const GET_RULES = {
   name: 'get_architectural_rules',
@@ -95,16 +118,22 @@ const GET_RULES = {
     properties: {
       path: {
         type: 'string',
-        description: 'A file or directory, relative to the project root or absolute inside it.',
+        description: 'A file or directory, relative to the project root or absolute inside it. Give this or paths.',
+      },
+      paths: {
+        type: 'array',
+        items: { type: 'string' },
+        minItems: 1,
+        description: 'Several files or directories, each answered in turn. Give this or path.',
       },
       include_inactive: {
         type: 'boolean',
         description: 'Also list rules from draft, proposed, rejected, deprecated, superseded and archived documents, the status written in English.',
       },
     },
-    required: ['path'],
     additionalProperties: false,
   },
+  outputSchema: answer(['root', 'specFiles', 'results', 'documents', 'errors']),
   annotations: READ_ONLY,
 };
 
@@ -114,18 +143,26 @@ const CHECK_ARCHITECTURE = {
   description:
     'Runs the architecture rules in force against the files on disk and reports every violation, as CI would. ' +
     'Given paths, runs only the rules that govern them - each over its whole scope, so a count or a cycle is judged ' +
-    'exactly as CI judges it - and marks which violations lie in those paths. Save your edits before calling.',
+    'exactly as CI judges it - and marks which violations lie in those paths. A path that is a spec document runs the rules it states too, ' +
+    'so a directive just written can be seen to hold. A file not saved yet is checked from contents, in memory; ' +
+    'a path that is neither on disk nor in contents is refused, since no rule can be checked for it.',
   inputSchema: {
     type: 'object',
     properties: {
       paths: {
         type: 'array',
         items: { type: 'string' },
-        description: 'Files or directories to check the rules of, relative to the project root. Omit to run every rule.',
+        description: 'Files or directories to check the rules of, relative to the project root. Omit to run every rule, or the rules of the files in contents.',
+      },
+      contents: {
+        type: 'object',
+        additionalProperties: { type: 'string' },
+        description: 'Files as they would be saved, by path relative to the project root, read in place of what is on disk. Nothing is written.',
       },
     },
     additionalProperties: false,
   },
+  outputSchema: answer(['ok', 'paths', 'rules', 'failures', 'errors']),
   annotations: READ_ONLY,
 };
 
@@ -159,15 +196,37 @@ const GET_DEPENDENTS = {
         type: 'boolean',
         description: 'Also list rules from draft, proposed, rejected, deprecated, superseded and archived documents, the status written in English.',
       },
+      max_files: {
+        type: 'integer',
+        minimum: 1,
+        description: `List at most this many dependents of each path, the nearest first, and count the rest in truncated. Default ${MAX_DEPENDENTS}.`,
+      },
+      summary: {
+        type: 'boolean',
+        description: 'Count the dependents of each path in truncated and list none of them.',
+      },
     },
     required: ['paths'],
     additionalProperties: false,
   },
+  outputSchema: answer(['root', 'results', 'rules']),
+  annotations: READ_ONLY,
+};
+
+const CHECK_CLAIMS = {
+  name: 'check_claims',
+  title: 'Check the labelled claims',
+  description:
+    'Holds each claim the project\'s specifications label - Implemented, Specified and the rest, as the configuration\'s "claims" names them - ' +
+    'to the evidence its label asks for: a directive under it that names a test and can be shown to fail, a criterion, one label each. ' +
+    'Reports every claim that falls short, with what to do. Refused where the project configures no claims.',
+  inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+  outputSchema: answer(['ok', 'totals', 'claims', 'findings']),
   annotations: READ_ONLY,
 };
 
 /** What `tools/list` answers, in the order it lists them. */
-export const TOOLS: readonly JsonObject[] = [GET_RULES, CHECK_ARCHITECTURE, GET_DEPENDENTS];
+export const TOOLS: readonly JsonObject[] = [GET_RULES, CHECK_ARCHITECTURE, GET_DEPENDENTS, CHECK_CLAIMS];
 
 export const RULES_URI = 'spec://rules';
 export const DOCUMENT_URI_PREFIX = 'spec://doc/';
@@ -222,7 +281,9 @@ export interface McpServerOptions {
    * the command line reports it, so an agent can see which exclusions a file
    * set.
    */
-  settings?: () => Promise<{ patterns: readonly string[]; run: Omit<RunOptions, 'patterns' | 'root' | 'select'>; config?: ConfigUse }>;
+  settings?: () => Promise<{ patterns: readonly string[]; run: Omit<RunOptions, 'patterns' | 'root' | 'select'>; config?: ConfigUse; claims?: ClaimsConfig }>;
+  /** The claims check's entry, when `settings` gives none: the configuration's "claims". */
+  claims?: ClaimsConfig;
   /** Reads a spec document. Injected so an unreadable one can be tested. */
   readFile?: (file: string) => Promise<string>;
   /**
@@ -246,7 +307,7 @@ function tool(descriptor: JsonObject & { name: string }, run: (args: JsonObject)
     descriptor,
     call: (args) =>
       run(args).catch((error: unknown) => {
-        if (error instanceof QueryPathError || error instanceof ImpactError) return toolError(error.message);
+        if (error instanceof QueryPathError || error instanceof ImpactError || error instanceof ClaimsError) return toolError(error.message);
         throw error;
       }),
   };
@@ -261,8 +322,8 @@ function tool(descriptor: JsonObject & { name: string }, run: (args: JsonObject)
 export function createMcpHandler(options: McpServerOptions): (message: unknown) => Promise<OutgoingMessage | null> {
   const readFile = options.readFile ?? ((file: string) => readText(nodeIo, file));
   /** The settings a request is answered under, read when the request arrives. */
-  const current = async (): Promise<{ patterns: readonly string[]; run: McpServerOptions['run']; config?: ConfigUse }> =>
-    options.settings ? options.settings() : { patterns: options.patterns, run: options.run };
+  const current = async (): Promise<{ patterns: readonly string[]; run: McpServerOptions['run']; config?: ConfigUse; claims?: ClaimsConfig }> =>
+    options.settings ? options.settings() : { patterns: options.patterns, run: options.run, claims: options.claims };
   // Every request reads the specs, and parsing them was most of what a query
   // cost; a document whose bytes have not changed since the last request is
   // not parsed again (ADR-0012's amendment of 2026-09-27). The memo holds the
@@ -302,31 +363,56 @@ export function createMcpHandler(options: McpServerOptions): (message: unknown) 
       : `${text}\n\nNote: ${unmatchedClause(unmatched)} under ${options.root}, so this answer holds no rule from ${unmatched.length === 1 ? 'it' : 'them'}. A --spec the server was started with, or the project's "specs", names documents that are not there.`;
 
   async function getRules(args: JsonObject): Promise<ToolOutcome> {
-    const unknown = unknownArguments(args, ['path', 'include_inactive']);
+    const unknown = unknownArguments(args, ['path', 'paths', 'include_inactive']);
     if (unknown) return unknown;
-    if (typeof args['path'] !== 'string') return toolError('"path" is required and must be a string.');
+    const many = args['paths'];
+    if (many !== undefined && !(Array.isArray(many) && many.length > 0 && many.every((entry) => typeof entry === 'string'))) {
+      return toolError('"paths" must be a non-empty array of strings.');
+    }
+    if (many !== undefined && args['path'] !== undefined) return toolError('Give "path" or "paths", not both.');
+    const single = args['path'];
+    if (many === undefined && typeof single !== 'string') return toolError('"path" is required and must be a string, or "paths" an array of them.');
+    const asked = many === undefined ? [single as string] : (many as string[]);
     const settings = await current();
     // A list is no `true`: the documents it names are read in force already.
     const includeInactive = args['include_inactive'] ?? settings.run?.ignoreStatus === true;
     if (typeof includeInactive !== 'boolean') return toolError('"include_inactive" must be true or false.');
 
     const startedAt = performance.now();
-    const query = await resolveQueryPath(args['path'], options.root);
+    const queries = await Promise.all(asked.map((entry) => resolveQueryPath(entry, options.root)));
     const ruleSet = await loadRuleSet(ruleSetOptions(settings));
     if (ruleSet.specFiles.length === 0) return noSpecs(settings.patterns);
-    const report = { ...answerQuery(ruleSet, [query], includeInactive), durationMs: elapsed(startedAt), config: settings.config };
+    const report = { ...answerQuery(ruleSet, queries, includeInactive), durationMs: elapsed(startedAt), config: settings.config };
     return { text: noted(formatQuery(report), report.unmatchedSpecs), structured: { ...report } };
   }
 
   async function checkArchitecture(args: JsonObject): Promise<ToolOutcome> {
-    const unknown = unknownArguments(args, ['paths']);
+    const unknown = unknownArguments(args, ['paths', 'contents']);
     if (unknown) return unknown;
     const rawPaths = args['paths'];
     if (rawPaths !== undefined && !(Array.isArray(rawPaths) && rawPaths.every((entry) => typeof entry === 'string'))) {
       return toolError('"paths" must be an array of strings.');
     }
-    const paths: QueryPath[] | undefined =
-      rawPaths === undefined ? undefined : await Promise.all((rawPaths as string[]).map((entry) => resolveQueryPath(entry, options.root)));
+    const contents = args['contents'];
+    if (contents !== undefined && !(typeof contents === 'object' && contents !== null && !Array.isArray(contents) && Object.values(contents).every((text) => typeof text === 'string'))) {
+      return toolError('"contents" must be an object of file paths to their text.');
+    }
+    // Unsaved files, read in memory in place of the disk, through the door
+    // prove reads its violations through: nothing is written.
+    const given = contents ?? {};
+    const unsaved = Object.entries(given as Record<string, string>);
+    const written = await Promise.all(unsaved.map(async ([file, text]): Promise<[string, string]> => [(await resolveQueryPath(file, options.root)).path, text]));
+    // An overlay of nothing reads what the disk holds, so `false` here is an
+    // equivalent mutant: the door is only spared.
+    const io: Io = written.length === 0 ? nodeIo : overlayIo(nodeIo, options.root, { write: new Map(written), remove: new Set() });
+    const asked = rawPaths === undefined ? (written.length === 0 ? undefined : written.map(([file]) => file)) : (rawPaths as string[]);
+    const paths: Array<QueryPath & { exists: boolean }> | undefined = asked === undefined ? undefined : await Promise.all(asked.map((entry) => resolveQueryPath(entry, options.root, io)));
+    // A path that is not there governs no rule's files and states no rule:
+    // checked, it passed, which said nothing true about it (round 29).
+    const absent = (paths ?? []).filter((query) => !query.exists).map((query) => query.path);
+    if (absent.length > 0) {
+      return toolError(`${absent.map((file) => `"${file}"`).join(', ')} ${absent.length === 1 ? 'is' : 'are'} not on disk, so no rule can be checked for ${absent.length === 1 ? 'it' : 'them'}: save ${absent.length === 1 ? 'it' : 'them'} first, or pass ${absent.length === 1 ? 'its' : 'their'} text in "contents".`);
+    }
 
     const settings = await current();
     let inForce = 0;
@@ -335,9 +421,14 @@ export function createMcpHandler(options: McpServerOptions): (message: unknown) 
       patterns: settings.patterns,
       root: options.root,
       documents,
+      // Only for unsaved contents: a run handed a door reads with the scanner,
+      // and one given none chooses its engine as the command line does.
+      ...(written.length === 0 ? {} : { io }),
       select: (assertion) => {
         inForce += 1;
-        return paths === undefined || paths.some((query) => governs(assertion, query));
+        // A rule that governs a path, or one a path states: a spec asked
+        // about by its path runs its own rules, which govern other files.
+        return paths === undefined || paths.some((query) => governs(assertion, query) || assertion.location.relativeFile === query.path);
       },
     });
     if (report.summary.specs === 0) return noSpecs(settings.patterns);
@@ -345,7 +436,7 @@ export function createMcpHandler(options: McpServerOptions): (message: unknown) 
     const scope =
       paths === undefined
         ? `all ${inForce} rules in force`
-        : `${report.summary.total} of ${inForce} rules in force - the ones that govern ${paths.map((query) => query.path).join(', ')}`;
+        : `${report.summary.total} of ${inForce} rules in force - the ones that govern or are stated in ${paths.map((query) => query.path).join(', ')}`;
     const structured = {
       ok: report.ok,
       // Why `ok` is false when nothing failed, under strict: see ADR-0010.
@@ -398,7 +489,7 @@ export function createMcpHandler(options: McpServerOptions): (message: unknown) 
    * not depend on them; the report says no rules are shown.
    */
   async function getDependents(args: JsonObject): Promise<ToolOutcome> {
-    const unknown = unknownArguments(args, ['paths', 'depth', 'include_inactive']);
+    const unknown = unknownArguments(args, ['paths', 'depth', 'include_inactive', 'max_files', 'summary']);
     if (unknown) return unknown;
     const paths = args['paths'];
     if (!Array.isArray(paths) || paths.length === 0 || !paths.every((entry) => typeof entry === 'string')) {
@@ -408,12 +499,16 @@ export function createMcpHandler(options: McpServerOptions): (message: unknown) 
     if (depth !== undefined && !(Number.isInteger(depth) && (depth as number) >= 1)) {
       return toolError('"depth" must be a whole number of 1 or more: a depth of 0 would follow no import.');
     }
+    const most = args['max_files'] ?? MAX_DEPENDENTS;
+    if (!(Number.isInteger(most) && (most as number) >= 1)) return toolError('"max_files" must be a whole number of 1 or more.');
+    const summary = args['summary'] ?? false;
+    if (typeof summary !== 'boolean') return toolError('"summary" must be true or false.');
     const settings = await current();
     // A list is no `true`: the documents it names are read in force already.
     const includeInactive = args['include_inactive'] ?? settings.run?.ignoreStatus === true;
     if (typeof includeInactive !== 'boolean') return toolError('"include_inactive" must be true or false.');
 
-    const report = {
+    const whole = {
       ...(await impactOf({
         ...ruleSetOptions(settings),
         paths: paths as string[],
@@ -423,9 +518,31 @@ export function createMcpHandler(options: McpServerOptions): (message: unknown) 
       })),
       config: settings.config,
     };
+    const report = { ...whole, results: whole.results.map((result) => bounded(result, summary ? 0 : (most as number))) };
     // With no spec at all the report says so itself, as it always has.
     const unmatched = report.specFiles.length === 0 ? undefined : report.unmatchedSpecs;
     return { text: noted(formatImpact(report), unmatched), structured: { ...impactDocument(report, { version: options.version }) } };
+  }
+
+  async function checkClaims(args: JsonObject): Promise<ToolOutcome> {
+    const unknown = unknownArguments(args, []);
+    if (unknown) return unknown;
+    const settings = await current();
+    if (settings.claims === undefined) {
+      return toolError('No claims are configured: name the documents and the labels in "claims", in .spec-guard.json or "specGuard" in package.json.');
+    }
+    const report = await findClaimsReport({
+      root: options.root,
+      config: settings.claims,
+      exclude: settings.run?.exclude,
+      ignoreStatus: settings.run?.ignoreStatus,
+      defaultSkips: settings.run?.defaultSkips,
+      comments: settings.run?.comments,
+    });
+    const structured = { ok: report.ok, totals: report.totals, claims: report.claims, findings: report.findings, prose: report.prose, files: report.files, unmatched: report.unmatched, config: settings.config };
+    // Verbose, since a client has no --verbose to ask for where a label
+    // stands in prose; plain and ASCII, as every answer's text is.
+    return { text: formatClaims(report, { color: false, verbose: true, ascii: true }), structured };
   }
 
   function rulesResource(ruleSet: RuleSet): JsonObject {
@@ -496,9 +613,18 @@ export function createMcpHandler(options: McpServerOptions): (message: unknown) 
     name: SERVER_NAME,
     version: options.version,
     instructions: INSTRUCTIONS,
-    tools: [tool(GET_RULES, getRules), tool(CHECK_ARCHITECTURE, checkArchitecture), tool(GET_DEPENDENTS, getDependents)],
+    tools: [tool(GET_RULES, getRules), tool(CHECK_ARCHITECTURE, checkArchitecture), tool(GET_DEPENDENTS, getDependents), tool(CHECK_CLAIMS, checkClaims)],
     resources,
   });
+}
+
+/**
+ * A path's dependents, at most `most` of them, the nearest first, and how
+ * many were left out in `truncated`, which is there only when some were.
+ */
+function bounded(result: ImpactPath, most: number): ImpactPath {
+  if (result.dependents.length <= most) return result;
+  return { ...result, dependents: result.dependents.slice(0, most), truncated: result.dependents.length - most };
 }
 
 /* -------------------------------------------------------------------- stdio */

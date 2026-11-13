@@ -368,7 +368,7 @@ describe.skipIf(!built)('spec-guard mcp, as a client launches it', () => {
     expect(messages.map((message) => message.id).sort()).toEqual([1, 2, 3, 4]);
     const byId = new Map(messages.map((message) => [message.id, message.result]));
     expect(byId.get(1)).toMatchObject({ protocolVersion: '2025-11-25', serverInfo: { name: 'spec-guard' } });
-    expect((byId.get(2)?.['tools'] as Array<{ name: string }>).map((entry) => entry.name)).toEqual(['get_architectural_rules', 'check_architecture', 'get_dependents']);
+    expect((byId.get(2)?.['tools'] as Array<{ name: string }>).map((entry) => entry.name)).toEqual(['get_architectural_rules', 'check_architecture', 'get_dependents', 'check_claims']);
     const rules = byId.get(3)?.['structuredContent'] as { results: Array<{ rules: Array<{ kind: string }> }> };
     expect(rules.results[0]?.rules.map((rule) => rule.kind)).toContain('assert-layers');
     // The server's own dependents: the command line and the server import impact.

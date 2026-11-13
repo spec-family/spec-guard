@@ -107,14 +107,18 @@ to its checks.
 
 | Tool | What it does |
 | --- | --- |
-| `get_architectural_rules(path, include_inactive?)` | The query above, as text and as structured content |
-| `check_architecture(paths?)` | A run. Given paths, only the rules that govern them, each over its whole scope, with every violation marked as in those paths or not |
-| `get_dependents(paths, depth?, include_inactive?)` | [`impact`](impact.md): the files that import each path, however far away, with the import that leads there, the imports that could not be followed, and the rules in play. The structured content is the document `impact --json` writes |
+| `get_architectural_rules(path \| paths, include_inactive?)` | The query above, for one path or several, as text and as structured content |
+| `check_architecture(paths?, contents?)` | A run. Given paths, only the rules that govern them, and the rules a spec states when the path is the spec's, each over its whole scope, with every violation marked as in those paths or not. `contents` holds files not yet saved, by path, read in memory in place of the disk, a spec among them; nothing is written. A path neither on disk nor in `contents` is refused, since no rule can be checked for it |
+| `get_dependents(paths, depth?, include_inactive?, max_files?, summary?)` | [`impact`](impact.md): the files that import each path, however far away, with the import that leads there, the imports that could not be followed, and the rules in play. The structured content is the document `impact --json` writes. At most `max_files` dependents of each path are listed, 200 unless asked, the nearest first, and the rest are counted in `truncated`; `summary` lists none and counts them all |
+| `check_claims()` | [`claims`](claims.md): each labelled claim held to the evidence its label asks for, under the configuration's `"claims"`; refused where there are none |
 
-All three are marked read-only, idempotent and closed-world. The server's
+All four are marked read-only, idempotent and closed-world, and each
+declares an `outputSchema`: an object, with the keys its structured content
+starts from. The server's
 instructions tell an agent when to call each: the rules before creating or
-changing a file, the dependents before changing a file others import, and the
-check after changing files.
+changing a file, the dependents before changing a file others import, the
+check after changing files, an unsaved one in `contents`, and the claims
+where the project labels them.
 
 The server starts whatever its patterns match, since a spec may be written
 while it runs. Where no spec file matches, the first two tools answer with an

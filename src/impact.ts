@@ -240,6 +240,11 @@ export interface ImpactPath {
   /** Why no dependent can be shown for this path, when none can. */
   note?: string;
   dependents: ImpactDependent[];
+  /**
+   * Dependents found and not listed, the farthest, where the MCP server was
+   * asked for fewer (`max_files`, `summary`). Absent when every one is listed.
+   */
+  truncated?: number;
 }
 
 export interface ImpactReport {
@@ -449,10 +454,13 @@ export function formatImpact(report: ImpactReport): string {
     }
     const direct = result.dependents.filter((dependent) => dependent.depth === 1).length;
     const deepest = result.dependents.reduce((most, dependent) => Math.max(most, dependent.depth), 0);
+    const left = result.truncated ?? 0;
     out.push(
-      result.dependents.length === 0
-        ? '  nothing in scope imports it'
-        : `  ${plural(result.dependents.length, 'file depends', 'files depend')} on it, ${direct} directly${deepest > 1 ? `, up to ${deepest} imports away` : ''}`,
+      left > 0
+        ? `  ${plural(result.dependents.length + left, 'file depends', 'files depend')} on it; ${result.dependents.length === 0 ? 'none is listed' : `the nearest ${result.dependents.length} are listed`}, and ${left} more counted`
+        : result.dependents.length === 0
+          ? '  nothing in scope imports it'
+          : `  ${plural(result.dependents.length, 'file depends', 'files depend')} on it, ${direct} directly${deepest > 1 ? `, up to ${deepest} imports away` : ''}`,
     );
     const width = Math.max(0, ...result.dependents.map((dependent) => displayWidth(dependent.file)));
     for (const dependent of result.dependents) {
